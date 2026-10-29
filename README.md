@@ -5,6 +5,18 @@
 
 ---
 
+## 👋 NEW TEAMMATES: START HERE FIRST!
+
+Don't get overwhelmed by the medical research! Start with our **Simple 3-Minute Visual Guide**, then open **your own personal playbook**:
+
+- 🌟 **[00-START-HERE-SIMPLE-GUIDE.md](./docs/00-START-HERE-SIMPLE-GUIDE.md)** — *Plain-English visual summary of the whole project in 3 minutes.*
+- 🧑‍💻 **[Member 1 Personal Playbook (Astronaut Simulator & Smart Alarm)](./team-guides/MEMBER-1-GUIDE.md)**
+- 🧠 **[Member 2 Personal Playbook (AI Space Doctor / RAG & Med-Kit)](./team-guides/MEMBER-2-GUIDE.md)**
+- 📈 **[Member 3 Personal Playbook (Frontend Charts, Crew Cards & Crisis Buttons)](./team-guides/MEMBER-3-GUIDE.md)**
+- 🩺 **[Member 4 Personal Playbook (Frontend AI Doctor Panel, Checklist & Pitch)](./team-guides/MEMBER-4-GUIDE.md)**
+
+---
+
 ## 📌 Project Overview
 
 **A.R.E.S. Med** (*Autonomous Real-time Extraterrestrial Survival & Medical System*) is a three-layer, closed-loop autonomous biomedical telemetry and clinical decision support platform designed for NASA Level V deep-space exploration missions (Artemis cis-lunar & Mars transit) where communication delays up to 20 minutes one-way and solar conjunction blackouts prevent real-time flight surgeon intervention.
