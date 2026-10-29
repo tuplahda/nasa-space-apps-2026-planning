@@ -1,77 +1,74 @@
-# 🧑‍💻 Member 1 Personal Playbook: Astronaut Simulator & Smart Alarm
+# 🧑‍💻 Member 1 Guide: Autonomous Astronaut Agent(s)
 
-**Your Role in Plain English:** You build the **heartbeat of the backend**. Every 1 second, your Python code generates realistic health numbers for 4 astronauts and checks if their numbers are safe or dangerous in zero-gravity.
-
-> 💡 **What you do NOT need to worry about:** You do **not** touch the Frontend UI, and you do **not** build the RAG AI or LLM prompts. You just generate the astronaut numbers and check if they cross the thresholds in [`data/nasa_baselines_and_thresholds.json`](../data/nasa_baselines_and_thresholds.json)!
+## 🎯 Your Goal
+Build the **Astronaut Agent(s)** that simulate real astronauts on a deep-space mission and output **dynamic, non-hardcoded health telemetry and status logs**.
 
 ---
 
-## 1. Visual Diagram of Your Exact Job
+## 🤖 How Your Astronaut Agent Works
 
 ```mermaid
 flowchart TD
-    BTN["Member 3 UI:<br/>Judge clicks 'Inject CO2 Crisis'<br/>or '30x Speed'"] -->|"Sets active_scenario"| LOOP
+    ENV["Environment Inputs<br/>• Live NASA DONKI Solar API<br/>• Cabin CO2 & O2 levels<br/>• Current Activity (Sleep / Spacewalk / Exercise / Rest)"] --> AGENT
 
-    subgraph YOUR_CODE["YOUR CODE (Layer 1 & Layer 2 in Python)"]
-        LOOP["1-Second Timer Loop<br/>(astronaut_agent.py)"]
-        MATH["Calculate Vitals:<br/>Base + Anomaly Math + Tiny Random Noise"]
-        CHECK["Check Thresholds:<br/>Compare against nasa_baselines_and_thresholds.json<br/>based on Activity (SLEEP / REST / EXERCISE / EVA)"]
-        DONKI["Fetch NASA Solar Storm API<br/>(donki_client.py)"]
-        
-        LOOP --> MATH --> CHECK
-        DONKI --> CHECK
+    subgraph AGENT["Your Autonomous Astronaut Agent"]
+        STATE["Internal Biological State & Memory<br/>• Flight Day in Zero-G<br/>• Autonomous physiological state model<br/>• LLM / Generative Agent Brain"]
+        OUT["Dynamic Output Stream<br/>• Vitals: HR, SBP, DBP, SpO2, HRV, Temp, RR<br/>• First-Person Symptom Log"]
+        STATE --> OUT
     end
 
-    CHECK -->|"Every 1 sec:<br/>Send Contract A & B JSON"| M3["Member 3 Frontend<br/>(Draws Live Charts)"]
-    CHECK -->|"ONLY when Green turns Yellow/Red"| M2["Member 2 RAG AI<br/>(Generates Doctor Advice)"]
-    M4["Member 4 UI:<br/>Judge checks off treatment"] -->|"Triggers Recovery Mode"| LOOP
+    OUT -->|"Streams to"| M2["Member 2 (RAG Medical Agent)"]
+    OUT -->|"Streams to"| M3["Member 3 (Live Website Charts)"]
+    M4["Treatment Applied from RAG Doctor"] -->|"Updates Agent State<br/>(Dynamic Recovery)"| STATE
 ```
 
 ---
 
-## 2. How Your Code Works (Step-by-Step)
+## 🛠️ What You Build (3 Key Parts)
 
-### Part A: The 4 Astronaut Objects (`layer1_agents/astronaut_agent.py`)
-You create 4 astronauts in Python:
-1. **CDR Maya Lin** (`activity_state = "IVA_REST"`) — *Our main demo astronaut!*
-2. **PLT Alex Vance** (`activity_state = "ARED_EXERCISE"`) — *Shows high HR (`155 bpm`) is still GREEN during exercise!*
-3. **MS1 Dr. Elena Rossi** (`activity_state = "SLEEP"`)
-4. **MS2 Kenji Sato** (`activity_state = "EVA_SPACEWALK"`)
+### 1. Dynamic (Non-Hardcoded) Physiology & State Engine
+Instead of fixed `if/else` numbers, each Astronaut Agent maintains a continuous **biological state** that evolves based on:
+- **Real Physiological Waveforms & Baselines:** Seeded from **PhysioNet** datasets and the microgravity adaptation ranges in [`data/nasa_baselines_and_thresholds.json`](../data/nasa_baselines_and_thresholds.json).
+- **Activity & Environment Coupling:** The agent reacts naturally to what it is doing (`Sleeping`, `Spacewalk EVA`, `ARED Exercise`, `Habitat Rest`) and external stressors (like real solar flare data fetched from NASA's `https://api.nasa.gov/DONKI/` API or cabin $\text{CO}_2$ buildup).
 
-Every 1 second:
-- If `active_scenario == "NOMINAL"`, output normal microgravity numbers plus tiny random jitter (`random.uniform(-0.8, 0.8)`) so the graph looks alive.
-- If the judge clicks a crisis button (like `SCENARIO_1_HYPERCAPNIA`), increment time `t` and apply the simple formula from [`data/rag_protocols_8_scenarios.json`](../data/rag_protocols_8_scenarios.json):
-  ```python
-  delta_co2 = max(0.0, cabin_ppCO2 - 2.0)
-  hr_bpm = hr_base + 1.8 * delta_co2
-  sbp_mmHg = sbp_base + 1.4 * delta_co2
-  rr_bpm = rr_base + 0.45 * delta_co2
-  hrv_rmssd = hrv_base - 2.2 * delta_co2
-  ```
-- **When Member 4's UI sends a "Countermeasure Checked" signal:** Set `is_recovering = True` and smoothly move `cabin_ppCO2` and `hr_bpm` back to normal over 10 seconds!
+### 2. Agent Brain & First-Person Symptom Logs
+Using an LLM Agent (e.g., Gemini API / LangChain / CrewAI with structured JSON output), the Astronaut Agent interprets its own internal physiological shifts and emits realistic first-person updates, such as:
+> *"Working at the science glovebox for 90 minutes. Developing a throbbing frontal headache and finding it harder to focus on the screen."*
 
-### Part B: The Smart Alarm Filter (`layer2_edge/anomaly_detector.py`)
-You load [`data/nasa_baselines_and_thresholds.json`](../data/nasa_baselines_and_thresholds.json) and check:
-1. What is the astronaut's `activity_state`? (`SLEEP`, `IVA_REST`, `ARED_EXERCISE`, `EVA_SPACEWALK`)
-2. Are their `hr_bpm`, `sbp_mmHg`, `spo2_pct`, `cbt_C`, or `cabin_ppCO2_mmHg` outside the safe range for that activity?
-3. Calculate a `risk_score_0_100` (`0–30` = Green, `31–69` = Yellow Warning, `70–100` = Red Critical).
-4. **Important:** Only set `"trigger_rag_consultation": true` when the alert state **changes** (e.g., from `NOMINAL_GREEN` to `WARNING_YELLOW`) so you don't spam Member 2's AI every second!
-
-### Part C: NASA DONKI Solar Storm Fetcher (`layer2_edge/donki_client.py`)
-A simple 20-line function that calls:
-`https://api.nasa.gov/DONKI/SEP?api_key=YOUR_KEY` and `https://api.nasa.gov/DONKI/FLR?api_key=YOUR_KEY`
-*(Tip: Save a sample JSON response in a local file so if the hackathon Wi-Fi dies, your function loads the backup file automatically!)*
+### 3. Dynamic Reaction to Treatment
+When Member 2's RAG Medical Agent (or the user on the dashboard) applies a treatment—such as turning on backup $\text{CO}_2$ scrubbers, moving to the radiation storm shelter, or administering a medication—your Astronaut Agent receives that event in its memory and **dynamically stabilizes its vitals and symptom logs**.
 
 ---
 
-## 3. Your Personal Checklist
+## 📦 JSON Format Your Agent Outputs
+Every tick/update, your agent outputs a clean JSON object that Member 2 and Member 3 consume:
+```json
+{
+  "astronaut_id": "AST-01",
+  "name": "CDR Maya Lin",
+  "mission_day": 84,
+  "activity": "IVA_REST",
+  "environment": {
+    "cabin_co2_mmHg": 3.8,
+    "radiation_mSv_hr": 0.05,
+    "solar_storm_active": false
+  },
+  "vitals": {
+    "heart_rate_bpm": 88.4,
+    "systolic_bp_mmHg": 125.1,
+    "diastolic_bp_mmHg": 76.3,
+    "spo2_pct": 97.2,
+    "hrv_ms": 21.0,
+    "body_temp_C": 37.9,
+    "respiration_rate_bpm": 19.5
+  },
+  "agent_status_log": "Developing a throbbing frontal headache and mild facial flushing near the glovebox."
+}
+```
 
-### Before November 14 (2 Hours of Prep)
-- [ ] Get a free NASA API key at [https://api.nasa.gov/](https://api.nasa.gov/).
-- [ ] Open [`data/nasa_baselines_and_thresholds.json`](../data/nasa_baselines_and_thresholds.json) and [`data/rag_protocols_8_scenarios.json`](../data/rag_protocols_8_scenarios.json) to see the exact numbers and formulas already written for you.
-- [ ] Practice writing a 30-line Python script that prints a fake astronaut JSON dictionary every 1 second.
+---
 
-### During the Hackathon (Nov 14–15)
-- [ ] **Hours 0–3:** Return hardcoded `Contract A` and `Contract B` JSON so Member 3 can test their charts immediately.
-- [ ] **Hours 4–16:** Code the math for the 4 main demo scenarios (`Hypercapnia CO2`, `Solar Radiation Storm`, `EVA Heat/DCS`, `SANS/IJV Clot`) + the `1x / 30x` speed multiplier.
-- [ ] **Hours 16–24:** Add the **Recovery Loop** (when countermeasures are applied, numbers return to Green) and hook up the NASA DONKI API.
+## ✅ Pre-Hackathon Prep (Before Nov 14)
+- [ ] Get a free NASA API key at [https://api.nasa.gov/](https://api.nasa.gov/) to pull live solar weather into your agent's environment.
+- [ ] Review [`data/nasa_baselines_and_thresholds.json`](../data/nasa_baselines_and_thresholds.json) to see how zero-gravity shifts normal human vitals.
+- [ ] Test a small Python agent script that updates a state object and outputs the JSON structure above.
