@@ -1,8 +1,7 @@
-# 🚀 A.R.E.S. Med — NASA Space Apps Challenge 2026 (Planning & Research Hub)
+# 🚀 A.R.E.S. Med — NASA Space Apps Challenge 2026 (Master Planning & Data Repository)
 
 **Challenge:** [Create Health Monitoring Software for Astronauts on Space Missions](https://www.spaceappschallenge.org/2026/challenges/health-monitoring-software/?tab=resources)  
 **Hackathon Dates:** November 14–15, 2026  
-**Code Repository:** `ares-med-space-apps-2026` *(Hackathon Implementation Repo)*
 
 ---
 
@@ -21,8 +20,9 @@
 
 ---
 
-## 📂 Repository Structure
+## 📂 Complete Repository Index
 
+### 📖 Engineering & Architecture Documentation (`docs/`)
 | Document | Description |
 | :--- | :--- |
 | [`docs/01-nasa-space-medicine-research.md`](./docs/01-nasa-space-medicine-research.md) | Complete biomedical research reference: $1g$ vs. $\mu g$ physiological baselines, `NASA-STD-3001` environmental & radiation limits, 8 mathematical anomaly models, CHeCS drug protocols, and NASA Open Data/APIs (`DONKI`, `OSDR`, `SSM`, `PhysioNet`). |
@@ -30,6 +30,13 @@
 | [`docs/03-system-mechanics-deep-dive.md`](./docs/03-system-mechanics-deep-dive.md) | Deep-dive technical analysis of the Closed-Loop Countermeasure Feedback Cycle, Layer 1 state machine, Layer 2 Earth-vs-Space context gate, and Layer 3 dual-mode RAG + offline fallback engine. |
 | [`docs/04-rag-knowledge-base-schema.md`](./docs/04-rag-knowledge-base-schema.md) | Document schema and structured clinical protocol cards for all 8 spaceflight medical scenarios and CHeCS medical subpacks. |
 | [`docs/05-ui-ux-console-wireframe.md`](./docs/05-ui-ux-console-wireframe.md) | Screen layout, panel breakdown, interactive crisis injector controls, and 2-minute judge demo flow for the Mission Medical Console UI. |
+| [`docs/06-codebase-structure-and-tech-stack.md`](./docs/06-codebase-structure-and-tech-stack.md) | Day-1 application folder structure (`backend/` FastAPI + `frontend/` React/Vite) and tech stack blueprint for November 14. |
+
+### 📊 Structured Reference Datasets (`data/`)
+| Dataset | Description |
+| :--- | :--- |
+| [`data/nasa_baselines_and_thresholds.json`](./data/nasa_baselines_and_thresholds.json) | Machine-readable JSON of $1g$ upright vs. adapted $\mu g$ baselines, activity modifiers (`SLEEP`, `IVA_REST`, `EVA_SPACEWALK`, `ARED_EXERCISE`), Yellow/Red thresholds, and `NASA-STD-3001` environmental/radiation limits. |
+| [`data/rag_protocols_8_scenarios.json`](./data/rag_protocols_8_scenarios.json) | Ready-to-ingest RAG knowledge base containing all 8 mathematical anomaly scenarios, symptom progressions, `CHeCS` drug mappings, strict contraindications, and autonomous checklists. |
 
 ---
 

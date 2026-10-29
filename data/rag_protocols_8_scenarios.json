@@ -1,0 +1,273 @@
+[
+  {
+    "scenario_id": "SCENARIO_1_HYPERCAPNIA",
+    "title": "Acute and Chronic Hypercapnia (CO2 Toxicity & ECLSS Scrubbing Degradation)",
+    "nasa_citations": [
+      "NASA-STD-3001 Vol 2 Rev D [V2 6004]",
+      "OCHMO-TB-004 (Carbon Dioxide)",
+      "ISS Medical Checklist JSC-48522-E4"
+    ],
+    "layer1_equations": {
+      "delta_CO2": "max(0, ppCO2(t) - 2.0)",
+      "rr_bpm": "RR_base + 0.45 * delta_CO2",
+      "ve_L_min": "VE_base + 0.89 * delta_CO2",
+      "hr_bpm": "HR_base + 1.8 * delta_CO2",
+      "sbp_mmHg": "SBP_base + 1.4 * delta_CO2",
+      "dbp_mmHg": "DBP_base + 0.6 * delta_CO2",
+      "hrv_rmssd_ms": "HRV_base - 2.2 * delta_CO2",
+      "cognitive_correct_per_min": "55.0 - 0.107 * delta_CO2"
+    },
+    "symptoms_by_severity": {
+      "mild_2.8_to_3.5_mmHg": "Mild-to-moderate frontal headache, facial flushing, incipient lethargy.",
+      "moderate_3.5_to_4.5_mmHg": "Throbbing frontal headache requiring analgesics, chronic dry cough, blurred vision, cognitive slowing.",
+      "severe_above_4.5_mmHg": "Severe fatigue, malaise, nausea, exertional dyspnea, 5th cranial (trigeminal) nerve dysesthesia (facial numbness)."
+    },
+    "checs_medications": [
+      {
+        "drug": "Ibuprofen 400-600 mg PO or Acetaminophen 325-650 mg PO",
+        "pack": "Convenience Medications Pack (CMP)",
+        "contraindication": "STRICT CONTRAINDICATION: Do NOT administer opioids (Hydrocodone/Hydromorphone) — suppresses central respiratory drive and worsens CO2 retention."
+      }
+    ],
+    "autonomous_checklist": [
+      "Relocate crewmember out of low-ventilation compartment (Crew Quarters / Glovebox) immediately.",
+      "Deploy portable inter-module ventilation fans and run ECLSS diagnostics on CDRA 4BMS zeolite / CAMRAS amine beds.",
+      "If ppCO2 > 5.0 mmHg or trigeminal symptoms: deploy 100% O2 via demand mask (RSP) and run i-STAT venous blood gas (MDP).",
+      "Administer Ibuprofen 400 mg PO or Acetaminophen 650 mg PO from CMP (avoid opioids).",
+      "Suspend 75% VO2max ARED exercise and shift crew diet toward higher fat (RQ -> 0.85) to cut metabolic CO2 production by 20%."
+    ]
+  },
+  {
+    "scenario_id": "SCENARIO_2_SANS",
+    "title": "Spaceflight-Associated Neuro-Ocular Syndrome (SANS)",
+    "nasa_citations": [
+      "NASA HRP Evidence Book: SANS",
+      "NASA SANS Clinical Practice Guideline (CPG)",
+      "ISS Medical Checklist JSC-48522"
+    ],
+    "layer1_equations": {
+      "rnfl_um": "95 + 18 * ln(1 + max(0, flight_day - 15) / 30)",
+      "refraction_shift_D": "+0.25 * floor(max(0, flight_day - 21) / 25)",
+      "choroid_area_delta_mm2": "+0.09",
+      "choroid_volume_delta_mm3": "+0.37"
+    },
+    "symptoms_by_severity": {
+      "early_fd21_to_60": "Asymptomatic optic disc edema on OCT or progressive near-vision blurriness (holding displays at arm's length).",
+      "advanced_fd60_plus": "Persistent near-acuity degradation, dull retro-orbital pressure (worsened by CO2), metamorphopsia (straight-line distortion), scotomas."
+    },
+    "checs_medications": [
+      {
+        "drug": "Tropicamide / Cyclopentolate mydriatic ophthalmic drops",
+        "pack": "Topical and Injectable Medications Pack (TIMP)",
+        "contraindication": "Screen anterior chamber angle before mydriasis."
+      },
+      {
+        "drug": "Acetazolamide PO (for progressive Frisen Grade >= 1 optic disc edema)",
+        "pack": "Oral Medications Pack (OMP)",
+        "contraindication": "Monitor electrolytes on i-STAT and kidney stone risk."
+      }
+    ],
+    "autonomous_checklist": [
+      "Perform OCT (quantify RNFL > 105 um), Optical Biometry (axial length), Tonometry, and PanOptic Fundoscopy (MDP).",
+      "Prescribe adjustable Space Anticipation Glasses calibrated to +0.75 to +1.50 D hyperopic shift.",
+      "Initiate nightly Lower Body Negative Pressure (LBNP) therapy (reduces CVP to 1.2 mmHg and choroidal area expansion by 74%).",
+      "Apply Venoconstrictive Thigh Cuffs (VTCs), clamp cabin ppCO2 < 2.5 mmHg, and moderate peak ARED Valsalva loads."
+    ]
+  },
+  {
+    "scenario_id": "SCENARIO_3_ORTHOSTATIC_INTOLERANCE",
+    "title": "Orthostatic Intolerance and Gravitational Transition Pre-Syncope",
+    "nasa_citations": [
+      "NASA-STD-3001 Fitness-for-Duty Orthostatic Hypotension Standard (4.2.11)",
+      "ISS Medical Checklist JSC-48522"
+    ],
+    "layer1_equations": {
+      "sbp_mmHg": "112 - 28 * (1 - exp(-t / 1.8)) - step(t - 4) * 18 * (t - 4)",
+      "dbp_mmHg": "72 - 14 * (1 - exp(-t / 2.0)) - step(t - 4) * 10 * (t - 4)",
+      "hr_bpm": "t <= 4.5 ? 65 + 42 * (1 - exp(-t / 1.2)) : 46"
+    },
+    "symptoms_by_severity": {
+      "compensatory_1_to_3_min": "Postural lightheadedness, dizziness, palpitations, weakness, mild visual blurring.",
+      "presyncope_4_to_6_min": "Tunnel vision ('graying out'), diaphoresis, epigastric nausea, tinnitus, impending syncope."
+    },
+    "checs_medications": [
+      {
+        "drug": "0.9% Normal Saline 500-1000 mL IV + AstroAde / Salt Tablets PO",
+        "pack": "IV Supply Pack (ISP) & Convenience/Oral Pack",
+        "contraindication": "Monitor for volume overload."
+      },
+      {
+        "drug": "Ondansetron 4 mg ODT or Promethazine 25 mg IM/IV",
+        "pack": "Oral Medications Pack (OMP) / TIMP",
+        "contraindication": "Promethazine may cause sedation; co-administer judiciously."
+      }
+    ],
+    "autonomous_checklist": [
+      "Command crewmember into immediate supine, legs-elevated (Trendelenburg) posture to restore venous return.",
+      "Attach Inspiratory Threshold Valve (ITV / ITD) to facemask (RSP) — boosts stroke volume to 138 mL and cardiac output to 8.9 L/min.",
+      "Don lower-body compression garments and execute NASA Fluid Loading Protocol (1.0-1.5 L isotonic fluid).",
+      "If severe post-landing hypotension persists: infuse 500-1,000 mL 0.9% Normal Saline via CHeCS IV pump (ISP)."
+    ]
+  },
+  {
+    "scenario_id": "SCENARIO_4_SOLAR_RADIATION_ARS",
+    "title": "Acute Radiation Syndrome (ARS) from Solar Particle Event (SPE)",
+    "nasa_citations": [
+      "NASA-STD-3001 Vol 1 Rev C [V1 4030] Space Permissible Exposure Limits",
+      "NASA DONKI API (/DONKI/SEP & /DONKI/FLR)",
+      "ISS Medical Checklist JSC-48522"
+    ],
+    "layer1_equations": {
+      "bfo_dose_rate_mGy_hr": "0.054 + A_SPE * ((t - t0)/tau)^(k-1) * exp(-((t - t0)/tau)^k)",
+      "cbt_C": "CBT_base + 1.2 * (1 - exp(-(t - t_onset) / 3.0))",
+      "hr_bpm": "HR_base + 28 * (1 - exp(-(t - t_onset) / 2.0))",
+      "sbp_mmHg": "SBP_base - 16 * (1 - exp(-(t - t_onset) / 4.0))",
+      "alc_cells_uL": "2100 * exp(-0.035 * D_BFO_Sv * (t - t0))"
+    },
+    "symptoms_by_severity": {
+      "prodromal_1_to_6_hr": "Sudden anorexia, severe nausea, retching, repetitive vomiting, acute fatigue.",
+      "manifest_6_to_48_hr": "Throbbing headache, parotid gland tenderness, watery diarrhea, cutaneous erythema."
+    },
+    "checs_medications": [
+      {
+        "drug": "Ondansetron 4-8 mg ODT/IV, Levofloxacin 500 mg PO, Valacyclovir, Fluconazole, Acetaminophen",
+        "pack": "OMP & TIMP",
+        "contraindication": "STRICT CONTRAINDICATION: Avoid Aspirin and NSAIDs (Ibuprofen/Ketorolac) — radiation thrombocytopenia creates severe GI hemorrhage risk."
+      }
+    ],
+    "autonomous_checklist": [
+      "ALARA Protocol: Abort EVA immediately upon DONKI /FLR or /SEP notification; retreat to high-hydrogen Storm Shelter.",
+      "Administer Ondansetron 4-8 mg ODT/IV (OMP/TIMP) and initiate 0.9% Normal Saline IV rehydration (ISP) with i-STAT electrolytes.",
+      "Perform serial C2M2 offline Complete Blood Count (CBC) assays every 6 hours to track Andrews lymphocyte depletion kinetics.",
+      "Initiate prophylactic antimicrobials (Levofloxacin, Valacyclovir, Fluconazole) and use Acetaminophen (NO NSAIDs/Aspirin) for fever."
+    ]
+  },
+  {
+    "scenario_id": "SCENARIO_5_EVA_THERMAL_DCS",
+    "title": "EVA Thermal Strain ('Space Fever'), Dehydration, and Decompression Sickness (DCS)",
+    "nasa_citations": [
+      "NASA-STD-3001 Vol 1 & Vol 2 [V2 6006]",
+      "NASA EVA Probabilistic Risk Assessment (PRA)",
+      "ISS Medical Checklist JSC-48522"
+    ],
+    "layer1_equations": {
+      "cbt_C": "37.8 + 2.6 * (1 - exp(-t / 45))",
+      "hr_bpm": "125 + 0.55 * t",
+      "sbp_mmHg": "142 - 0.35 * t",
+      "dcs_spo2_pct": "88.0"
+    },
+    "symptoms_by_severity": {
+      "thermal_strain": "Profuse cranial sweat pooling across eyes, visor fogging, intense heat discomfort, muscle cramps, cognitive disorientation.",
+      "dcs_type_I_and_II": "Deep periarticular shoulder/knee pain ('the bends'), substernal burning chest pain, paroxysmal cough ('the chokes'), scotomas."
+    },
+    "checs_medications": [
+      {
+        "drug": "100% Oxygen (RSP) + 0.9% Normal Saline 1-2 L IV (ISP) + Ibuprofen 600 mg PO / Ketorolac 30 mg IV (TIMP)",
+        "pack": "RSP, ISP, CMP, TIMP",
+        "contraindication": "Rule out intracerebral hemorrhage before high-dose Ketorolac."
+      }
+    ],
+    "autonomous_checklist": [
+      "Order immediate EVA work-rest pause (reduce VO2 < 1,000 mL/min) and set LCVG cooling water flow to maximum.",
+      "Abort EVA, ingress airlock, and repressurize to 101.3 kPa (14.7 psia) to compress nitrogen microbubbles.",
+      "Doff spacesuit and apply active surface cooling packs (neck, axillae, groin) until CBT < 38.0 °C.",
+      "Place astronaut on 100% O2 via tight-fitting mask (RSP), infuse 1.0-2.0 L Normal Saline IV (ISP), and run i-STAT panel."
+    ]
+  },
+  {
+    "scenario_id": "SCENARIO_6_CIRCADIAN_SLEEP",
+    "title": "Circadian Desynchrony, Sleep Architecture Fragmentation, and Behavioral Asthenia",
+    "nasa_citations": [
+      "NASA Spaceflight Standard Measures (SSM) — Sleep & Cognition Test Battery (CTB)",
+      "NASA-STD-3001 [V2 6012] Thermal Comfort",
+      "ISS CHeCS Formulary"
+    ],
+    "layer1_equations": {
+      "sleep_onset_latency_min": "65",
+      "wake_after_sleep_onset_min": "72",
+      "total_sleep_time_hr": "4.6",
+      "nocturnal_cbt_C": "37.7",
+      "nocturnal_hr_bpm": "65",
+      "nocturnal_hrv_rmssd_ms": "17"
+    },
+    "symptoms_by_severity": {
+      "subacute_drift": "Difficulty falling asleep, frequent awakenings, daytime cognitive fog, slowed visual reaction speed (+30% on CTB).",
+      "acute_behavioral": "Irritability, declining motivation, acute anxiety or agitation crisis (>24 hours)."
+    },
+    "checs_medications": [
+      {
+        "drug": "Melatonin 3-5 mg PO, Zaleplon 5-10 mg PO (onset), or Zolpidem 5-10 mg PO (maintenance); Modafinil/Caffeine (daytime)",
+        "pack": "Oral Medications Pack (OMP) & CMP",
+        "contraindication": "If benzodiazepines (Lorazepam/Diazepam) are used for acute agitation, stage Flumazenil 0.1 mg/mL (EMTP) for reversal."
+      }
+    ],
+    "autonomous_checklist": [
+      "Configure dynamic solid-state lighting: 480 nm blue-enriched light upon waking; blue-depleted dim light 2 hours pre-sleep.",
+      "Cool Crew Quarters to 18-20 °C ([V2 6012]) and verify local sleep-station fan & ppCO2 < 2.5 mmHg.",
+      "Administer Melatonin 3 mg PO or Zaleplon 5-10 mg PO at bedtime (OMP); use Caffeine/Modafinil prior to critical EVA/docking.",
+      "Activate C2M2 offline VR relaxation, CBT modules, and asynchronous Private Psychological Conference."
+    ]
+  },
+  {
+    "scenario_id": "SCENARIO_7_IJV_THROMBOSIS_ARRHYTHMIA",
+    "title": "Spaceflight Venous Thromboembolism (IJV Thrombosis) and Cardiac Arrhythmia",
+    "nasa_citations": [
+      "ISS Vascular Contingency Pack Protocol",
+      "ISS Medical Checklist JSC-48522 (ACLS / CMRS)"
+    ],
+    "layer1_equations": {
+      "ijv_uncomplicated_hr_bpm": "84",
+      "pe_branch_hr_bpm": "128",
+      "pe_branch_spo2_pct": "88",
+      "vt_branch_hr_bpm": "185"
+    },
+    "symptoms_by_severity": {
+      "ijv_thrombosis": "Unilateral neck fullness, dull ache along sternocleidomastoid/clavicle, unilateral facial congestion, headache.",
+      "pe_or_vt": "Sudden pleuritic chest pain, acute resting dyspnea, palpitations, presyncopal dizziness."
+    },
+    "checs_medications": [
+      {
+        "drug": "Enoxaparin SC -> Apixaban PO (Vascular Contingency Pack); Metoprolol, Nitroglycerin, Epinephrine (EMTP)",
+        "pack": "Vascular Contingency Pack (VCP), OMP, EMTP",
+        "contraindication": "HIGH TRAUMA BLEED RISK: Immediately restrict EVA and high-load ARED exercise; stage Protamine (for Enoxaparin) and PCC (for Apixaban)."
+      }
+    ],
+    "autonomous_checklist": [
+      "Perform C2M2 AI-guided neck ultrasound to confirm IJV thrombus and assess compressibility/Doppler flow.",
+      "Initiate subcutaneous Enoxaparin followed by oral Apixaban from the Vascular Contingency Pack (VCP).",
+      "Lock out crewmember from EVA and high-load ARED resistive exercise; stage Protamine and PCC reversal agents.",
+      "If VT/VF cardiac arrest occurs: secure crewmember to electrically isolated CMRS, defibrillate via AED/Zoll, place ILMA airway (RSP), and administer Epinephrine 0.1 mg/mL (EMTP)."
+    ]
+  },
+  {
+    "scenario_id": "SCENARIO_8_SAS_URINARY_RETENTION",
+    "title": "Early-Mission Space Adaptation Syndrome (SAS), Rhinosinusitis, and Acute Urinary Retention",
+    "nasa_citations": [
+      "ISS Medical Checklist JSC-48522 (SAS & Bladder Catheterization)",
+      "NASA IMM Clinical Finding Forms (CLIFFs)"
+    ],
+    "layer1_equations": {
+      "sas_vagal_hr_bpm": "48",
+      "retention_sbp_mmHg": "112 + 2.8 * t_ret",
+      "retention_dbp_mmHg": "72 + 1.8 * t_ret",
+      "retention_hr_bpm": "64 + 3.2 * t_ret"
+    },
+    "symptoms_by_severity": {
+      "sas_and_sinus": "Severe motion-induced nausea/vomiting, pallor, 'space stuffies' nasal congestion, sinus headache, ear fullness.",
+      "urinary_retention": "No void >8-12 hours (bladder volume >600 mL post-promethazine), suprapubic fullness, lower abdominal pain."
+    },
+    "checs_medications": [
+      {
+        "drug": "Promethazine 25-50 mg PO/IM/IV + Caffeine 100-200 mg PO; Tamsulosin 0.4 mg PO; Lidocaine Jelly; Nitrofurantoin",
+        "pack": "CMP, OMP, TIMP, Minor Treatment Pack (MTP)",
+        "contraindication": "Anticholinergic antiemetics (Promethazine/Meclizine) precipitate urinary retention in microgravity — monitor bladder volume."
+      }
+    ],
+    "autonomous_checklist": [
+      "For SAS: Minimize head pitch/roll movements; administer Ondansetron 4 mg ODT or Promethazine 25 mg + Caffeine 100-200 mg (CMP/TIMP).",
+      "For Cephalad Rhinosinusitis: Administer Pseudoephedrine PO and Oxymetazoline nasal spray (limit <= 3 days).",
+      "If unable to void >8 hours: Perform AI-guided bladder ultrasound (MDP) and administer Tamsulosin 0.4 mg PO (OMP).",
+      "If bladder volume >500 mL: Perform sterile urethral catheterization per JSC-48522 using Lidocaine Jelly and MTP catheter kit."
+    ]
+  }
+]

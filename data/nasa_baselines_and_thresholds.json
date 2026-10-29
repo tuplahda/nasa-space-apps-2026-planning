@@ -1,0 +1,180 @@
+{
+  "metadata": {
+    "title": "NASA-STD-3001 Physiological & Environmental Reference Baselines",
+    "standards": [
+      "NASA-STD-3001 Volume 1 Rev C (Crew Health)",
+      "NASA-STD-3001 Volume 2 Rev D/F (Human Factors, Habitability, and Environmental Health)",
+      "OCHMO-TB-004 (Carbon Dioxide)"
+    ]
+  },
+  "physiological_baselines": {
+    "hr_bpm": {
+      "unit": "bpm",
+      "earth_1g_upright": [65, 80],
+      "adapted_ug_iva_rest": [52, 68],
+      "activity_modifiers_ug": {
+        "SLEEP": [42, 55],
+        "IVA_REST": [52, 68],
+        "EVA_SPACEWALK": [95, 135],
+        "ARED_EXERCISE": [135, 165]
+      },
+      "warning_yellow": {
+        "SLEEP": { "min": 38, "max": 70 },
+        "IVA_REST": { "min": 45, "max": 85 },
+        "EVA_SPACEWALK": { "min": 60, "max": 145 },
+        "ARED_EXERCISE": { "min": 80, "max": 172 }
+      },
+      "critical_red": {
+        "SLEEP": { "min": 35, "max": 85 },
+        "IVA_REST": { "min": 40, "max": 100 },
+        "EVA_SPACEWALK": { "min": 50, "max": 170 },
+        "ARED_EXERCISE": { "min": 60, "max": 185 }
+      }
+    },
+    "sbp_mmHg": {
+      "unit": "mmHg",
+      "earth_1g_upright": [115, 125],
+      "adapted_ug_iva_rest": [105, 116],
+      "activity_modifiers_ug": {
+        "SLEEP": [95, 108],
+        "IVA_REST": [105, 116],
+        "EVA_SPACEWALK": [125, 150],
+        "ARED_EXERCISE": [145, 185]
+      },
+      "warning_yellow": {
+        "IVA_REST": { "min": 98, "max": 130 },
+        "ARED_EXERCISE": { "min": 110, "max": 190 }
+      },
+      "critical_red": {
+        "IVA_REST": { "min": 90, "max": 145 },
+        "ARED_EXERCISE": { "min": 95, "max": 220 }
+      }
+    },
+    "dbp_mmHg": {
+      "unit": "mmHg",
+      "earth_1g_upright": [75, 82],
+      "adapted_ug_iva_rest": [65, 74],
+      "activity_modifiers_ug": {
+        "SLEEP": [58, 66],
+        "IVA_REST": [65, 74],
+        "EVA_SPACEWALK": [70, 84],
+        "ARED_EXERCISE": [68, 88]
+      },
+      "warning_yellow": {
+        "IVA_REST": { "min": 60, "max": 85 },
+        "ARED_EXERCISE": { "min": 60, "max": 95 }
+      },
+      "critical_red": {
+        "IVA_REST": { "min": 55, "max": 95 },
+        "ARED_EXERCISE": { "min": 55, "max": 105 }
+      }
+    },
+    "spo2_pct": {
+      "unit": "%",
+      "earth_1g_upright": [97, 100],
+      "adapted_ug_iva_rest": [96, 99],
+      "activity_modifiers_ug": {
+        "SLEEP": [94, 98],
+        "IVA_REST": [96, 99],
+        "EVA_SPACEWALK": [98, 100],
+        "ARED_EXERCISE": [95, 99]
+      },
+      "warning_yellow": {
+        "SLEEP": { "min": 89, "max": 100 },
+        "DEFAULT": { "min": 91, "max": 100 }
+      },
+      "critical_red": {
+        "DEFAULT": { "min": 90, "max": 100 }
+      }
+    },
+    "hrv_rmssd_ms": {
+      "unit": "ms",
+      "earth_1g_upright": [35, 65],
+      "adapted_ug_iva_rest": [28, 52],
+      "activity_modifiers_ug": {
+        "SLEEP": [45, 80],
+        "IVA_REST": [28, 52],
+        "EVA_SPACEWALK": [10, 25],
+        "ARED_EXERCISE": [10, 25]
+      },
+      "warning_yellow": {
+        "SLEEP": { "min": 25 },
+        "IVA_REST": { "min": 18 }
+      },
+      "critical_red": {
+        "SLEEP": { "min": 15 },
+        "IVA_REST": { "min": 15 }
+      }
+    },
+    "cbt_C": {
+      "unit": "°C",
+      "earth_1g_upright": [36.6, 37.1],
+      "adapted_ug_iva_rest_post_fd75": [37.4, 38.0],
+      "activity_modifiers_ug": {
+        "SLEEP": [36.8, 37.3],
+        "IVA_REST": [37.4, 38.0],
+        "EVA_SPACEWALK": [37.6, 38.8],
+        "ARED_EXERCISE": [38.2, 39.6]
+      },
+      "warning_yellow": {
+        "IVA_REST": { "min": 36.0, "max": 38.5 },
+        "EVA_SPACEWALK": { "min": 36.0, "max": 40.1 },
+        "ARED_EXERCISE": { "min": 36.0, "max": 40.1 }
+      },
+      "critical_red": {
+        "IVA_REST": { "min": 35.5, "max": 38.5 },
+        "EVA_SPACEWALK": { "min": 35.5, "max": 40.2 },
+        "ARED_EXERCISE": { "min": 35.5, "max": 40.2 }
+      }
+    },
+    "rr_bpm": {
+      "unit": "breaths/min",
+      "earth_1g_upright": [12, 16],
+      "adapted_ug_iva_rest": [11, 15],
+      "activity_modifiers_ug": {
+        "SLEEP": [9, 13],
+        "IVA_REST": [11, 15],
+        "EVA_SPACEWALK": [18, 28],
+        "ARED_EXERCISE": [25, 42]
+      },
+      "warning_yellow": {
+        "SLEEP": { "min": 8, "max": 16 },
+        "IVA_REST": { "min": 9, "max": 18 },
+        "EVA_SPACEWALK": { "min": 12, "max": 30 }
+      },
+      "critical_red": {
+        "IVA_REST": { "min": 8, "max": 24 },
+        "EVA_SPACEWALK": { "min": 8, "max": 45 }
+      }
+    }
+  },
+  "environmental_and_radiation_limits": {
+    "cabin_ppCO2_mmHg": {
+      "standard_code": "NASA-STD-3001 [V2 6004]",
+      "nominal_7d_max": 2.5,
+      "warning_1hr_24hr_max": 3.0,
+      "critical_excursion": 4.5
+    },
+    "suit_PICO2_mmHg": {
+      "standard_code": "NASA-STD-3001 [V2 6004]",
+      "nominal_inlet_max": 2.0,
+      "warning_7hr_max": 12.5,
+      "critical_30min_max": 15.0,
+      "emergency_1hr_contingency": 30.0
+    },
+    "cabin_ppO2_mmHg": {
+      "standard_code": "NASA-STD-3001 [V2 6003]",
+      "nominal_range": [145, 155],
+      "warning_low": 135,
+      "critical_hypoxia": 128
+    },
+    "radiation_bfo_mGy_Eq": {
+      "standard_code": "NASA-STD-3001 [V1 4030]",
+      "nominal_gcr_mSv_day": 1.3,
+      "limit_30_day_mGy_Eq": 250,
+      "limit_1_year_mGy_Eq": 500,
+      "limit_career_mGy_Eq": 1000,
+      "universal_career_effective_mSv": 600
+    }
+  }
+}
