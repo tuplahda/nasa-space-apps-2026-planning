@@ -31,6 +31,7 @@
 | [`docs/04-rag-knowledge-base-schema.md`](./docs/04-rag-knowledge-base-schema.md) | Document schema and structured clinical protocol cards for all 8 spaceflight medical scenarios and CHeCS medical subpacks. |
 | [`docs/05-ui-ux-console-wireframe.md`](./docs/05-ui-ux-console-wireframe.md) | Screen layout, panel breakdown, interactive crisis injector controls, and 2-minute judge demo flow for the Mission Medical Console UI. |
 | [`docs/06-codebase-structure-and-tech-stack.md`](./docs/06-codebase-structure-and-tech-stack.md) | Day-1 application folder structure (`backend/` FastAPI + `frontend/` React/Vite) and tech stack blueprint for November 14. |
+| [`docs/07-team-roles-and-work-breakdown.md`](./docs/07-team-roles-and-work-breakdown.md) | Complete 4-Member Work Breakdown (`Member 1: Agents/Edge`, `Member 2: RAG/CHeCS`, `Member 3: Telemetry UI`, `Member 4: Triage UI & Pitch`) with hour-by-hour sync milestones. |
 
 ### 📊 Structured Reference Datasets (`data/`)
 | Dataset | Description |
