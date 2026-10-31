@@ -1,0 +1,1 @@
+User notified on 2026-10-31T22:38:25+04:00 to check arXiv API terms of use at https://info.arxiv.org/help/api/index.html and to verify the license of any retrieved papers for restrictions.
