@@ -68,10 +68,21 @@ From the official pre-hackathon briefing and the [NASA Challenge Details](https:
 
 ---
 
-## 📂 NASA Reference Data (`data/` Folder)
+## 📂 Datasets & Hybrid Data Strategy (`data/` Folder)
 
-All the NASA space medicine research, microgravity baselines, and treatment protocols are ready in the [`data/`](./data/) folder for Member 1's Astronaut Agent and Member 2's RAG Knowledge Base:
+### 🥇 How We Combine NASA's Official Dataset + Our Gathered Datasets (Hybrid Priority Rule)
+When we receive the official NASA Challenge Dataset at the hackathon:
+1. **Priority #1 — Official NASA Challenge Dataset (Feeds Member 1's Astronaut Agent):**
+   - We use NASA's official dataset as the **Primary Patient Telemetry Input** driving Member 1's Astronaut Agent baselines and vital sign streams. If any threshold in our files differs from NASA's official challenge dataset, NASA's dataset always takes priority.
+2. **Priority #2 — Our Pre-Built JSON & CSV Datasets (Feeds Member 2's RAG Medical Assistant):**
+   - Because raw NASA telemetry CSVs only contain sensor numbers (not treatment checklists or medication contraindications), **Member 2's RAG Agent** uses our pre-built datasets below as the **Medical Textbook & Citation Brain** to diagnose anomalies and quote official NASA & arXiv sources!
 
-- [`data/nasa_space_medicine_research.md`](./data/nasa_space_medicine_research.md) — Full NASA Space Medicine research document (for RAG ingestion).
-- [`data/nasa_baselines_and_thresholds.json`](./data/nasa_baselines_and_thresholds.json) — Earth ($1g$) vs. Microgravity ($\mu g$) physiological baselines and activity ranges.
-- [`data/rag_protocols_8_scenarios.json`](./data/rag_protocols_8_scenarios.json) — Structured NASA medical protocols, `CHeCS` medications, contraindications, and physiological trends for 8 spaceflight anomalies.
+### 📊 Available JSON & CSV Datasets in `data/`
+Every dataset is provided in **both `.json` (for Python/AI code) and `.csv` (for easy merging with NASA spreadsheets)**:
+
+| Dataset Topic | JSON File (For Code / RAG) | CSV File (For Merging / Tables) | What's Inside |
+| :--- | :--- | :--- | :--- |
+| **1. Space vs. Earth Baselines** | [`data/nasa_baselines_and_thresholds.json`](./data/nasa_baselines_and_thresholds.json) | [`data/nasa_baselines_and_thresholds.csv`](./data/nasa_baselines_and_thresholds.csv) | $1g$ vs. $\mu g$ physiological baselines, activity ranges (`SLEEP`, `IVA_REST`, `EVA`, `EXERCISE`), and `NASA-STD-3001` limits. |
+| **2. 8 Medical RAG Protocols** | [`data/rag_protocols_8_scenarios.json`](./data/rag_protocols_8_scenarios.json) | [`data/rag_protocols_8_scenarios.csv`](./data/rag_protocols_8_scenarios.csv) | 8 spaceflight anomaly scenarios, vital trends, symptoms, `CHeCS` medications, strict contraindications, and 4-step checklists. |
+| **3. 15 Peer-Reviewed arXiv Papers** | [`data/arxiv_literature_citations.json`](./data/arxiv_literature_citations.json) | [`data/arxiv_literature_citations.csv`](./data/arxiv_literature_citations.csv) | 15 arXiv research papers (2020–2026) with direct quotes mapped to our architecture layers and judging rubric. |
+| **4. Full Markdown Corpus** | [`data/nasa_space_medicine_research.md`](./data/nasa_space_medicine_research.md) | [`data/arxiv_literature_citations.md`](./data/arxiv_literature_citations.md) | Full text documents ready for vector chunking in Member 2's RAG database. |

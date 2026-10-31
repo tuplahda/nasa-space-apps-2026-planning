@@ -1,0 +1,12 @@
+parameter,unit,earth_1g_min,earth_1g_max,ug_sleep_min,ug_sleep_max,ug_iva_rest_min,ug_iva_rest_max,ug_eva_min,ug_eva_max,ug_exercise_min,ug_exercise_max,warning_rest_min,warning_rest_max,critical_rest_min,critical_rest_max,nasa_standard_ref
+hr_bpm,bpm,65,80,42,55,52,68,95,135,135,165,45,85,40,100,NASA-STD-3001 [V1 3003a]
+sbp_mmHg,mmHg,115,125,95,108,105,116,125,150,145,185,98,130,90,145,NASA-STD-3001 [V1 3003a]
+dbp_mmHg,mmHg,75,82,58,66,65,74,70,84,68,88,60,85,55,95,NASA-STD-3001 [V1 3003a]
+spo2_pct,%,97,100,94,98,96,99,98,100,95,99,91,100,90,100,NASA-STD-3001 [V2 6003]
+hrv_rmssd_ms,ms,35,65,45,80,28,52,10,25,10,25,18,100,15,100,NASA Spaceflight Standard Measures (SSM)
+cbt_C,degC,36.6,37.1,36.8,37.3,37.4,38.0,37.6,38.8,38.2,39.6,36.0,38.5,35.5,40.2,NASA-STD-3001 [V1 3003a] (Space Fever Adapted)
+rr_bpm,breaths/min,12,16,9,13,11,15,18,28,25,42,9,18,8,24,NASA-STD-3001 [V1 3003a]
+cabin_ppCO2_mmHg,mmHg,0.6,0.8,0.6,2.5,0.6,2.5,0.6,2.0,0.6,2.5,0.0,3.0,0.0,4.5,NASA-STD-3001 [V2 6004] & OCHMO-TB-004
+suit_PICO2_mmHg,mmHg,0.6,0.8,0.0,2.0,0.0,2.0,0.0,2.0,0.0,2.0,0.0,12.5,0.0,15.0,NASA-STD-3001 [V2 6004]
+cabin_ppO2_mmHg,mmHg,159,160,145,155,145,155,145,155,145,155,135,165,128,170,NASA-STD-3001 [V2 6003]
+radiation_bfo_mGy_Eq,mGy-Eq,0.0,0.01,0.0,1.3,0.0,1.3,0.0,1.3,0.0,1.3,0.0,250.0,0.0,500.0,NASA-STD-3001 [V1 4030]

@@ -26,10 +26,10 @@ flowchart TD
 
 ## 🛠️ What You Build (3 Key Parts)
 
-### 1. Dynamic (Non-Hardcoded) Physiology & State Engine
-Instead of fixed `if/else` numbers, each Astronaut Agent maintains a continuous **biological state** that evolves based on:
-- **Real Physiological Waveforms & Baselines:** Seeded from **PhysioNet** datasets and the microgravity adaptation ranges in [`data/nasa_baselines_and_thresholds.json`](../data/nasa_baselines_and_thresholds.json).
-- **Activity & Environment Coupling:** The agent reacts naturally to what it is doing (`Sleeping`, `Spacewalk EVA`, `ARED Exercise`, `Habitat Rest`) and external stressors (like real solar flare data fetched from NASA's `https://api.nasa.gov/DONKI/` API or cabin $\text{CO}_2$ buildup).
+### 1. Dynamic (Non-Hardcoded) Physiology & Hybrid Dataset Priority
+Instead of fixed `if/else` numbers, each Astronaut Agent maintains a continuous **biological state** using our **Hybrid Dataset Rule**:
+- **Priority #1 (Official NASA Challenge Dataset):** When we receive the official dataset from NASA on Day 1, load those CSV/JSON logs directly as the primary baseline and telemetry stream for your Astronaut Agent.
+- **Priority #2 (Our Pre-Built Baselines & Environment Stressors):** Use [`data/nasa_baselines_and_thresholds.csv`](../data/nasa_baselines_and_thresholds.csv) (or `.json`) and [`data/rag_protocols_8_scenarios.csv`](../data/rag_protocols_8_scenarios.csv) to fill in any missing physiological parameters, activity modifiers (`Sleeping`, `Spacewalk EVA`, `ARED Exercise`, `Habitat Rest`), and environmental stressors (like live solar flares from NASA's `https://api.nasa.gov/DONKI/` API or cabin $\text{CO}_2$ changes).
 
 ### 2. Agent Brain & First-Person Symptom Logs
 Using an LLM Agent (e.g., Gemini API / LangChain / CrewAI with structured JSON output), the Astronaut Agent interprets its own internal physiological shifts and emits realistic first-person updates, such as:

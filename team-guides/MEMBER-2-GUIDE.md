@@ -31,12 +31,13 @@ flowchart LR
 Your agent continuously inspects the JSON stream coming from Member 1's Astronaut Agent against [`data/nasa_baselines_and_thresholds.json`](../data/nasa_baselines_and_thresholds.json):
 - It checks the astronaut's **Activity Context** (`SLEEP`, `IVA_REST`, `ARED_EXERCISE`, `EVA_SPACEWALK`). For example, a heart rate of `150 bpm` during `ARED_EXERCISE` is normal, whereas `88 bpm` during `IVA_REST` with rising cabin $\text{CO}_2$ triggers a RAG medical consultation!
 
-### 2. NASA Space Medicine RAG Pipeline
-You index our two curated files in [`data/`](../data/):
-- [`data/nasa_space_medicine_research.md`](../data/nasa_space_medicine_research.md)
-- [`data/rag_protocols_8_scenarios.json`](../data/rag_protocols_8_scenarios.json)
+### 2. NASA Space Medicine & arXiv RAG Pipeline (JSON + CSV Ready)
+While Member 1 prioritizes the official NASA challenge dataset for the astronaut's raw vitals, **your RAG Agent uses our pre-built datasets in [`data/`](../data/) as the Medical Textbook & Citation Brain**:
+- **Medical Protocols:** [`data/rag_protocols_8_scenarios.json`](../data/rag_protocols_8_scenarios.json) (and `.csv`) + [`data/nasa_space_medicine_research.md`](../data/nasa_space_medicine_research.md)
+- **Zero-G Thresholds:** [`data/nasa_baselines_and_thresholds.json`](../data/nasa_baselines_and_thresholds.json) (and `.csv`)
+- **Scientific & AI Citations:** [`data/arxiv_literature_citations.json`](../data/arxiv_literature_citations.json) (and `.csv`)
 
-Using a vector database (like `ChromaDB` or `FAISS`) + embeddings, when an anomaly happens, your agent retrieves the exact **NASA Standard (`NASA-STD-3001`)**, **ISS Medical Checklist (`JSC-48522`)**, and **Spacecraft Med-Kit (`CHeCS`)** rules.
+Using a vector database (like `ChromaDB` or `FAISS`) or hybrid CSV/JSON lookup, when an anomaly happens in NASA's dataset, your agent retrieves the exact **NASA Standard (`NASA-STD-3001`)**, **ISS Medical Checklist (`JSC-48522`)**, **Spacecraft Med-Kit (`CHeCS`)** rules, and **peer-reviewed arXiv quotes**.
 
 ### 3. Clinical Review & Safety Output
 Your RAG Agent passes the retrieved NASA protocol + the Astronaut Agent's vitals and symptom log to the LLM to return a structured JSON diagnosis:
