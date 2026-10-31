@@ -51,6 +51,23 @@ Each member has a **1-page guide** explaining exactly what to build:
 
 ---
 
+## 🏆 Pre-Hackathon Meeting Intel: The 10 Judging Criteria & How We Win Each One
+
+From the official pre-hackathon briefing and the [NASA Challenge Details](https://www.spaceappschallenge.org/2026/challenges/health-monitoring-software/?tab=details) ([Briefing Video](https://www.youtube.com/watch?v=RERG3gEmdC8)), here is exactly what judges are marking us on and how our design hits every single point:
+
+| Judging Criterion | How Our Project Scores 10/10 |
+| :--- | :--- |
+| **1. Bonus: Fully Functional Software** | Instead of static slides or Figma mockups, we are shipping a **100% working, end-to-end live web app** where judges click buttons, watch the Astronaut Agent react in real time, and see the RAG AI Doctor diagnose and heal the astronaut. |
+| **2. Meaningful Improvement on Existing Ideas** | Standard smartwatches/ICU monitors fail in space because they use **Earth ($1g$) baselines** and require **live internet to doctors**. We improve on existing monitors with **(a) Zero-G Activity-Adjusted Baselines** (no false alarms on $37.8^\circ\text{C}$ "Space Fever") and **(b) Offline Autonomous RAG** for 20-minute Mars radio blackouts. |
+| **3. Scientific Combine** | We combine **3 distinct sciences** in one engine: **Space Physiology** (wearable biometrics) + **Spacecraft ECLSS Engineering** (cabin $\text{CO}_2/\text{O}_2$) + **Heliophysics** (live solar radiation from the **NASA DONKI API**). |
+| **4. Quotation & 5. Validity** | Every diagnosis from our RAG Agent displays **direct quotations and exact standard codes** from official NASA documents (`NASA-STD-3001 Vol 1 & Vol 2`, `ISS Medical Checklist JSC-48522`, `OCHMO-TB-004`, `NASA OSDR`). |
+| **6. Logical Feasibility** | Designed for NASA Level V constraints (Orion medical kit limit is only `9.07 kg`): runs lightweight edge anomaly detection (`<1 ms`) and only wakes up the local RAG model when an anomaly crosses a threshold. |
+| **7. Creativity** | Using **Autonomous Digital-Twin Astronaut Agents** (Member 1) talking to an **Autonomous RAG Medical Officer Agent** (Member 2) in a closed-loop recovery cycle. |
+| **8. Alignment & 9. Relevance** | Directly fulfills every objective on the official challenge page: *Gather Health Indicators $\rightarrow$ Evaluate Status Autonomously $\rightarrow$ Enable Immediate Action without Alert Fatigue*. |
+| **10. Presentation (Clear, Concise, Direct)** | Single-screen dark-mode console + a crisp 4-step demo flow (Problem $\rightarrow$ Existing vs. Ours $\rightarrow$ Live Crisis & Quoted NASA RAG $\rightarrow$ Closed-Loop Recovery). |
+
+---
+
 ## 📂 NASA Reference Data (`data/` Folder)
 
 All the NASA space medicine research, microgravity baselines, and treatment protocols are ready in the [`data/`](./data/) folder for Member 1's Astronaut Agent and Member 2's RAG Knowledge Base:

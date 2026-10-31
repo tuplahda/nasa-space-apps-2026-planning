@@ -46,8 +46,11 @@ Your RAG Agent passes the retrieved NASA protocol + the Astronaut Agent's vitals
   "diagnosis": "Acute Cabin Hypercapnia (CO2 Toxicity)",
   "nasa_citations": [
     "NASA-STD-3001 Vol 2 [V2 6004]",
-    "ISS Medical Checklist JSC-48522"
+    "ISS Medical Checklist JSC-48522",
+    "OCHMO-TB-004"
   ],
+  "nasa_direct_quote": "NASA-STD-3001 [V2 6004]: Average 1-hour and 24-hour habitable volume CO2 partial pressure (ppCO2) shall not exceed 3.0 mmHg to maintain daily headache incidence below 1.4% and prevent cognitive performance decrements.",
+  "meaningful_improvement_note": "Standard Earth monitors miss cabin CO2 coupling and only flag mild tachycardia; A.R.E.S. Med correlates ECLSS ppCO2 + zero-G HRV drop to diagnose hypercapnia offline.",
   "clinical_review": "Astronaut CDR Lin shows elevated resting HR (88.4 bpm vs 52-68 bpm zero-G baseline), suppressed HRV (21 ms), and tachypnea correlated with elevated cabin CO2 (3.8 mmHg) and frontal headache.",
   "medication": "Ibuprofen 400 mg PO from Convenience Medications Pack (CMP)",
   "safety_warning": "CONTRAINDICATION: Do NOT administer opioid painkillers — suppresses respiratory drive and worsens CO2 retention.",

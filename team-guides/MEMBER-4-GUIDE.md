@@ -30,7 +30,10 @@ flowchart TD
 ### 1. The RAG Medical Assistant Panel (Right Column)
 Takes the JSON output from Member 2's RAG Agent and renders:
 - **Clinical Analysis & Diagnosis:** Shows the AI Doctor's real-time review of why the Astronaut Agent's vitals and symptom logs are abnormal.
-- **NASA Source Citations:** Displays clear badges for the retrieved NASA documents (`NASA-STD-3001`, `ISS Medical Checklist JSC-48522`, `OCHMO-TB-004`) so judges see that our RAG never hallucinates.
+- **Direct NASA Quotations & Citations *(Crucial for the "Quotation" & "Validity" Rubric!)*:** Displays exact badges AND a direct verbatim quote from the retrieved NASA document (`NASA-STD-3001 [V2 6004]`, `ISS Medical Checklist JSC-48522`, `OCHMO-TB-004`) so judges immediately award full marks for **Quotation** and **Validity**.
+- **"Meaningful Improvement" Comparison Badge:** Shows a 1-line comparison right on the alert card:
+  - *Standard Earth Monitor:* ❌ False alarm / Requires Ground Doctor
+  - *A.R.E.S. Med (Zero-G + Offline RAG):* ✅ Context-Adjusted + Autonomous Action
 - **Spacecraft Med-Kit (`CHeCS`) & Safety Alert Box:** Highlights the exact medication pack to open and renders a high-visibility red warning for any spaceflight contraindications (e.g., *No opioids during high $\text{CO}_2$*).
 
 ### 2. Interactive "Apply Countermeasure" Feedback Loop
