@@ -10,7 +10,7 @@
 
 On deep-space missions to the Moon or Mars, radio communication suffers a **20-minute one-way delay** to Earth. During an acute life-support crisis or solar radiation storm, astronauts cannot wait 40 minutes for flight surgeons in Houston—they need an autonomous, onboard, 100% offline medical monitoring and triage console.
 
-**A.R.E.S. Med** (*Autonomous Real-time Extraterrestrial Survival & Medical System*) is a **Closed-Loop Multi-Agent Simulation & Clinical Decision Support System**:
+**A.R.E.S. Med** (*Astronaut Rapid Evaluation Support & Medical System*) is a **Closed-Loop Multi-Agent Simulation & Clinical Decision Support System**:
 
 1. **Autonomous Astronaut Agent (Digital Twin) — *Dheer*:** Generates dynamic, non-hardcoded microgravity vitals (`HR`, `BP`, `SpO2`, `HRV`, `Core Temp`), activity states (`SLEEP`, `RESTING`, `EXERCISE`, `EVA`), and first-person symptom logs, modulated by live NASA space weather (`DONKI API`).
 2. **60-Second Sliding Ring Buffer & SEU Filter — *Yohan*:** Evaluates incoming telemetry against spaceflight-adapted baselines using JPL Power-of-Ten safety rules and a 3-tick persistence debounce to filter cosmic ray bit-flips.
