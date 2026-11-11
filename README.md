@@ -1,88 +1,117 @@
-# 🚀 A.R.E.S. Med — Multi-Agent Space Health Monitoring System
+# 🚀 A.R.E.S. Med — Autonomous Space Health Monitoring System
 
 **2026 NASA Space Apps Challenge:** [Create Health Monitoring Software for Astronauts on Space Missions](https://www.spaceappschallenge.org/2026/challenges/health-monitoring-software/?tab=resources)  
 **Hackathon Dates:** November 14–15, 2026  
+**Local Event Location:** Mauritius  
 
 ---
 
 ## 🎯 What We Are Building (In Plain English)
 
-On deep-space missions to the Moon or Mars, radio signals take up to **20 minutes each way** to reach Earth, so astronauts cannot rely on real-time human doctors in Houston.
+On deep-space missions to the Moon or Mars, radio communication suffers a **20-minute one-way delay** to Earth. During an acute life-support crisis or solar radiation storm, astronauts cannot wait 40 minutes for flight surgeons in Houston—they need an autonomous, onboard, 100% offline medical monitoring and triage console.
 
-We are building a **Multi-Agent AI System + Web Dashboard**:
-1. **Autonomous Astronaut Agent(s) *(Member 1)*:** AI/model agents that simulate living astronauts in space—dynamically generating non-hardcoded health vitals (`Heart Rate`, `Blood Pressure`, `SpO2`, `Body Temp`, `HRV`) and first-person symptom logs based on their current activity, internal physiology, and real NASA space weather (`DONKI API`).
-2. **AI Medical Assistant — RAG Agent *(Member 2)*:** An autonomous medical officer agent that monitors the Astronaut Agent's live stream, detects anomalies against microgravity baselines, searches our **NASA Space Medicine RAG Knowledge Base**, and prescribes step-by-step treatments back to the Astronaut Agent.
-3. **Mission Medical Dashboard *(Members 3 & 4)*:** A live web interface showing the Astronaut Agent's streaming vitals & logs on the left/center, and the RAG Medical Assistant's clinical analysis & treatment actions on the right.
+**A.R.E.S. Med** (*Autonomous Real-time Extraterrestrial Survival & Medical System*) is a **Closed-Loop Multi-Agent Simulation & Clinical Decision Support System**:
+
+1. **Autonomous Astronaut Agent (Digital Twin) — *Dheer*:** Generates dynamic, non-hardcoded microgravity vitals (`HR`, `BP`, `SpO2`, `HRV`, `Core Temp`), activity states (`SLEEP`, `RESTING`, `EXERCISE`, `EVA`), and first-person symptom logs, modulated by live NASA space weather (`DONKI API`).
+2. **60-Second Sliding Ring Buffer & SEU Filter — *Yohan*:** Evaluates incoming telemetry against spaceflight-adapted baselines using JPL Power-of-Ten safety rules and a 3-tick persistence debounce to filter cosmic ray bit-flips.
+3. **NASA Level V RAG Medical Officer — *Yohan*:** An onboard AI doctor executing our strict **2-Mode Clinical Protocol**:
+   - **Mode A (Known Condition $\ge 75\%$):** Diagnoses from NASA protocols, quotes verbatim standards (`NASA-STD-3001`), prescribes from physical ISS `CHeCS` medical packs (`CMP`, `TIMP`), and locks out contraindications (e.g. no opioids during hypercapnia).
+   - **Mode B (Novel Zero-Day Anomaly $< 75\%$):** Triggers **Certified Abstention** (no hallucinations) + 4-step stabilization (ABC vitals, Point-of-Care `i-STAT`/`C2M2` labs, High-Risk Drug Lockout, In-Flight Learning).
+4. **Mission Control Console & 3D Body HUD — *Tivesh*:** A dark-mode HTML/CSS/JS dashboard featuring real-time `Chart.js` line graphs, an interactive **3D Holographic Anatomical Body HUD** with glowing organ pins (`SANS-01`, `CV-02`, `ECLSS-03`, `RAD-04`), and a **Daily Routine Prevention Schedule** (`94% Readiness Meter`).
+5. **System Integrator & Pitch Lead — *Roy*:** Connects the closed-loop recovery (applying treatments heals astronaut vitals back to normal tick-by-tick) and leads the **Official 7-Slide Deck** and **4-Minute Timed Presentation**.
 
 ---
 
-## 🤖 System Flow Diagram
+## 🔄 Updated System Flow Diagram
 
 ```mermaid
-flowchart LR
-    ENV["Space Environment<br/>(NASA DONKI API + Cabin)"] --> A1
-    
-    subgraph M1["Member 1: Astronaut Agent(s)"]
-        A1["Autonomous Astronaut Agent<br/>• Own Memory, Persona & Activity<br/>• Dynamically generates HR, BP, SpO2, Temp<br/>• Writes live first-person symptom logs"]
+flowchart TD
+    DONKI["NASA DONKI API<br/>(Live & Cached Solar Weather)"] --> L1
+
+    subgraph L1["Layer 1: Autonomous Astronaut Agent (Dheer)"]
+        SIM["Physiological Simulator Engine<br/>• Sinus Arrhythmia (±3 bpm)<br/>• State Machine (Sleep, Exercise, EVA)<br/>• First-Person Symptom Feed"]
+        SIM --> OUT["1Hz Telemetry Packet (JSON)"]
     end
 
-    subgraph M2["Member 2: AI Medical Assistant (RAG Agent)"]
-        A2["Medical Officer RAG Agent<br/>• Monitors Astronaut Agent stream<br/>• Detects microgravity anomalies<br/>• Searches NASA Medical RAG Database<br/>• Sends treatment back to Astronaut Agent"]
+    subgraph L2["Layer 2: Edge Anomaly Detector (Yohan)"]
+        OUT --> RING["60s Sliding Ring Buffer (JPL Rules)<br/>• Rolling Averages & Slew Rate<br/>• 3-Tick SEU Bit-Flip Debounce"]
+        RING --> EVAL["Microgravity Threshold Evaluation<br/>(data/nasa_baselines_and_thresholds.json)"]
     end
 
-    A1 -->|"Live Dynamic Vitals + Symptom Log"| A2
-    A2 -->|"Prescribed Countermeasure"| A1
-    A1 -->|"Live Stream"| M3["Member 3 UI:<br/>Astronaut Vitals Charts & Logs"]
-    A2 -->|"Diagnosis + NASA Sources"| M4["Member 4 UI:<br/>RAG Doctor Panel & Treatment"]
+    subgraph L3["Layer 3: NASA Level V RAG Medical Officer (Yohan)"]
+        EVAL -->|"Anomaly Detected!"| RAG["RAG Retrieval Engine<br/>(data/rag_protocols_8_scenarios.json)"]
+        
+        RAG --> DECIDE{"Confidence >= 0.75?"}
+        
+        DECIDE -->|"YES (>= 0.75)"| MODEA["🟢 MODE A: KNOWN CONDITION<br/>• Verbatim Quote: [NASA-STD-3001 V2 6004]<br/>• CHeCS Subpack Formulary (CMP, TIMP)<br/>• Drug Contraindications (No Opioids during CO2)"]
+        
+        DECIDE -->|"NO (< 0.75)"| MODEB["🔴 MODE B: NOVEL ZERO-DAY ANOMALY<br/>• Certified Abstention (Anti-Hallucination)<br/>• 1. ABC Vital Stabilization (RSP O2, IV Saline)<br/>• 2. Point-of-Care Lab Orders (i-STAT, CBC, US)<br/>• 3. 🔒 High-Risk Drug Lockout (Opioids/NSAIDs)<br/>• 4. Priority Earth Uplink & In-Flight RAG Learning"]
+    end
+
+    subgraph L4["Layer 4: Mission Control Console UI (Tivesh & Roy)"]
+        OUT -->|"WebSocket: /ws/telemetry"| CHARTS["Tivesh: Rolling Biometric Charts<br/>(HR, BP, SpO2, Cabin CO2, Radiation)"]
+        OUT -->|"Vitals State"| HUD["Tivesh: 3D Holographic Body HUD<br/>• Organ Pins: SANS-01, CV-02, ECLSS-03, RAD-04<br/>• Color shifts: Cyan ➔ Amber ➔ Pulsing Red"]
+        MODEA & MODEB -->|"REST: /api/diagnose"| MED_PANEL["Roy: AI Medical Officer Panel<br/>• 🔴 20-Min Mars Comms Lag Alert<br/>• Clinical Diagnosis & Lab Orders<br/>• Interactive Treatment Action Checklist"]
+        
+        SCHEDULE["Tivesh: Daily Routine Schedule<br/>• 08:00 Orthostatic BP & Hydration<br/>• 13:30 30-min ARED Exercise<br/>• 94% Mission Readiness Score"]
+        
+        CRISIS["Top Bar Scenario Triggers<br/>[Nominal] [Solar Flare] [EVA Hypercapnia] [Mode B Zero-Day]"] -->|"POST /api/scenarios/trigger"| SIM
+        MED_PANEL -->|"Treatment Checkbox Completed!<br/>POST /api/treatments/apply"| SIM
+    end
 ```
 
 ---
 
-## 👥 Team Guides (Open Your Guide!)
+## 👥 Team Roles & Dedicated Guides
 
-Each member has a **1-page guide** explaining exactly what to build:
+Each member has a dedicated, self-contained guide with their tasks, data files, artifacts, and AI master prompts:
 
-| Team Member | Role | Guide Link |
-| :--- | :--- | :--- |
-| **Member 1** | **Autonomous Astronaut Agent(s)** *(Dynamic Vitals & Symptom Generator)* | 👉 **[team-guides/MEMBER-1-GUIDE.md](./team-guides/MEMBER-1-GUIDE.md)** |
-| **Member 2** | **AI Medical Assistant (RAG Agent)** *(Anomaly Detection & NASA RAG Lookup)* | 👉 **[team-guides/MEMBER-2-GUIDE.md](./team-guides/MEMBER-2-GUIDE.md)** |
-| **Member 3** | **Frontend — Astronaut View** *(Live Vitals Charts, Agent Feed & Environment Controls)* | 👉 **[team-guides/MEMBER-3-GUIDE.md](./team-guides/MEMBER-3-GUIDE.md)** |
-| **Member 4** | **Frontend — RAG Doctor View & Pitch** *(Diagnosis Panel, Treatment Action & Demo Video)* | 👉 **[team-guides/MEMBER-4-GUIDE.md](./team-guides/MEMBER-4-GUIDE.md)** |
-
----
-
-## 🏆 Pre-Hackathon Meeting Intel: The 10 Judging Criteria & How We Win Each One
-
-From the official pre-hackathon briefing and the [NASA Challenge Details](https://www.spaceappschallenge.org/2026/challenges/health-monitoring-software/?tab=details) ([Briefing Video](https://www.youtube.com/watch?v=RERG3gEmdC8)), here is exactly what judges are marking us on and how our design hits every single point:
-
-| Judging Criterion | How Our Project Scores 10/10 |
-| :--- | :--- |
-| **1. Bonus: Fully Functional Software** | Instead of static slides or Figma mockups, we are shipping a **100% working, end-to-end live web app** where judges click buttons, watch the Astronaut Agent react in real time, and see the RAG AI Doctor diagnose and heal the astronaut. |
-| **2. Meaningful Improvement on Existing Ideas** | Standard smartwatches/ICU monitors fail in space because they use **Earth ($1g$) baselines** and require **live internet to doctors**. We improve on existing monitors with **(a) Zero-G Activity-Adjusted Baselines** (no false alarms on $37.8^\circ\text{C}$ "Space Fever") and **(b) Offline Autonomous RAG** for 20-minute Mars radio blackouts. |
-| **3. Scientific Combine** | We combine **3 distinct sciences** in one engine: **Space Physiology** (wearable biometrics) + **Spacecraft ECLSS Engineering** (cabin $\text{CO}_2/\text{O}_2$) + **Heliophysics** (live solar radiation from the **NASA DONKI API**). |
-| **4. Quotation & 5. Validity** | Every diagnosis from our RAG Agent displays **direct quotations and exact standard codes** from official NASA documents (`NASA-STD-3001 Vol 1 & Vol 2`, `ISS Medical Checklist JSC-48522`, `OCHMO-TB-004`, `NASA OSDR`). |
-| **6. Logical Feasibility** | Designed for NASA Level V constraints (Orion medical kit limit is only `9.07 kg`): runs lightweight edge anomaly detection (`<1 ms`) and only wakes up the local RAG model when an anomaly crosses a threshold. |
-| **7. Creativity** | Using **Autonomous Digital-Twin Astronaut Agents** (Member 1) talking to an **Autonomous RAG Medical Officer Agent** (Member 2) in a closed-loop recovery cycle. |
-| **8. Alignment & 9. Relevance** | Directly fulfills every objective on the official challenge page: *Gather Health Indicators $\rightarrow$ Evaluate Status Autonomously $\rightarrow$ Enable Immediate Action without Alert Fatigue*. |
-| **10. Presentation (Clear, Concise, Direct)** | Single-screen dark-mode console + a crisp 4-step demo flow (Problem $\rightarrow$ Existing vs. Ours $\rightarrow$ Live Crisis & Quoted NASA RAG $\rightarrow$ Closed-Loop Recovery). |
-
----
-
-## 📂 Datasets & Hybrid Data Strategy (`data/` Folder)
-
-### 🥇 How We Combine NASA's Official Dataset + Our Gathered Datasets (Hybrid Priority Rule)
-When we receive the official NASA Challenge Dataset at the hackathon:
-1. **Priority #1 — Official NASA Challenge Dataset (Feeds Member 1's Astronaut Agent):**
-   - We use NASA's official dataset as the **Primary Patient Telemetry Input** driving Member 1's Astronaut Agent baselines and vital sign streams. If any threshold in our files differs from NASA's official challenge dataset, NASA's dataset always takes priority.
-2. **Priority #2 — Our Pre-Built JSON & CSV Datasets (Feeds Member 2's RAG Medical Assistant):**
-   - Because raw NASA telemetry CSVs only contain sensor numbers (not treatment checklists or medication contraindications), **Member 2's RAG Agent** uses our pre-built datasets below as the **Medical Textbook & Citation Brain** to diagnose anomalies and quote official NASA & arXiv sources!
-
-### 📊 Available JSON & CSV Datasets in `data/`
-Every dataset is provided in **both `.json` (for Python/AI code) and `.csv` (for easy merging with NASA spreadsheets)**:
-
-| Dataset Topic | JSON File (For Code / RAG) | CSV File (For Merging / Tables) | What's Inside |
+| Team Member | Role | Primary AI Tool | Guide Link |
 | :--- | :--- | :--- | :--- |
-| **1. Space vs. Earth Baselines** | [`data/nasa_baselines_and_thresholds.json`](./data/nasa_baselines_and_thresholds.json) | [`data/nasa_baselines_and_thresholds.csv`](./data/nasa_baselines_and_thresholds.csv) | $1g$ vs. $\mu g$ physiological baselines, activity ranges (`SLEEP`, `IVA_REST`, `EVA`, `EXERCISE`), and `NASA-STD-3001` limits. |
-| **2. 8 Medical RAG Protocols** | [`data/rag_protocols_8_scenarios.json`](./data/rag_protocols_8_scenarios.json) | [`data/rag_protocols_8_scenarios.csv`](./data/rag_protocols_8_scenarios.csv) | 8 spaceflight anomaly scenarios, vital trends, symptoms, `CHeCS` medications, strict contraindications, and 4-step checklists. |
-| **3. 15 Peer-Reviewed arXiv Papers** | [`data/arxiv_literature_citations.json`](./data/arxiv_literature_citations.json) | [`data/arxiv_literature_citations.csv`](./data/arxiv_literature_citations.csv) | 15 arXiv research papers (2020–2026) with direct quotes mapped to our architecture layers and judging rubric. |
-| **4. Full Markdown Corpus** | [`data/nasa_space_medicine_research.md`](./data/nasa_space_medicine_research.md) | [`data/arxiv_literature_citations.md`](./data/arxiv_literature_citations.md) | Full text documents ready for vector chunking in Member 2's RAG database. |
+| **Dheer** | **Autonomous Astronaut Agent** *(Physiological Simulator & Space Weather)* | Antigravity (Gemini Pro) | 👉 **[`team-guides/DHEER-GUIDE.md`](./team-guides/DHEER-GUIDE.md)** |
+| **Yohan** | **Whole RAG System** *(Anomaly Detector & Level V AI Medical Officer)* | Antigravity (Gemini Pro) | 👉 **[`team-guides/YOHAN-GUIDE.md`](./team-guides/YOHAN-GUIDE.md)** |
+| **Tivesh** | **Frontend Entirely** *(Mission Control Console, 3D Body HUD & Charts)* | ChatGPT Plus / Claude | 👉 **[`team-guides/TIVESH-GUIDE.md`](./team-guides/TIVESH-GUIDE.md)** |
+| **Roy** | **Jack of All Trades** *(Integration, Backend/AI Assistant & Pitch Lead)* | DeepSeek / ChatGPT Plus | 👉 **[`team-guides/ROY-GUIDE.md`](./team-guides/ROY-GUIDE.md)** |
+
+---
+
+## 🛰️ Hybrid Dataset Strategy (Room for Improvement)
+
+NASA's official private challenge dataset is expected to be released within ~24 hours of kickoff. Our architecture is designed with **zero-friction dataset swappability**:
+1. **Priority #1 (Official NASA Challenge Dataset):** When the official CSV/JSON dataset arrives, place it in `data/nasa_official_dataset/`. Dheer's simulator and Yohan's anomaly detector load this as the primary baseline.
+2. **Priority #2 (Our Synthetic Digital Twin Fallback):** If NASA's dataset lacks continuous 1Hz streams or specific crisis states, our mathematical physiological engine fills in the missing biometric parameters automatically.
+
+---
+
+## ⏰ Critical Timeline (Mauritius Local Time)
+
+* **Saturday, Nov 14 — 09:00:** NASA submission portal opens.
+* **Saturday, Nov 14 — 21:00:** Golden Loop verified (Crisis $\rightarrow$ Anomaly $\rightarrow$ RAG Treatment $\rightarrow$ Astronaut Recovers).
+* **Sunday, Nov 15 — 10:00:** **Code Freeze.** Bug fixes only.
+* **Sunday, Nov 15 — 10:30:** Roy records backup 60-second demo video on USB.
+* **Sunday, Nov 15 — 11:30 (HARD LOCAL DEADLINE):** Project, 7-slide deck, and video submitted!
+* **Sunday, Nov 15 — 12:00:** Live judging begins! (Strictly **4-minute presentation** + 2-minute Q&A).
+
+---
+
+## 📂 Repository Directory Tree
+
+```
+├── artifacts/
+│   ├── clinical_decision_protocol_2_modes.md   <-- Mode A vs Mode B clinical spec
+│   ├── official_hackathon_submission_rules.md  <-- Mauritius presentation rules & slide structure
+│   ├── security_and_safety_guardrails.md       <-- JPL Power-of-Ten & anti-hallucination rules
+│   ├── system_mechanics_deep_dive.md           <-- Physiological equations & fluid shift math
+│   └── vanilla_frontend_architecture.md        <-- Shared DOM IDs, layout specs & API endpoints
+├── data/
+│   ├── nasa_baselines_and_thresholds.json      <-- Zero-G vital ranges (HR, BP, SpO2, CO2)
+│   ├── rag_protocols_8_scenarios.json          <-- 8 spaceflight medical protocols with citations
+│   ├── nasa_space_medicine_research.md         <-- Space medicine notes & CHeCS formulary
+│   └── arxiv_literature_citations.json         <-- Academic literature citations for judging
+├── team-guides/
+│   ├── DHEER-GUIDE.md                          <-- Autonomous Astronaut Agent Guide
+│   ├── YOHAN-GUIDE.md                          <-- Whole RAG System & AI Medical Officer Guide
+│   ├── TIVESH-GUIDE.md                         <-- Complete Frontend & 3D Body HUD Guide
+│   └── ROY-GUIDE.md                            <-- Integration, Testing & Pitch Lead Guide
+└── README.md                                   <-- This master documentation file
+```
