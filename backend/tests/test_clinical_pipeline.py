@@ -10,13 +10,16 @@ Comprehensive Verification & Benchmark Suite for A.R.E.S. Med Backend Clinical S
 from pathlib import Path
 import sys
 import time
+import copy
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from backend.models.telemetry import TelemetryPacket
-from backend.routes.diagnose import execute_diagnosis_pipeline
+from backend.routes.diagnose import build_contract_b_response, execute_diagnosis_pipeline, rag_engine
 from backend.services.anomaly_detector import EdgeAnomalyDetector
-from backend.services.rag_engine import sanitize_symptom_log
+from backend.services.rag_engine import LocalMedicalRAGEngine, sanitize_symptom_log
 from backend.services.ring_buffer import (
     CHANNEL_SPECS,
     FixedChannelRingBuffer,
@@ -229,6 +232,8 @@ def test_mode_b_novel_zero_day_certified_abstention() -> None:
     assert "LOCKED OUT" in out["drug_lockout_warning"]
     assert out["telemetry_uplink"]["store_and_forward_priority"] == "EMERGENCY"
     assert out["telemetry_uplink"]["save_candidate_to_local_rag"] is True
+    assert out["telemetry_uplink"]["candidate_storage_status"] == "IN_MEMORY_ONLY_PENDING_REVIEW"
+    assert out["telemetry_uplink"]["candidate_indexed_for_retrieval"] is False
     assert out["total_pipeline_latency_ms"] < 50.0
 
 
@@ -284,6 +289,135 @@ def test_sustained_step_change_and_multi_hazard_guardrails() -> None:
     assert all("ibuprofen" not in m.lower() for m in meds)
     assert any("OPIOID" in c.upper() for c in r4["contraindications_locked"])
     assert any("NSAID" in c.upper() for c in r4["contraindications_locked"])
+
+
+def test_contract_a_fields_are_preserved_and_unknown_fields_are_rejected() -> None:
+    payload = {
+        "timestamp": "2026-11-14T14:22:05Z",
+        "mission_day": 84,
+        "comms_status": {
+            "one_way_delay_sec": 1120,
+            "mode": "AUTONOMOUS_LEVEL_V",
+            "solar_conjunction_blackout": True,
+        },
+        "environment": {
+            "cabin_ppCO2_mmHg": 3.8,
+            "cabin_ppO2_mmHg": 148.0,
+            "cabin_pressure_kPa": 101.3,
+            "cabin_temp_C": 22.4,
+            "donki_spe_active": False,
+            "dosimetry_rate_mSv_hr": 0.054,
+        },
+        "astronaut": {
+            "id": "AST-01",
+            "name": "CDR Maya Lin",
+            "activity_state": "IVA_REST",
+            "active_scenario_id": "SCENARIO_1_HYPERCAPNIA",
+            "vitals": {"hr_bpm": 88.2, "dbp_mmHg": 76.1, "ve_L_min": 14.2},
+            "specialized_diagnostics": {"refraction_shift_D": 0.0},
+            "symptom_log": "Headache",
+        },
+    }
+    out = execute_diagnosis_pipeline(payload)
+    assert out["comms_status"]["one_way_delay_sec"] == 1120
+    assert out["comms_status"]["solar_conjunction_blackout"] is True
+    assert out["cabin_environment"] == {"cabin_pressure_kPa": 101.3, "cabin_temp_C": 22.4}
+    assert out["layer2_assessment"]["astronaut_id"] == "AST-01"
+
+    bad_payload = copy.deepcopy(payload)
+    bad_payload["environment"]["unplanned_field"] = 1
+    with pytest.raises(ValueError):
+        TelemetryPacket.model_validate(bad_payload)
+
+
+def test_contract_b_response_and_contract_c_mode_a_shape() -> None:
+    payload = {
+        "activity_state": "EVA_SPACEWALK",
+        "vitals": {
+            "heart_rate": 118,
+            "blood_pressure_sys": 142,
+            "blood_pressure_dia": 92,
+            "spo2": 95.8,
+            "hrv_ms": 22.4,
+            "core_temp_c": 37.6,
+            "respiration_rate": 20,
+        },
+        "environment": {"cabin_co2_mmhg": 12.8, "ambient_radiation_msv_h": 0.05},
+        "symptom_log": "Throbbing frontal headache, air feels sluggish, short of breath.",
+    }
+    result = execute_diagnosis_pipeline(payload)
+    assert "hardware_and_diagnostics" in result
+    assert result["hardware_and_diagnostics"]
+    assert all("contraindication_warning" in med for med in result["checs_medications"])
+    assert result["source_mode"] == "DETERMINISTIC_LOCAL_KNOWLEDGE_BASE"
+    assert result["source_verification_status"] == "NOT_EXTERNALLY_VERIFIED"
+
+    packet = TelemetryPacket.model_validate(payload)
+    assessment = EdgeAnomalyDetector().evaluate_packet(packet)
+    contract_b = build_contract_b_response(assessment, packet)
+    assert contract_b["astronaut_id"] == packet.astronaut_id
+    assert contract_b["assessment"]["breached_parameters"]
+    for breach in contract_b["breached_parameters"]:
+        assert "threshold" in breach
+    assert "rag_consultation" in contract_b
+
+    mode_b = execute_diagnosis_pipeline({"force_mode_b": True})
+    assert mode_b["hardware_and_diagnostics"]
+
+
+def test_cache_key_covers_every_normalized_input_field() -> None:
+    base = {
+        "timestamp": "2026-11-14T14:22:05Z",
+        "comms_status": {"one_way_delay_sec": 1120, "mode": "AUTONOMOUS_LEVEL_V"},
+        "astronaut": {
+            "id": "AST-01",
+            "vitals": {"heart_rate": 88, "blood_pressure_dia": 76, "ve_L_min": 14.2},
+            "specialized_diagnostics": {"refraction_shift_D": 0.0},
+        },
+        "environment": {
+            "cabin_ppO2_mmHg": 148,
+            "suit_pressure_psi": 4.3,
+            "cabin_pressure_kPa": 101.3,
+            "cabin_temp_C": 22.4,
+        },
+    }
+    base_packet = TelemetryPacket.model_validate(base)
+    base_key = rag_engine._build_cache_key(base_packet, "same symptoms")
+    variations = [
+        ("astronaut", "vitals", "blood_pressure_dia", 77),
+        ("astronaut", "vitals", "ve_L_min", 15.2),
+        ("astronaut", "specialized_diagnostics", "refraction_shift_D", 0.5),
+        ("environment", "cabin_ppO2_mmHg", None, 140),
+        ("environment", "suit_pressure_psi", None, 5.0),
+        ("environment", "cabin_pressure_kPa", None, 99.0),
+        ("environment", "cabin_temp_C", None, 24.0),
+        ("comms_status", "one_way_delay_sec", None, 900),
+        ("timestamp", None, None, "2026-11-14T14:22:06Z"),
+    ]
+    for first, second, third, value in variations:
+        changed = copy.deepcopy(base)
+        if third is not None:
+            changed[first][second][third] = value
+        elif second is not None:
+            changed[first][second] = value
+        else:
+            changed[first] = value
+        changed_packet = TelemetryPacket.model_validate(changed)
+        assert rag_engine._build_cache_key(changed_packet, "same symptoms") != base_key
+
+
+def test_dynamic_official_text_can_be_retrieved_as_evidence() -> None:
+    engine = LocalMedicalRAGEngine()
+    engine.dynamic_research_chunks = {
+        "NASA_DOC_VASCULAR": (
+            "[Source: nasa_official_protocols/vascular.md] Neck swelling, jugular clot, "
+            "and ultrasound diagnostics."
+        ),
+        "NASA_DOC_SLEEP": "[Source: nasa_official_protocols/sleep.md] Circadian sleep measures.",
+    }
+    evidence = engine._select_dynamic_evidence("neck swelling and blood clot")
+    assert len(evidence) == 1
+    assert "vascular.md" in evidence[0]
 
 
 if __name__ == "__main__":

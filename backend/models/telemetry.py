@@ -29,6 +29,13 @@ def _clamp_float(val: Any, default: float, low: float, high: float) -> float:
     return max(low, min(high, num))
 
 
+def _reject_unknown_fields(data: Dict[str, Any], allowed: set[str], model_name: str) -> None:
+    """Match Pydantic's extra='forbid' behavior in the standard-library fallback."""
+    unknown = set(data) - allowed
+    if unknown:
+        raise ValueError(f"Unknown {model_name} field(s): {', '.join(sorted(unknown))}")
+
+
 def _normalize_vitals_dict(data: Dict[str, Any]) -> Dict[str, Any]:
     """Normalize both Dheer (`heart_rate`) and NASA (`hr_bpm`) vital field names."""
     normalized = dict(data)
@@ -43,8 +50,10 @@ def _normalize_vitals_dict(data: Dict[str, Any]) -> Dict[str, Any]:
         "ve_L_min": "ve_l_min",
     }
     for src_key, dst_key in alias_map.items():
-        if src_key in normalized and dst_key not in normalized:
-            normalized[dst_key] = normalized[src_key]
+        if src_key in normalized:
+            if dst_key not in normalized:
+                normalized[dst_key] = normalized[src_key]
+            normalized.pop(src_key, None)
     return normalized
 
 
@@ -59,9 +68,16 @@ def _normalize_env_dict(data: Dict[str, Any]) -> Dict[str, Any]:
         "suit_PICO2_mmHg": "suit_pico2_mmhg",
     }
     for src_key, dst_key in alias_map.items():
-        if src_key in normalized and dst_key not in normalized:
-            normalized[dst_key] = normalized[src_key]
+        if src_key in normalized:
+            if dst_key not in normalized:
+                normalized[dst_key] = normalized[src_key]
+            normalized.pop(src_key, None)
     return normalized
+
+
+def _normalize_comms_dict(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Normalize Contract A communications status fields."""
+    return dict(data)
 
 
 def _unpack_packet_dict(data: Dict[str, Any]) -> Dict[str, Any]:
@@ -69,6 +85,11 @@ def _unpack_packet_dict(data: Dict[str, Any]) -> Dict[str, Any]:
     payload = dict(data)
     if "astronaut" in payload and isinstance(payload["astronaut"], dict):
         astro = payload["astronaut"]
+        _reject_unknown_fields(
+            astro,
+            {"id", "name", "activity_state", "active_scenario_id", "vitals", "specialized_diagnostics", "symptom_log"},
+            "astronaut",
+        )
         payload.setdefault("astronaut_id", astro.get("id", "ASTRO-01"))
         payload.setdefault("name", astro.get("name", "Cmdr. Maya Lin"))
         payload.setdefault("activity_state", astro.get("activity_state", "IVA_REST"))
@@ -76,40 +97,63 @@ def _unpack_packet_dict(data: Dict[str, Any]) -> Dict[str, Any]:
         payload.setdefault("vitals", astro.get("vitals", {}))
         payload.setdefault("specialized_diagnostics", astro.get("specialized_diagnostics"))
         payload.setdefault("symptom_log", astro.get("symptom_log", ""))
+        payload.pop("astronaut", None)
 
     vital_keys = {
         "heart_rate", "hr_bpm", "blood_pressure_sys", "sbp_mmHg",
         "blood_pressure_dia", "dbp_mmHg", "spo2", "spo2_pct",
         "hrv_ms", "hrv_rmssd_ms", "core_temp_c", "cbt_C",
-        "respiration_rate", "rr_bpm",
+        "respiration_rate", "rr_bpm", "ve_L_min", "ve_l_min",
     }
     if "vitals" not in payload:
         extracted_vitals = {k: payload[k] for k in vital_keys if k in payload}
         if extracted_vitals:
             payload["vitals"] = extracted_vitals
+            for key in extracted_vitals:
+                payload.pop(key, None)
 
     env_keys = {
         "cabin_co2_mmhg", "cabin_ppCO2_mmHg", "ambient_radiation_msv_h",
         "dosimetry_rate_mSv_hr", "suit_pressure_psi", "cabin_ppO2_mmHg",
-        "suit_PICO2_mmHg", "donki_spe_active",
+        "suit_PICO2_mmHg", "donki_spe_active", "cabin_pressure_kPa", "cabin_temp_C",
     }
     if "environment" not in payload:
         extracted_env = {k: payload[k] for k in env_keys if k in payload}
         if extracted_env:
             payload["environment"] = extracted_env
+            for key in extracted_env:
+                payload.pop(key, None)
 
-    if "scenario" in payload and not payload.get("active_scenario_id"):
-        payload["active_scenario_id"] = payload["scenario"]
+    if "scenario" in payload:
+        if not payload.get("active_scenario_id"):
+            payload["active_scenario_id"] = payload["scenario"]
+        payload.pop("scenario", None)
 
     return payload
 
 
 if PYDANTIC_AVAILABLE:
 
+    class CommsStatus(BaseModel):
+        """Communications and autonomy state from Contract A."""
+
+        model_config = ConfigDict(extra="forbid")
+
+        one_way_delay_sec: int = Field(default=0, ge=0, le=86400)
+        mode: str = Field(default="AUTONOMOUS_LEVEL_V", min_length=1, max_length=64)
+        solar_conjunction_blackout: bool = False
+
+        @model_validator(mode="before")
+        @classmethod
+        def normalize_comms(cls, data: Any) -> Any:
+            if isinstance(data, dict):
+                return _normalize_comms_dict(data)
+            return data
+
     class Vitals(BaseModel):
         """Astronaut physiological vital signs supporting both naming conventions."""
 
-        model_config = ConfigDict(extra="ignore", populate_by_name=True)
+        model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
         heart_rate: float = Field(default=62.0, ge=20.0, le=240.0, alias="hr_bpm")
         blood_pressure_sys: float = Field(default=112.0, ge=40.0, le=260.0, alias="sbp_mmHg")
@@ -130,7 +174,7 @@ if PYDANTIC_AVAILABLE:
     class Environment(BaseModel):
         """Spacecraft habitat ECLSS and space radiation environment."""
 
-        model_config = ConfigDict(extra="ignore", populate_by_name=True)
+        model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
         cabin_co2_mmhg: float = Field(default=2.2, ge=0.0, le=50.0)
         ambient_radiation_msv_h: float = Field(default=0.054, ge=0.0, le=500.0)
@@ -138,6 +182,8 @@ if PYDANTIC_AVAILABLE:
         cabin_ppo2_mmhg: float = Field(default=148.0, ge=50.0, le=250.0)
         suit_pico2_mmhg: Optional[float] = Field(default=None, ge=0.0, le=50.0)
         donki_spe_active: bool = Field(default=False)
+        cabin_pressure_kPa: Optional[float] = Field(default=None, ge=0.0, le=200.0)
+        cabin_temp_C: Optional[float] = Field(default=None, ge=-100.0, le=100.0)
 
         @model_validator(mode="before")
         @classmethod
@@ -149,7 +195,7 @@ if PYDANTIC_AVAILABLE:
     class SpecializedDiagnostics(BaseModel):
         """Optional point-of-care medical diagnostic inputs (OCT, C2M2 CBC, Ultrasound)."""
 
-        model_config = ConfigDict(extra="ignore")
+        model_config = ConfigDict(extra="forbid")
 
         oct_rnfl_um: Optional[float] = None
         refraction_shift_D: Optional[float] = None
@@ -160,7 +206,7 @@ if PYDANTIC_AVAILABLE:
     class TelemetryPacket(BaseModel):
         """Unified 1Hz Astronaut Telemetry Packet & `/api/diagnose` Request Payload."""
 
-        model_config = ConfigDict(extra="ignore", populate_by_name=True)
+        model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
         timestamp: str = Field(default="2026-11-14T10:15:30Z")
         met: str = Field(default="042:14:30:12")
@@ -169,6 +215,7 @@ if PYDANTIC_AVAILABLE:
         name: str = Field(default="Cmdr. Maya Lin")
         activity_state: str = Field(default="IVA_REST")
         active_scenario_id: Optional[str] = Field(default=None)
+        comms_status: Optional[CommsStatus] = Field(default=None)
         vitals: Vitals = Field(default_factory=Vitals)
         environment: Environment = Field(default_factory=Environment)
         specialized_diagnostics: Optional[SpecializedDiagnostics] = Field(default=None)
@@ -189,6 +236,7 @@ if PYDANTIC_AVAILABLE:
         parameter: str
         display_name: str
         value: float
+        threshold: Optional[float] = None
         unit: str
         expected_ug_range: str
         threshold_breached: str
@@ -219,8 +267,35 @@ if PYDANTIC_AVAILABLE:
 
 else:
     # Pure standard-library fallback classes with identical interface
+    class CommsStatus:  # type: ignore[no-redef]
+        def __init__(self, **kwargs: Any) -> None:
+            _reject_unknown_fields(
+                kwargs,
+                {"one_way_delay_sec", "mode", "solar_conjunction_blackout"},
+                "comms_status",
+            )
+            normalized = _normalize_comms_dict(kwargs)
+            self.one_way_delay_sec = int(normalized.get("one_way_delay_sec", 0))
+            self.mode = str(normalized.get("mode", "AUTONOMOUS_LEVEL_V"))
+            self.solar_conjunction_blackout = bool(normalized.get("solar_conjunction_blackout", False))
+            if not 0 <= self.one_way_delay_sec <= 86400 or not self.mode:
+                raise ValueError("Invalid comms_status values")
+
+        def model_dump(self) -> Dict[str, Any]:
+            return dict(self.__dict__)
+
     class Vitals:  # type: ignore[no-redef]
         def __init__(self, **kwargs: Any) -> None:
+            _reject_unknown_fields(
+                kwargs,
+                {
+                    "heart_rate", "hr_bpm", "blood_pressure_sys", "sbp_mmHg",
+                    "blood_pressure_dia", "dbp_mmHg", "spo2", "spo2_pct",
+                    "hrv_ms", "hrv_rmssd_ms", "core_temp_c", "cbt_C",
+                    "respiration_rate", "rr_bpm", "ve_l_min", "ve_L_min",
+                },
+                "vitals",
+            )
             norm = _normalize_vitals_dict(kwargs)
             self.heart_rate = _clamp_float(norm.get("heart_rate", 62.0), 62.0, 20.0, 240.0)
             self.blood_pressure_sys = _clamp_float(norm.get("blood_pressure_sys", 112.0), 112.0, 40.0, 260.0)
@@ -233,6 +308,16 @@ else:
 
     class Environment:  # type: ignore[no-redef]
         def __init__(self, **kwargs: Any) -> None:
+            _reject_unknown_fields(
+                kwargs,
+                {
+                    "cabin_co2_mmhg", "cabin_ppCO2_mmHg", "ambient_radiation_msv_h",
+                    "dosimetry_rate_mSv_hr", "bfo_dose_rate_mGy_hr", "suit_pressure_psi",
+                    "cabin_ppo2_mmhg", "cabin_ppO2_mmHg", "suit_pico2_mmhg",
+                    "suit_PICO2_mmHg", "donki_spe_active", "cabin_pressure_kPa", "cabin_temp_C",
+                },
+                "environment",
+            )
             norm = _normalize_env_dict(kwargs)
             self.cabin_co2_mmhg = _clamp_float(norm.get("cabin_co2_mmhg", 2.2), 2.2, 0.0, 50.0)
             self.ambient_radiation_msv_h = _clamp_float(norm.get("ambient_radiation_msv_h", 0.054), 0.054, 0.0, 500.0)
@@ -240,9 +325,22 @@ else:
             self.cabin_ppo2_mmhg = _clamp_float(norm.get("cabin_ppo2_mmhg", 148.0), 148.0, 50.0, 250.0)
             self.suit_pico2_mmhg = norm.get("suit_pico2_mmhg")
             self.donki_spe_active = bool(norm.get("donki_spe_active", False))
+            self.cabin_pressure_kPa = (
+                _clamp_float(norm["cabin_pressure_kPa"], 101.3, 0.0, 200.0)
+                if norm.get("cabin_pressure_kPa") is not None else None
+            )
+            self.cabin_temp_C = (
+                _clamp_float(norm["cabin_temp_C"], 22.0, -100.0, 100.0)
+                if norm.get("cabin_temp_C") is not None else None
+            )
 
     class SpecializedDiagnostics:  # type: ignore[no-redef]
         def __init__(self, **kwargs: Any) -> None:
+            _reject_unknown_fields(
+                kwargs,
+                {"oct_rnfl_um", "refraction_shift_D", "alc_cells_uL", "ultrasound_ijv_thrombus", "bladder_volume_mL"},
+                "specialized_diagnostics",
+            )
             self.oct_rnfl_um = kwargs.get("oct_rnfl_um")
             self.refraction_shift_D = kwargs.get("refraction_shift_D")
             self.alc_cells_uL = kwargs.get("alc_cells_uL")
@@ -252,6 +350,19 @@ else:
     class TelemetryPacket:  # type: ignore[no-redef]
         def __init__(self, **kwargs: Any) -> None:
             unpacked = _unpack_packet_dict(kwargs)
+            root_fields = {
+                "timestamp", "met", "mission_day", "astronaut_id", "name", "activity_state",
+                "active_scenario_id", "comms_status", "vitals", "environment",
+                "specialized_diagnostics", "symptom_log", "force_mode_b", "stateless_evaluation",
+                "astronaut", "scenario", "heart_rate", "hr_bpm", "blood_pressure_sys", "sbp_mmHg",
+                "blood_pressure_dia", "dbp_mmHg", "spo2", "spo2_pct", "hrv_ms", "hrv_rmssd_ms",
+                "core_temp_c", "cbt_C", "respiration_rate", "rr_bpm", "ve_l_min", "ve_L_min",
+                "cabin_co2_mmhg", "cabin_ppCO2_mmHg", "ambient_radiation_msv_h",
+                "dosimetry_rate_mSv_hr", "bfo_dose_rate_mGy_hr", "suit_pressure_psi",
+                "cabin_ppo2_mmhg", "cabin_ppO2_mmHg", "suit_pico2_mmhg", "suit_PICO2_mmHg",
+                "donki_spe_active", "cabin_pressure_kPa", "cabin_temp_C",
+            }
+            _reject_unknown_fields(unpacked, root_fields, "telemetry")
             self.timestamp = str(unpacked.get("timestamp", "2026-11-14T10:15:30Z"))
             self.met = str(unpacked.get("met", "042:14:30:12"))
             self.mission_day = int(unpacked.get("mission_day", 84))
@@ -259,6 +370,10 @@ else:
             self.name = str(unpacked.get("name", "Cmdr. Maya Lin"))
             self.activity_state = str(unpacked.get("activity_state", "IVA_REST"))
             self.active_scenario_id = unpacked.get("active_scenario_id")
+            comms = unpacked.get("comms_status")
+            self.comms_status = (
+                comms if isinstance(comms, CommsStatus) or comms is None else CommsStatus(**comms)
+            )
             v_raw = unpacked.get("vitals", {})
             self.vitals = v_raw if isinstance(v_raw, Vitals) else Vitals(**(v_raw or {}))
             e_raw = unpacked.get("environment", {})
@@ -282,6 +397,7 @@ else:
             self.parameter = kwargs["parameter"]
             self.display_name = kwargs["display_name"]
             self.value = kwargs["value"]
+            self.threshold = kwargs.get("threshold")
             self.unit = kwargs["unit"]
             self.expected_ug_range = kwargs["expected_ug_range"]
             self.threshold_breached = kwargs["threshold_breached"]

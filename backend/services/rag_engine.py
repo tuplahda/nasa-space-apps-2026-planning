@@ -47,6 +47,7 @@ MAX_SYMPTOM_CHARS: int = 500
 MAX_CHUNKS: int = 64
 MODE_A_CONFIDENCE_THRESHOLD: float = 0.75
 
+
 REPO_ROOT: Path = Path(__file__).resolve().parent.parent.parent
 PROTOCOLS_JSON_PATH: Path = REPO_ROOT / "data" / "rag_protocols_8_scenarios.json"
 RESEARCH_MD_PATH: Path = REPO_ROOT / "data" / "nasa_space_medicine_research.md"
@@ -423,6 +424,7 @@ class LocalMedicalRAGEngine:
         self.protocol_by_id: Dict[str, Dict[str, Any]] = {}
         self.arxiv_citations: List[Dict[str, Any]] = []
         self.research_chunks: Dict[str, str] = {}
+        self.dynamic_research_chunks: Dict[str, str] = {}
         self.research_notes_loaded: bool = False
         self.dynamic_docs_loaded: List[str] = []
         self.candidate_rag_buffer: List[Dict[str, Any]] = []
@@ -452,6 +454,7 @@ class LocalMedicalRAGEngine:
         """Load core NASA datasets, research chunks, and dynamic files, then build indices."""
         self.protocols = []
         self.protocol_by_id = {}
+        self.dynamic_research_chunks = {}
         self.dynamic_docs_loaded = []
         self.diagnosis_cache.clear()
 
@@ -623,13 +626,16 @@ class LocalMedicalRAGEngine:
         """
         text = fpath.read_text(encoding="utf-8")[:2000]
         sid = f"NASA_DOC_{fpath.stem.upper()}"
-        self.research_chunks[sid] = f"[Source: nasa_official_protocols/{fpath.name}] {text[:600]}"
+        self.dynamic_research_chunks[sid] = (
+            f"[Source: nasa_official_protocols/{fpath.name}] {text[:600]}"
+        )
         self.dynamic_docs_loaded.append(fpath.name)
 
-    def _is_protocol_verified_for_mode_a(self, proto: Optional[Dict[str, Any]]) -> bool:
+    def _is_mode_a_data_complete(self, proto: Optional[Dict[str, Any]]) -> bool:
         """
-        Verify that a candidate protocol has non-empty source citations, CHeCS medications,
-        and checklist steps in local source files before allowing Mode A output.
+        Require the local protocol record to contain the fields needed for Mode A output.
+
+        This structural check does not independently validate external source provenance.
         """
         if not proto:
             return False
@@ -643,28 +649,56 @@ class LocalMedicalRAGEngine:
         v = packet.vitals
         e = packet.environment
         d = packet.specialized_diagnostics
-        effective_co2 = max(e.cabin_co2_mmhg, e.suit_pico2_mmhg or 0.0)
+        c = packet.comms_status
         key_obj = {
-            "act": packet.activity_state,
-            "fd": packet.mission_day,
-            "scen": packet.active_scenario_id,
-            "mode_b": packet.force_mode_b,
-            "v": [
-                round(v.heart_rate, 1),
-                round(v.blood_pressure_sys, 1),
-                round(v.spo2, 1),
-                round(v.hrv_ms, 1),
-                round(v.core_temp_c, 2),
-                round(v.respiration_rate, 1),
-            ],
-            "e": [round(effective_co2, 2), round(e.ambient_radiation_msv_h, 3), e.donki_spe_active],
-            "d": [
-                d.oct_rnfl_um if d else None,
-                d.alc_cells_uL if d else None,
-                d.ultrasound_ijv_thrombus if d else None,
-                d.bladder_volume_mL if d else None,
-            ],
-            "sym": clean_symptoms.lower(),
+            "timestamp": packet.timestamp,
+            "met": packet.met,
+            "mission_day": packet.mission_day,
+            "astronaut_id": packet.astronaut_id,
+            "name": packet.name,
+            "activity_state": packet.activity_state,
+            "active_scenario_id": packet.active_scenario_id,
+            "force_mode_b": packet.force_mode_b,
+            "stateless_evaluation": packet.stateless_evaluation,
+            "sanitized_symptom_log": clean_symptoms.lower(),
+            "comms_status": (
+                {
+                    "one_way_delay_sec": c.one_way_delay_sec,
+                    "mode": c.mode,
+                    "solar_conjunction_blackout": c.solar_conjunction_blackout,
+                }
+                if c is not None else None
+            ),
+            "vitals": {
+                "heart_rate": v.heart_rate,
+                "blood_pressure_sys": v.blood_pressure_sys,
+                "blood_pressure_dia": v.blood_pressure_dia,
+                "spo2": v.spo2,
+                "hrv_ms": v.hrv_ms,
+                "core_temp_c": v.core_temp_c,
+                "respiration_rate": v.respiration_rate,
+                "ve_l_min": v.ve_l_min,
+            },
+            "environment": {
+                "cabin_co2_mmhg": e.cabin_co2_mmhg,
+                "ambient_radiation_msv_h": e.ambient_radiation_msv_h,
+                "suit_pressure_psi": e.suit_pressure_psi,
+                "cabin_ppo2_mmhg": e.cabin_ppo2_mmhg,
+                "suit_pico2_mmhg": e.suit_pico2_mmhg,
+                "donki_spe_active": e.donki_spe_active,
+                "cabin_pressure_kPa": e.cabin_pressure_kPa,
+                "cabin_temp_C": e.cabin_temp_C,
+            },
+            "specialized_diagnostics": (
+                {
+                    "oct_rnfl_um": d.oct_rnfl_um,
+                    "refraction_shift_D": d.refraction_shift_D,
+                    "alc_cells_uL": d.alc_cells_uL,
+                    "ultrasound_ijv_thrombus": d.ultrasound_ijv_thrombus,
+                    "bladder_volume_mL": d.bladder_volume_mL,
+                }
+                if d is not None else None
+            ),
         }
         raw = json.dumps(key_obj, sort_keys=True)
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()
@@ -695,7 +729,7 @@ class LocalMedicalRAGEngine:
         if (
             confidence >= MODE_A_CONFIDENCE_THRESHOLD
             and not packet.force_mode_b
-            and self._is_protocol_verified_for_mode_a(matched_proto)
+            and self._is_mode_a_data_complete(matched_proto)
         ):
             response = self._build_mode_a_response(
                 best_scenario_id,
@@ -985,8 +1019,24 @@ class LocalMedicalRAGEngine:
             return True
         return False
 
-    def _get_retrieved_evidence_chunks(self, scenario_id: str, proto: Dict[str, Any]) -> List[str]:
-        """Return `[Source: ...]` tagged clinical evidence chunks from all 3 local knowledge files."""
+    def _select_dynamic_evidence(self, clean_symptoms: str) -> List[str]:
+        """Select up to two loaded text documents with lexical overlap to the symptom query."""
+        query_tokens = set(_tokenize(expand_clinical_synonyms(clean_symptoms)))
+        matches: List[Tuple[int, str, str]] = []
+        for index, sid in enumerate(self.dynamic_research_chunks):
+            if index >= MAX_DYNAMIC_FILES:
+                break
+            chunk = self.dynamic_research_chunks[sid]
+            overlap = len(query_tokens.intersection(_tokenize(chunk)))
+            if overlap > 0:
+                matches.append((overlap, sid, chunk))
+        matches.sort(key=lambda row: (-row[0], row[1]))
+        return [row[2] for row in matches[:2]]
+
+    def _get_retrieved_evidence_chunks(
+        self, scenario_id: str, proto: Dict[str, Any], clean_symptoms: str
+    ) -> List[str]:
+        """Return tagged protocol, research, citation, and matching official text evidence."""
         chunks: List[str] = []
         citations = proto.get("nasa_citations", [])
         primary_cit = citations[0] if citations else "UNSPECIFIED_CITATION"
@@ -997,6 +1047,7 @@ class LocalMedicalRAGEngine:
         prefix = "_".join(scenario_id.split("_")[:2])
         if prefix in self.research_chunks:
             chunks.append(self.research_chunks[prefix])
+        chunks.extend(self._select_dynamic_evidence(clean_symptoms))
 
         # Attach relevant Layer 3 / radiation / RAG validation arXiv citation from local dataset
         for i in range(min(len(self.arxiv_citations), MAX_PROTOCOLS)):
@@ -1014,6 +1065,35 @@ class LocalMedicalRAGEngine:
                     f"{paper.get('title', '')}: {paper.get('key_finding_quote', '')}"
                 )
         return chunks
+
+    def _normalize_contract_checs_medications(self, medications: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Add Contract C medication keys while preserving the source record fields."""
+        normalized: List[Dict[str, Any]] = []
+        for med in medications:
+            item = dict(med)
+            item.setdefault("drug", str(med.get("medication", "")))
+            item.setdefault("pack", str(med.get("checs_pack", "")))
+            item["contraindication_warning"] = str(
+                med.get("contraindication_warning") or med.get("contraindication") or ""
+            )
+            normalized.append(item)
+        return normalized
+
+    def _build_hardware_and_diagnostics(self, proto: Dict[str, Any]) -> List[str]:
+        """Return source checklist actions that name onboard diagnostic hardware."""
+        explicit = proto.get("hardware_and_diagnostics")
+        if isinstance(explicit, list):
+            return [str(item) for item in explicit]
+        markers = (
+            "MDP", "RSP", "i-STAT", "C2M2", "OCT", "ultrasound", "ECG",
+            "AED", "LBNP", "ITV", "LCVG", "ventilation fan", "fundoscopy",
+        )
+        selected: List[str] = []
+        for step in proto.get("autonomous_checklist", []):
+            text = str(step)
+            if any(marker.lower() in text.lower() for marker in markers):
+                selected.append(text)
+        return selected
 
     def _build_mode_a_response(
         self,
@@ -1068,6 +1148,8 @@ class LocalMedicalRAGEngine:
             packet,
             assessment,
         )
+        contract_checs_meds = self._normalize_contract_checs_medications(checs_meds)
+        hardware_and_diagnostics = self._build_hardware_and_diagnostics(proto)
         checklist = [
             {
                 "step": idx + 1,
@@ -1085,7 +1167,7 @@ class LocalMedicalRAGEngine:
             if assessment.nasa_priority_class == "CLASS_1_EMERGENCY"
             else "CLASS_2_WARNING"
         )
-        evidence_chunks = self._get_retrieved_evidence_chunks(scenario_id, proto)
+        evidence_chunks = self._get_retrieved_evidence_chunks(scenario_id, proto, clean_symptoms)
 
         return {
             "diagnosis_id": f"DIAG-2026-{scenario_id[-4:]}",
@@ -1105,7 +1187,8 @@ class LocalMedicalRAGEngine:
             },
             "checs_subpack": subpack_str,
             "prescriptions": prescriptions,
-            "checs_medications": checs_meds,
+            "checs_medications": contract_checs_meds,
+            "hardware_and_diagnostics": hardware_and_diagnostics,
             "contraindications_locked": contraindications,
             "action_checklist": checklist,
             "action_plan": checklist,
@@ -1124,7 +1207,8 @@ class LocalMedicalRAGEngine:
             "readiness_score_0_100": assessment.readiness_score_0_100,
             "execution_time_ms": elapsed_ms,
             "cache_hit": False,
-            "source_mode": "DETERMINISTIC_NASA_VERIFIED",
+            "source_mode": "DETERMINISTIC_LOCAL_KNOWLEDGE_BASE",
+            "source_verification_status": "NOT_EXTERNALLY_VERIFIED",
             "rag_metrics": {
                 "retrieval_latency_ms": elapsed_ms,
                 "protocols_evaluated": len(self.protocols),
@@ -1167,6 +1251,9 @@ class LocalMedicalRAGEngine:
                 "order": "Perform AI-guided thoracic & optic nerve ultrasound.",
                 "hardware": "Ultrasound-2 Onboard Unit",
             },
+        ]
+        hardware_and_diagnostics = [
+            f"{item['hardware']}: {item['order']}" for item in poc_orders
         ]
         lockout_msg = (
             "CRITICAL SAFETY LOCKOUT: Opioids, NSAIDs, and Anticoagulants are LOCKED OUT "
@@ -1222,6 +1309,7 @@ class LocalMedicalRAGEngine:
                 "protocol": abc_stabilization["protocol"],
             },
             "point_of_care_orders": poc_orders,
+            "hardware_and_diagnostics": hardware_and_diagnostics,
             "drug_lockout_warning": lockout_msg,
             "safety_warning": lockout_msg,
             "contraindications_locked": [
@@ -1234,6 +1322,8 @@ class LocalMedicalRAGEngine:
                 "uplink_target": "Houston Flight Surgeon Console (20m 14s delay)",
                 "save_candidate_to_local_rag": True,
                 "candidates_queued": len(self.candidate_rag_buffer),
+                "candidate_storage_status": "IN_MEMORY_ONLY_PENDING_REVIEW",
+                "candidate_indexed_for_retrieval": False,
             },
             "action_checklist": checklist,
             "action_plan": checklist,
@@ -1440,6 +1530,7 @@ class LocalMedicalRAGEngine:
             "checs_subpack": "NONE",
             "prescriptions": [],
             "checs_medications": [],
+            "hardware_and_diagnostics": [],
             "contraindications_locked": [],
             "action_checklist": checklist,
             "action_plan": checklist,
@@ -1455,7 +1546,8 @@ class LocalMedicalRAGEngine:
             "readiness_score_0_100": assessment.readiness_score_0_100,
             "execution_time_ms": elapsed_ms,
             "cache_hit": False,
-            "source_mode": "DETERMINISTIC_NASA_VERIFIED",
+            "source_mode": "DETERMINISTIC_LOCAL_KNOWLEDGE_BASE",
+            "source_verification_status": "NOT_EXTERNALLY_VERIFIED",
             "rag_metrics": {
                 "retrieval_latency_ms": elapsed_ms,
                 "protocols_evaluated": len(self.protocols),

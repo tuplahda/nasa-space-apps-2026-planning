@@ -26,6 +26,31 @@ except ImportError:  # pragma: no cover - Air-gapped stdlib fallback
 anomaly_detector = EdgeAnomalyDetector()
 rag_engine = LocalMedicalRAGEngine()
 
+
+def attach_contract_a_context(result: Dict[str, Any], packet: TelemetryPacket) -> Dict[str, Any]:
+    """Expose Contract A context that is not part of the clinical RAG decision."""
+    comms = packet.comms_status
+    result["comms_status"] = comms.model_dump() if comms is not None else None
+    result["cabin_environment"] = {
+        "cabin_pressure_kPa": packet.environment.cabin_pressure_kPa,
+        "cabin_temp_C": packet.environment.cabin_temp_C,
+    }
+    return result
+
+
+def build_contract_b_response(
+    assessment: AnomalyAssessment,
+    packet: TelemetryPacket,
+    rag_consultation: Any = None,
+) -> Dict[str, Any]:
+    """Return Contract B fields at the root and retain the existing wrapped form."""
+    assessment_data = assessment.model_dump()
+    response = dict(assessment_data)
+    response["assessment"] = assessment_data
+    response["rag_consultation"] = rag_consultation
+    attach_contract_a_context(response, packet)
+    return response
+
 SWAGGER_DIAGNOSE_EXAMPLES: Dict[str, Dict[str, Any]] = {
     "mode_a_hypercapnia": {
         "summary": "🟢 Mode A: EVA Hypercapnia (CO2 Toxicity — Locks Out Opioids)",
@@ -158,7 +183,7 @@ def execute_diagnosis_pipeline(payload: Dict[str, Any]) -> Dict[str, Any]:
     total_ms = round((time.perf_counter_ns() - start_ns) / 1_000_000.0, 3)
     rag_result["total_pipeline_latency_ms"] = total_ms
     rag_result["layer2_assessment"] = assessment.model_dump()
-    return rag_result
+    return attach_contract_a_context(rag_result, packet)
 
 
 if FASTAPI_AVAILABLE and router is not None:
@@ -178,7 +203,7 @@ if FASTAPI_AVAILABLE and router is not None:
             total_ms = round((time.perf_counter_ns() - start_ns) / 1_000_000.0, 3)
             result["total_pipeline_latency_ms"] = total_ms
             result["layer2_assessment"] = assessment.model_dump()
-            return result
+            return attach_contract_a_context(result, packet)
         except Exception as exc:
             raise HTTPException(
                 status_code=500,
@@ -200,13 +225,10 @@ if FASTAPI_AVAILABLE and router is not None:
         """
         packet.stateless_evaluation = False
         assessment = anomaly_detector.evaluate_packet(packet)
-        response: Dict[str, Any] = {
-            "assessment": assessment.model_dump(),
-            "rag_consultation": None,
-        }
+        rag_consultation = None
         if assessment.trigger_rag_consultation:
-            response["rag_consultation"] = rag_engine.diagnose(packet, assessment)
-        return response
+            rag_consultation = rag_engine.diagnose(packet, assessment)
+        return build_contract_b_response(assessment, packet, rag_consultation)
 
     @router.get("/diagnose/buffer-status")
     async def get_buffer_status(astronaut_id: str = "ASTRO-01") -> Dict[str, Any]:

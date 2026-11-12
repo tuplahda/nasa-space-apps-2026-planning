@@ -20,6 +20,7 @@ from backend.routes.diagnose import (
     FASTAPI_AVAILABLE,
     SWAGGER_DIAGNOSE_EXAMPLES,
     anomaly_detector,
+    build_contract_b_response,
     execute_diagnosis_pipeline,
     rag_engine,
     router as diagnose_router,
@@ -269,10 +270,7 @@ class AresMedStdlibRequestHandler(BaseHTTPRequestHandler):
                 if assessment.trigger_rag_consultation
                 else None
             )
-            self._send_json(
-                200,
-                {"assessment": assessment.model_dump(), "rag_consultation": rag_out},
-            )
+            self._send_json(200, build_contract_b_response(assessment, packet, rag_out))
             return
 
         self._send_json(404, {"title": "Not Found", "status": 404})

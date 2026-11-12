@@ -11,6 +11,7 @@ functions < 60 lines).
 """
 
 import json
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -61,6 +62,12 @@ PARAM_DISPLAY_NAMES: Dict[str, Tuple[str, str]] = {
     "cabin_ppCO2_mmHg": ("Cabin CO2", "NASA-STD-3001 [V2 6004]"),
     "ambient_radiation_msv_h": ("Ambient Radiation", "NASA-STD-3001 [V1 4030]"),
 }
+
+
+def _threshold_value(description: str) -> Optional[float]:
+    """Expose the numeric cutoff in Contract B when the rule has one."""
+    match = re.search(r"[-+]?(?:\d+\.?\d*|\.\d+)", description)
+    return float(match.group(0)) if match else None
 
 
 def normalize_activity_state(raw_state: str) -> str:
@@ -310,6 +317,7 @@ class EdgeAnomalyDetector:
                             parameter=k,
                             display_name=disp_name,
                             value=st.validated_value,
+                            threshold=_threshold_value(thresh_desc),
                             unit=unit,
                             expected_ug_range=exp_str,
                             threshold_breached=thresh_desc,
@@ -340,6 +348,7 @@ class EdgeAnomalyDetector:
                     parameter="oct_rnfl_um",
                     display_name="OCT Retinal Nerve Fiber Layer",
                     value=diag.oct_rnfl_um,
+                    threshold=105.0,
                     unit="μm",
                     expected_ug_range="90-102 μm",
                     threshold_breached="> 105 μm (SANS Optic Disc Edema)",
@@ -356,6 +365,7 @@ class EdgeAnomalyDetector:
                     parameter="alc_cells_uL",
                     display_name="Absolute Lymphocyte Count (C2M2)",
                     value=diag.alc_cells_uL,
+                    threshold=1500.0,
                     unit="cells/μL",
                     expected_ug_range="1500-4000 cells/μL",
                     threshold_breached="< 1500 cells/μL (Andrews Radiation Depletion)",
@@ -372,6 +382,7 @@ class EdgeAnomalyDetector:
                     parameter="ultrasound_ijv_thrombus",
                     display_name="IJV Ultrasound Venous Scan",
                     value=1.0,
+                    threshold=1.0,
                     unit="boolean",
                     expected_ug_range="Compressible / Patent",
                     threshold_breached="Echogenic Thrombus Detected",
@@ -388,6 +399,7 @@ class EdgeAnomalyDetector:
                     parameter="bladder_volume_mL",
                     display_name="Bladder Ultrasound Volume",
                     value=diag.bladder_volume_mL,
+                    threshold=500.0,
                     unit="mL",
                     expected_ug_range="< 400 mL",
                     threshold_breached="> 500 mL (Acute Urinary Retention)",
