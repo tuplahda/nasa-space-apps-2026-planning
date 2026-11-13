@@ -18,8 +18,12 @@ Build the **Autonomous NASA Level V Crew Medical Officer AI (RAG Agent)** that m
 
 | Resource | Path | How You Use It |
 | :--- | :--- | :--- |
-| **8 Emergency Protocols** | [`data/rag_protocols_8_scenarios.json`](../data/rag_protocols_8_scenarios.json) | The primary clinical knowledge base for Mode A diagnoses and treatments. |
-| **NASA Research Notes** | [`data/nasa_space_medicine_research.md`](../data/nasa_space_medicine_research.md) | Clinical evidence, ISS medical checklist excerpts, and CHeCS formulary. |
+| **Expanded RAG Protocols (40)** | [`data/rag_protocols_expanded.json`](../data/rag_protocols_expanded.json) | **PRIMARY:** 8 spaceflight scenarios (with `layer1_equations`) + 32 NASA Space Medicine CPGs (`CPG-01`–`CPG-32`) as pre-processed RAG chunks. |
+| **CHeCS Formulary (54 Meds)** | [`data/checs_formulary.json`](../data/checs_formulary.json) | Pre-processed ISS CHeCS subpack formulary (`CMP`, `OMP`, `TIMP`, `EMTP`, `RSP`, `ISP`), doses, and hard lockout rules. |
+| **NASA-STD-3001 Rules (26)** | [`data/nasa_std_3001_rules.json`](../data/nasa_std_3001_rules.json) | Verbatim clinical, radiation, atmospheric, and JSC 20584 SMAC threshold rules for `nasa_direct_quote`. |
+| **Onboard Hardware Specs (5)** | [`data/onboard_hardware_specs.json`](../data/onboard_hardware_specs.json) | Point-of-care diagnostic specs (`i-STAT`, `Ultrasound-2`, `C2M2`, `PanOptic/OCT`, `Tempus Pro`) for Mode B lab orders. |
+| **8 Legacy Scenarios** | [`data/rag_protocols_8_scenarios.json`](../data/rag_protocols_8_scenarios.json) | Original 8 scenarios (preserved for backward compatibility). |
+| **NASA Research Notes** | [`data/nasa_space_medicine_research.md`](../data/nasa_space_medicine_research.md) | Clinical evidence, ISS medical checklist excerpts, and CHeCS formulary notes. |
 | **Microgravity Thresholds** | [`data/nasa_baselines_and_thresholds.json`](../data/nasa_baselines_and_thresholds.json) | Threshold numbers used by your edge anomaly detector. |
 | **arXiv Citations** | [`data/arxiv_literature_citations.json`](../data/arxiv_literature_citations.json) | Academic papers to cite for AI and space medicine validation. |
 | **Clinical Protocol Spec** | [`artifacts/clinical_decision_protocol_2_modes.md`](../artifacts/clinical_decision_protocol_2_modes.md) | **MUST READ:** Exact JSON schema and clinical rules for Mode A vs Mode B. |
@@ -46,8 +50,11 @@ Build the **Autonomous NASA Level V Crew Medical Officer AI (RAG Agent)** that m
 * Requires **3 consecutive abnormal ticks** before triggering an anomaly (filters single-tick cosmic ray bit-flips).
 
 ### 2. The 2-Mode RAG Engine (`backend/services/rag_engine.py`)
-Loads our verified datasets:
-* [`data/rag_protocols_8_scenarios.json`](../data/rag_protocols_8_scenarios.json)
+Loads our pre-processed, offline-ready datasets into your local vector/keyword store:
+* [`data/rag_protocols_expanded.json`](../data/rag_protocols_expanded.json) (8 legacy scenarios + 32 `CPG-01`–`CPG-32` clinical protocols)
+* [`data/checs_formulary.json`](../data/checs_formulary.json) (54 ISS CHeCS medications + spaceflight lockouts)
+* [`data/nasa_std_3001_rules.json`](../data/nasa_std_3001_rules.json) (26 verbatim NASA-STD-3001 & JSC 20584 SMAC rules)
+* [`data/onboard_hardware_specs.json`](../data/onboard_hardware_specs.json) (5 onboard diagnostic devices)
 * [`data/nasa_space_medicine_research.md`](../data/nasa_space_medicine_research.md)
 
 When an anomaly packet arrives, it queries the local knowledge base and computes a **Retrieval Confidence Score (0.0 to 1.0)**:

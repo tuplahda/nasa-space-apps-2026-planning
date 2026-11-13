@@ -1,0 +1,122 @@
+{
+  "dataset_metadata": {
+    "name": "Onboard Diagnostic Hardware Specifications & Operational Constraints",
+    "version": "1.0.0",
+    "source": "NASA Space Medicine RAG Corpus (ISS & Exploration Medical Kit Hardware)",
+    "total_devices": 5,
+    "offline_ready": true,
+    "description": "Pre-processed hardware capabilities, measurable analytes/metrics, and spaceflight limitations for offline RAG retrieval."
+  },
+  "devices": [
+    {
+      "device_id": "HW-001",
+      "name": "Abbott i-STAT Portable Clinical Analyzer",
+      "category": "Point-of-Care Blood Chemistry & Blood Gas",
+      "cartridges_supported": ["Chem8+", "CG4+"],
+      "measurable_parameters": [
+        "Na+ (Sodium)",
+        "K+ (Potassium)",
+        "Cl- (Chloride)",
+        "TCO2",
+        "Anion Gap",
+        "iCa (Ionized Calcium)",
+        "Glucose",
+        "BUN",
+        "Creatinine",
+        "Hematocrit / Hemoglobin",
+        "pH, pCO2, pO2, HCO3-, Lactate (CG4+)"
+      ],
+      "clinical_triggers": [
+        "Verify Creatinine before Ketorolac or Valacyclovir",
+        "Verify K+ before Lisinopril or TMP-SMX",
+        "Verify pCO2/pH/Lactate in hypercapnia, sepsis, or shock"
+      ],
+      "spaceflight_constraints": "Cartridges have strict shelf-life expiration and are sensitive to ionizing radiation and thermal excursions. Requires bubble-free microgravity venous/fingerstick loading.",
+      "search_text": "Abbott i-STAT Chem8+ CG4+ blood chemistry electrolytes creatinine potassium lactate pCO2 pH expiration radiation sensitivity."
+    },
+    {
+      "device_id": "HW-002",
+      "name": "Ultrasound-2 (Diagnostic Sonography)",
+      "category": "Point-of-Care Imaging & Doppler",
+      "protocols_supported": [
+        "eFAST (Extended Focused Assessment with Sonography for Trauma)",
+        "Optic Nerve Sheath Diameter (ONSD)",
+        "Renal / Bladder / Pelvis Scan",
+        "Internal Jugular Vein (IJV) Compression & Color Doppler",
+        "RLQ Appendix / Gallbladder Scan"
+      ],
+      "diagnostic_thresholds": {
+        "onsd_sans_threshold_mm": 5.9,
+        "ijv_thrombosis_grading": "Grade 3/4 non-compressible occlusive or stagnant flow"
+      },
+      "clinical_triggers": [
+        "ONSD > 5.9 mm indicates elevated ICP / SANS progression",
+        "IJV Grade 3/4 thrombosis triggers Enoxaparin -> Apixaban protocol",
+        "eFAST positive free fluid triggers Level V trauma resuscitation",
+        "Renal hydronephrosis confirms obstructive nephrolithiasis"
+      ],
+      "spaceflight_constraints": "Operator-dependent; autonomous crew rely on guided probe placement overlays and pre-loaded reference loops.",
+      "search_text": "Ultrasound-2 eFAST ONSD optic nerve sheath diameter > 5.9 mm SANS IJV internal jugular vein Doppler Grade 3 4 renal bladder appendix."
+    },
+    {
+      "device_id": "HW-003",
+      "name": "C2M2 (Compact Hematology / CBC Analyzer)",
+      "category": "Point-of-Care Hematology",
+      "measurable_parameters": [
+        "WBC (White Blood Cell Count) & Differential",
+        "ALC (Absolute Lymphocyte Count)",
+        "ANC (Absolute Neutrophil Count)",
+        "Platelet Count",
+        "Hemoglobin / RBC"
+      ],
+      "clinical_triggers": [
+        "Leukocytosis / left shift confirms acute infection (appendicitis, sepsis, pneumonia)",
+        "Rapid ALC drop (Andrews curves) quantifies Acute Radiation Syndrome (ARS) severity",
+        "Thrombocytopenia locks out Aspirin, NSAIDs, Enoxaparin, Apixaban, Clopidogrel"
+      ],
+      "spaceflight_constraints": "Microgravity fluidics require closed-cartridge capillary handling without free-air bubbles.",
+      "search_text": "C2M2 CBC hematology WBC leukocytosis ALC absolute lymphocyte count ARS radiation thrombocytopenia platelets."
+    },
+    {
+      "device_id": "HW-004",
+      "name": "PanOptic Fundoscope & Optical Coherence Tomography (OCT)",
+      "category": "Ophthalmic & Neuro-Ocular Imaging",
+      "measurable_parameters": [
+        "Optic disc edema (Frisen Scale 0-5)",
+        "Choroidal folds",
+        "Retinal Nerve Fiber Layer (RNFL) thickness",
+        "Posterior globe flattening",
+        "Corneal fluorescein staining (with Cobalt blue filter)"
+      ],
+      "diagnostic_thresholds": {
+        "frisen_scale_range": "0 (normal) to 5 (severe papilledema)"
+      },
+      "clinical_triggers": [
+        "Frisen >= 1 or choroidal folds / RNFL thickening confirms SANS progression",
+        "Corneal fluorescein uptake confirms corneal abrasion (locks out Olopatadine)"
+      ],
+      "spaceflight_constraints": "Requires pupil dilation or dark-adapted cabin; OCT provides objective quantitative SANS tracking over months.",
+      "search_text": "PanOptic Fundoscope OCT Optical Coherence Tomography Frisen Scale 0-5 choroidal folds RNFL SANS papilledema corneal abrasion."
+    },
+    {
+      "device_id": "HW-005",
+      "name": "Tempus Pro & Holter Monitor",
+      "category": "Vital Signs, 12-Lead ECG, Capnography & Defibrillation",
+      "measurable_parameters": [
+        "12-lead ECG & QTc interval",
+        "Continuous Holter rhythm telemetry",
+        "ETCO2 (End-Tidal CO2 waveform capnography)",
+        "SpO2, NIBP, Core/Skin Temp",
+        "Defibrillation / Cardioversion capability"
+      ],
+      "clinical_triggers": [
+        "QTc > 470 ms locks out Azithromycin / high-dose Ondansetron",
+        "ST-elevation / ischemic ECG triggers ACS / EMTP Aspirin + Nitroglycerin + Clopidogrel",
+        "Rising ETCO2 confirms hypoventilation / opioid toxicity or cabin hypercapnia",
+        "VF/pVT triggers ACLS defibrillation + Epinephrine"
+      ],
+      "spaceflight_constraints": "Primary Level V real-time telemetry and ACLS interception hub; conductive gel pads must be stored sealed to prevent drying.",
+      "search_text": "Tempus Pro Holter 12-lead ECG QTc ETCO2 defibrillator ACLS Level V interception telemetry."
+    }
+  ]
+}

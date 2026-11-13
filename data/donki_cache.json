@@ -1,0 +1,64 @@
+{
+  "metadata": {
+    "source": "NASA Space Weather Database Of Notifications, Knowledge, Information (DONKI)",
+    "api_endpoint": "https://api.nasa.gov/DONKI/SEP",
+    "cache_policy": "Air-Gapped Offline Fallback Cache",
+    "last_sync": "2026-11-12T00:00:00Z",
+    "mission_context": "Deep Space Transit / Lunar Surface Sortie (Mars Analog)",
+    "nominal_background_msv_h": 0.065,
+    "spe_threshold_flux_pfu": 10.0
+  },
+  "cached_events": [
+    {
+      "sepID": "2026-11-10T14:22:00-SEP-001",
+      "eventTime": "2026-11-10T14:22:00Z",
+      "instruments": [
+        {"displayName": "GOES-16 EPS/HEPAD"},
+        {"displayName": "ACE SIS"}
+      ],
+      "linkedEvents": [
+        {
+          "activityID": "2026-11-10T13:48:00-FLR-001",
+          "classType": "X8.7",
+          "sourceLocation": "S18W74",
+          "activeRegionNum": 3664
+        },
+        {
+          "activityID": "2026-11-10T14:05:00-CME-001",
+          "speed": 1640.0,
+          "halfAngle": 62.0
+        }
+      ],
+      "proton_flux_gt_10mev_pfu": 420.5,
+      "calculated_radiation_dose_msv_h": 4.85,
+      "severity": "WARNING_HIGH_FLUX",
+      "recommended_action": "Order EVA crew to abort, retreat to radiation storm shelter (Deep-water shielded bay / Sleeping quarters)"
+    },
+    {
+      "sepID": "2026-11-04T08:15:00-SEP-002",
+      "eventTime": "2026-11-04T08:15:00Z",
+      "instruments": [
+        {"displayName": "GOES-18 EPS"}
+      ],
+      "linkedEvents": [
+        {
+          "activityID": "2026-11-04T07:50:00-FLR-002",
+          "classType": "M3.2",
+          "sourceLocation": "N12E45",
+          "activeRegionNum": 3662
+        }
+      ],
+      "proton_flux_gt_10mev_pfu": 28.4,
+      "calculated_radiation_dose_msv_h": 1.25,
+      "severity": "ADVISORY_ELEVATED",
+      "recommended_action": "Monitor personal dosimeter badges; prepare solar storm shelter if flux accelerates"
+    }
+  ],
+  "nominal_state": {
+    "spe_active": false,
+    "proton_flux_gt_10mev_pfu": 0.8,
+    "ambient_radiation_msv_h": 0.065,
+    "severity": "NOMINAL_BACKGROUND",
+    "recommended_action": "Unrestricted IVA and EVA operational clearance"
+  }
+}
