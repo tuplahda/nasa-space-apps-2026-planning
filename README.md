@@ -39,7 +39,7 @@ flowchart TD
     end
 
     subgraph L3["Layer 3: NASA Level V RAG Medical Officer (Yohan)"]
-        EVAL -->|"Anomaly Detected!"| RAG["RAG Retrieval Engine<br/>(data/rag_protocols_8_scenarios.json)"]
+        EVAL -->|"Anomaly Detected!"| RAG["RAG Retrieval Engine<br/>(125 Pre-Processed Offline Chunks:<br/>rag_protocols_expanded, checs_formulary,<br/>nasa_std_3001_rules, onboard_hardware_specs)"]
         
         RAG --> DECIDE{"Confidence >= 0.75?"}
         
@@ -105,7 +105,11 @@ NASA's official private challenge dataset is expected to be released within ~24 
 │   └── vanilla_frontend_architecture.md        <-- Shared DOM IDs, layout specs & API endpoints
 ├── data/
 │   ├── nasa_baselines_and_thresholds.json      <-- Zero-G vital ranges (HR, BP, SpO2, CO2)
-│   ├── rag_protocols_8_scenarios.json          <-- 8 spaceflight medical protocols with citations
+│   ├── rag_protocols_expanded.json             <-- 8 legacy scenarios + 32 NASA CPGs (CPG-01..32)
+│   ├── checs_formulary.json                    <-- 54 pre-processed ISS CHeCS meds & lockouts
+│   ├── nasa_std_3001_rules.json                <-- 26 verbatim NASA-STD-3001 & SMAC rules
+│   ├── onboard_hardware_specs.json             <-- 5 onboard diagnostic device specs
+│   ├── rag_protocols_8_scenarios.json          <-- Original 8 scenarios (preserved for compatibility)
 │   ├── nasa_space_medicine_research.md         <-- Space medicine notes & CHeCS formulary
 │   └── arxiv_literature_citations.json         <-- Academic literature citations for judging
 ├── team-guides/
