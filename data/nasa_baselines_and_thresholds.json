@@ -5,146 +5,377 @@
       "NASA-STD-3001 Volume 1 Rev C (Crew Health)",
       "NASA-STD-3001 Volume 2 Rev D/F (Human Factors, Habitability, and Environmental Health)",
       "OCHMO-TB-004 (Carbon Dioxide)"
+    ],
+    "version": "2.0.0",
+    "evidence_classes": [
+      "observed",
+      "literature_derived",
+      "device_or_institution_specific",
+      "synthetic"
     ]
   },
   "physiological_baselines": {
     "hr_bpm": {
       "unit": "bpm",
-      "earth_1g_upright": [65, 80],
-      "adapted_ug_iva_rest": [52, 68],
+      "earth_1g_upright": [
+        65,
+        80
+      ],
+      "adapted_ug_iva_rest": [
+        52,
+        68
+      ],
       "activity_modifiers_ug": {
-        "SLEEP": [42, 55],
-        "IVA_REST": [52, 68],
-        "EVA_SPACEWALK": [95, 135],
-        "ARED_EXERCISE": [135, 165]
+        "SLEEP": [
+          42,
+          55
+        ],
+        "IVA_REST": [
+          52,
+          68
+        ],
+        "EVA_SPACEWALK": [
+          95,
+          135
+        ],
+        "ARED_EXERCISE": [
+          135,
+          165
+        ]
       },
       "warning_yellow": {
-        "SLEEP": { "min": 38, "max": 70 },
-        "IVA_REST": { "min": 45, "max": 85 },
-        "EVA_SPACEWALK": { "min": 60, "max": 145 },
-        "ARED_EXERCISE": { "min": 80, "max": 172 }
+        "SLEEP": {
+          "min": 38,
+          "max": 70
+        },
+        "IVA_REST": {
+          "min": 45,
+          "max": 85
+        },
+        "EVA_SPACEWALK": {
+          "min": 60,
+          "max": 145
+        },
+        "ARED_EXERCISE": {
+          "min": 80,
+          "max": 172
+        }
       },
       "critical_red": {
-        "SLEEP": { "min": 35, "max": 85 },
-        "IVA_REST": { "min": 40, "max": 100 },
-        "EVA_SPACEWALK": { "min": 50, "max": 170 },
-        "ARED_EXERCISE": { "min": 60, "max": 185 }
+        "SLEEP": {
+          "min": 35,
+          "max": 85
+        },
+        "IVA_REST": {
+          "min": 40,
+          "max": 100
+        },
+        "EVA_SPACEWALK": {
+          "min": 50,
+          "max": 170
+        },
+        "ARED_EXERCISE": {
+          "min": 60,
+          "max": 185
+        }
       }
     },
     "sbp_mmHg": {
       "unit": "mmHg",
-      "earth_1g_upright": [115, 125],
-      "adapted_ug_iva_rest": [105, 116],
+      "earth_1g_upright": [
+        115,
+        125
+      ],
+      "adapted_ug_iva_rest": [
+        105,
+        116
+      ],
       "activity_modifiers_ug": {
-        "SLEEP": [95, 108],
-        "IVA_REST": [105, 116],
-        "EVA_SPACEWALK": [125, 150],
-        "ARED_EXERCISE": [145, 185]
+        "SLEEP": [
+          95,
+          108
+        ],
+        "IVA_REST": [
+          105,
+          116
+        ],
+        "EVA_SPACEWALK": [
+          125,
+          150
+        ],
+        "ARED_EXERCISE": [
+          145,
+          185
+        ]
       },
       "warning_yellow": {
-        "IVA_REST": { "min": 98, "max": 130 },
-        "ARED_EXERCISE": { "min": 110, "max": 190 }
+        "IVA_REST": {
+          "min": 98,
+          "max": 130
+        },
+        "ARED_EXERCISE": {
+          "min": 110,
+          "max": 190
+        }
       },
       "critical_red": {
-        "IVA_REST": { "min": 90, "max": 145 },
-        "ARED_EXERCISE": { "min": 95, "max": 220 }
+        "IVA_REST": {
+          "min": 90,
+          "max": 145
+        },
+        "ARED_EXERCISE": {
+          "min": 95,
+          "max": 220
+        }
       }
     },
     "dbp_mmHg": {
       "unit": "mmHg",
-      "earth_1g_upright": [75, 82],
-      "adapted_ug_iva_rest": [65, 74],
+      "earth_1g_upright": [
+        75,
+        82
+      ],
+      "adapted_ug_iva_rest": [
+        65,
+        74
+      ],
       "activity_modifiers_ug": {
-        "SLEEP": [58, 66],
-        "IVA_REST": [65, 74],
-        "EVA_SPACEWALK": [70, 84],
-        "ARED_EXERCISE": [68, 88]
+        "SLEEP": [
+          58,
+          66
+        ],
+        "IVA_REST": [
+          65,
+          74
+        ],
+        "EVA_SPACEWALK": [
+          70,
+          84
+        ],
+        "ARED_EXERCISE": [
+          68,
+          88
+        ]
       },
       "warning_yellow": {
-        "IVA_REST": { "min": 60, "max": 85 },
-        "ARED_EXERCISE": { "min": 60, "max": 95 }
+        "IVA_REST": {
+          "min": 60,
+          "max": 85
+        },
+        "ARED_EXERCISE": {
+          "min": 60,
+          "max": 95
+        }
       },
       "critical_red": {
-        "IVA_REST": { "min": 55, "max": 95 },
-        "ARED_EXERCISE": { "min": 55, "max": 105 }
+        "IVA_REST": {
+          "min": 55,
+          "max": 95
+        },
+        "ARED_EXERCISE": {
+          "min": 55,
+          "max": 105
+        }
       }
     },
     "spo2_pct": {
       "unit": "%",
-      "earth_1g_upright": [97, 100],
-      "adapted_ug_iva_rest": [96, 99],
+      "earth_1g_upright": [
+        97,
+        100
+      ],
+      "adapted_ug_iva_rest": [
+        96,
+        99
+      ],
       "activity_modifiers_ug": {
-        "SLEEP": [94, 98],
-        "IVA_REST": [96, 99],
-        "EVA_SPACEWALK": [98, 100],
-        "ARED_EXERCISE": [95, 99]
+        "SLEEP": [
+          94,
+          98
+        ],
+        "IVA_REST": [
+          96,
+          99
+        ],
+        "EVA_SPACEWALK": [
+          98,
+          100
+        ],
+        "ARED_EXERCISE": [
+          95,
+          99
+        ]
       },
       "warning_yellow": {
-        "SLEEP": { "min": 89, "max": 100 },
-        "DEFAULT": { "min": 91, "max": 100 }
+        "SLEEP": {
+          "min": 89,
+          "max": 100
+        },
+        "DEFAULT": {
+          "min": 91,
+          "max": 100
+        }
       },
       "critical_red": {
-        "DEFAULT": { "min": 90, "max": 100 }
+        "DEFAULT": {
+          "min": 90,
+          "max": 100
+        }
       }
     },
     "hrv_rmssd_ms": {
       "unit": "ms",
-      "earth_1g_upright": [35, 65],
-      "adapted_ug_iva_rest": [28, 52],
+      "earth_1g_upright": [
+        35,
+        65
+      ],
+      "adapted_ug_iva_rest": [
+        28,
+        52
+      ],
       "activity_modifiers_ug": {
-        "SLEEP": [45, 80],
-        "IVA_REST": [28, 52],
-        "EVA_SPACEWALK": [10, 25],
-        "ARED_EXERCISE": [10, 25]
+        "SLEEP": [
+          45,
+          80
+        ],
+        "IVA_REST": [
+          28,
+          52
+        ],
+        "EVA_SPACEWALK": [
+          10,
+          25
+        ],
+        "ARED_EXERCISE": [
+          10,
+          25
+        ]
       },
       "warning_yellow": {
-        "SLEEP": { "min": 25 },
-        "IVA_REST": { "min": 18 }
+        "SLEEP": {
+          "min": 25
+        },
+        "IVA_REST": {
+          "min": 18
+        }
       },
       "critical_red": {
-        "SLEEP": { "min": 15 },
-        "IVA_REST": { "min": 15 }
+        "SLEEP": {
+          "min": 15
+        },
+        "IVA_REST": {
+          "min": 15
+        }
       }
     },
     "cbt_C": {
       "unit": "°C",
-      "earth_1g_upright": [36.6, 37.1],
-      "adapted_ug_iva_rest_post_fd75": [37.4, 38.0],
+      "earth_1g_upright": [
+        36.6,
+        37.1
+      ],
+      "adapted_ug_iva_rest_post_fd75": [
+        37.4,
+        38.0
+      ],
       "activity_modifiers_ug": {
-        "SLEEP": [36.8, 37.3],
-        "IVA_REST": [37.4, 38.0],
-        "EVA_SPACEWALK": [37.6, 38.8],
-        "ARED_EXERCISE": [38.2, 39.6]
+        "SLEEP": [
+          36.8,
+          37.3
+        ],
+        "IVA_REST": [
+          37.4,
+          38.0
+        ],
+        "EVA_SPACEWALK": [
+          37.6,
+          38.8
+        ],
+        "ARED_EXERCISE": [
+          38.2,
+          39.6
+        ]
       },
       "warning_yellow": {
-        "IVA_REST": { "min": 36.0, "max": 38.5 },
-        "EVA_SPACEWALK": { "min": 36.0, "max": 40.1 },
-        "ARED_EXERCISE": { "min": 36.0, "max": 40.1 }
+        "IVA_REST": {
+          "min": 36.0,
+          "max": 38.5
+        },
+        "EVA_SPACEWALK": {
+          "min": 36.0,
+          "max": 40.1
+        },
+        "ARED_EXERCISE": {
+          "min": 36.0,
+          "max": 40.1
+        }
       },
       "critical_red": {
-        "IVA_REST": { "min": 35.5, "max": 38.5 },
-        "EVA_SPACEWALK": { "min": 35.5, "max": 40.2 },
-        "ARED_EXERCISE": { "min": 35.5, "max": 40.2 }
+        "IVA_REST": {
+          "min": 35.5,
+          "max": 38.5
+        },
+        "EVA_SPACEWALK": {
+          "min": 35.5,
+          "max": 40.2
+        },
+        "ARED_EXERCISE": {
+          "min": 35.5,
+          "max": 40.2
+        }
       }
     },
     "rr_bpm": {
       "unit": "breaths/min",
-      "earth_1g_upright": [12, 16],
-      "adapted_ug_iva_rest": [11, 15],
+      "earth_1g_upright": [
+        12,
+        16
+      ],
+      "adapted_ug_iva_rest": [
+        11,
+        15
+      ],
       "activity_modifiers_ug": {
-        "SLEEP": [9, 13],
-        "IVA_REST": [11, 15],
-        "EVA_SPACEWALK": [18, 28],
-        "ARED_EXERCISE": [25, 42]
+        "SLEEP": [
+          9,
+          13
+        ],
+        "IVA_REST": [
+          11,
+          15
+        ],
+        "EVA_SPACEWALK": [
+          18,
+          28
+        ],
+        "ARED_EXERCISE": [
+          25,
+          42
+        ]
       },
       "warning_yellow": {
-        "SLEEP": { "min": 8, "max": 16 },
-        "IVA_REST": { "min": 9, "max": 18 },
-        "EVA_SPACEWALK": { "min": 12, "max": 30 }
+        "SLEEP": {
+          "min": 8,
+          "max": 16
+        },
+        "IVA_REST": {
+          "min": 9,
+          "max": 18
+        },
+        "EVA_SPACEWALK": {
+          "min": 12,
+          "max": 30
+        }
       },
       "critical_red": {
-        "IVA_REST": { "min": 8, "max": 24 },
-        "EVA_SPACEWALK": { "min": 8, "max": 45 }
+        "IVA_REST": {
+          "min": 8,
+          "max": 24
+        },
+        "EVA_SPACEWALK": {
+          "min": 8,
+          "max": 45
+        }
       }
     }
   },
@@ -164,7 +395,10 @@
     },
     "cabin_ppO2_mmHg": {
       "standard_code": "NASA-STD-3001 [V2 6003]",
-      "nominal_range": [145, 155],
+      "nominal_range": [
+        145,
+        155
+      ],
       "warning_low": 135,
       "critical_hypoxia": 128
     },
@@ -176,5 +410,210 @@
       "limit_career_mGy_Eq": 1000,
       "universal_career_effective_mSv": 600
     }
+  },
+  "circadian_cosinor_model": {
+    "evidence_class": "literature_derived",
+    "equation": "HR(t) = M + A * cos((2 * pi * (t - phi)) / tau)",
+    "iss_cohort_n10": {
+      "preflight": {
+        "mesor_bpm": 69.32,
+        "mesor_sd": 6.84,
+        "amp_bpm": 10.9,
+        "tau_h": 23.52,
+        "phi": "14:39"
+      },
+      "iss01": {
+        "mesor_bpm": 71.53,
+        "mesor_sd": 6.6,
+        "amp_bpm": 12.54
+      },
+      "iss02": {
+        "mesor_bpm": 73.94,
+        "mesor_sd": 6.11,
+        "amp_bpm": 12.77,
+        "trough_to_peak_bpm": [
+          61.2,
+          86.7
+        ]
+      },
+      "postflight": {
+        "mesor_bpm": 70.26,
+        "mesor_sd": 10.2,
+        "amp_bpm": 10.55,
+        "tau_h": 25.11
+      }
+    },
+    "rmssd_validity_rule": "RMSSD_ms = sqrt(mean((NN_ms[i+1] - NN_ms[i])**2)). Requires beat-to-beat NN intervals; return null/non-autonomic flag during Afib, ectopy, seizure, or hypothermia."
+  },
+  "cephalad_fluid_shift_timeline": {
+    "evidence_class": "literature_derived",
+    "phases": [
+      {
+        "phase": "Acute Entry (0-24 h / FD1)",
+        "plasma_volume_pct": "-17% to -18%",
+        "cvp_cmH2O": "8.4 seated -> 2.5 microgravity",
+        "rbc_notes": "Transient hemoconcentration; EPO depressed FD1-FD4"
+      },
+      {
+        "phase": "Early Adaptation (FD2-FD14)",
+        "plasma_volume_pct": "-10% to -15%",
+        "rbc_notes": "-11% at FD9-10; -13% at FD14; ~1%/day RBC mass loss"
+      },
+      {
+        "phase": "Steady State (>30 to 100+ d)",
+        "plasma_volume_pct": "Sustained -10% to -15%",
+        "rbc_notes": "Elevated relative RBC/platelet concentration; aldosterone & renin rise by FD100"
+      },
+      {
+        "phase": "Postflight Recovery (R+0 to R+30)",
+        "plasma_volume_pct": "+4.8% expansion within 1 d",
+        "rbc_notes": "Rebound EPO surge by R+1; full hematologic normalization by R+30"
+      }
+    ],
+    "directional_bp_and_hrv_deltas": {
+      "sbp_inflight_shift_mmHg": -8,
+      "dbp_inflight_shift_mmHg": -9,
+      "hdt_60d_rmssd_day_drop_pct": [
+        -22.5,
+        -25.4
+      ],
+      "hdt_60d_rmssd_night_drop_pct": [
+        -28.9,
+        -41.2
+      ],
+      "cbt_space_fever_elevation_C": 1.01
+    }
+  },
+  "activity_state_thermal_and_eva_limits": {
+    "evidence_class": "literature_derived",
+    "microgravity_exercise_cbt_slope_C_per_min": 0.15,
+    "earth_exercise_cbt_slope_C_per_min": 0.1,
+    "eva_suit_nominal_psi": 4.3,
+    "eva_metabolic_design_range_W": [
+      147,
+      617
+    ],
+    "eva_target_metabolic_range_W": [
+      200,
+      470
+    ],
+    "eva_heat_storage_comfort_limit_kJ_kg": 3.0,
+    "eva_heat_storage_cdo_ceiling_kJ_kg": 4.7,
+    "lcg_cooling_settings_C": {
+      "min": 21,
+      "med": 15,
+      "max": 7
+    }
+  },
+  "space_weather_triggers": {
+    "evidence_class": "literature_derived",
+    "donki_caveat": "NASA DONKI /SEP and /FLR return event metadata only (no pfu or mSv/h). Pair DONKI event context with NOAA GOES primary proton feed (integral-protons-1-day.json) and a named transport/shielding model.",
+    "spe_vs_espe": {
+      "spe_eva_penetration": ">= 10 pfu at > 10 MeV (3x 5-min GOES readings)",
+      "espe_hull_penetration": "> 1 pfu at > 100 MeV"
+    },
+    "noaa_scales": [
+      {
+        "level": 1,
+        "s_scale_10mev_pfu": 10,
+        "g_scale_kp": 5,
+        "r_scale_xray": "M1",
+        "action": "SRAG Watch/Warning assessment"
+      },
+      {
+        "level": 2,
+        "s_scale_10mev_pfu": 100,
+        "g_scale_kp": 6,
+        "r_scale_xray": "M5",
+        "action": "SRAG MCC notification; delay LEO EVA during belt/SAA passes"
+      },
+      {
+        "level": 3,
+        "s_scale_10mev_pfu": 1000,
+        "g_scale_kp": 7,
+        "r_scale_xray": "X1",
+        "action": "Immediate EVA Abort & Return (1 h nominal / 4 h lunar)"
+      },
+      {
+        "level": 4,
+        "s_scale_10mev_pfu": 10000,
+        "g_scale_kp": 8,
+        "r_scale_xray": "X10",
+        "action": "Unavoidable EVA hazard; GNSS/solar degradation"
+      },
+      {
+        "level": 5,
+        "s_scale_10mev_pfu": 100000,
+        "g_scale_kp": 9,
+        "r_scale_xray": "X20+",
+        "action": "Extreme radiation hazard; multi-hour HF blackout"
+      }
+    ],
+    "deep_space_storm_shelter": {
+      "ingress_hera_uGy_min": [
+        50,
+        75
+      ],
+      "ingress_goes_100mev_fallback_pfu": 50,
+      "egress_hera_uGy_min": 20,
+      "egress_goes_100mev_fallback_pfu": 20
+    }
+  },
+  "mechanistic_recovery_models": {
+    "evidence_class": "literature_derived",
+    "exponential_recovery_equation": "x(t) = x_target + (x_at_treatment - x_target) * exp(-(t - delay) / tau)",
+    "well_mixed_co2_scrubber_ode": "dC/dt = G/V - (Q*eta/V)*(C - C_supply); tau_CO2 = V / (Q*eta)",
+    "published_anchors": [
+      {
+        "intervention": "oxygen_normobaric_co_exposure",
+        "mechanism": "COHb_elimination",
+        "half_time_min": 74,
+        "uncertainty_min": 25,
+        "tau_min": 107,
+        "note": "Conventional SpO2 is misleading in CO poisoning."
+      },
+      {
+        "intervention": "normal_saline_500ml",
+        "mechanism": "volume_distribution",
+        "distribution_half_time_min": 8,
+        "equilibration_min": 30,
+        "note": "Depends on fluid responsiveness and ongoing hemorrhage."
+      },
+      {
+        "intervention": "inhaled_albuterol",
+        "mechanism": "bronchodilation",
+        "onset_min_lt": 5,
+        "plasma_half_life_h": 3.8
+      },
+      {
+        "intervention": "iv_epinephrine",
+        "mechanism": "vasopressor_anaphylaxis",
+        "onset_min_lt": 5,
+        "offset_min_lt": 20,
+        "note": "IV kinetics only; do not copy to IM."
+      }
+    ]
+  },
+  "canonical_1hz_telemetry_contract": {
+    "fields": [
+      "timestamp_utc",
+      "elapsed_s",
+      "crew_state_id",
+      "scenario_id",
+      "HR_bpm",
+      "SBP_mmHg",
+      "DBP_mmHg",
+      "SpO2_pct",
+      "RR_breaths_min",
+      "Tcore_C",
+      "HRV_RMSSD_ms",
+      "ppCO2_mmHg",
+      "O2_kPa",
+      "radiation_mSv_h",
+      "quality_flags",
+      "source_manifest_id",
+      "model_version"
+    ],
+    "backend_normalization_note": "backend/models/telemetry.py automatically normalizes both canonical NASA keys (hr_bpm, sbp_mmHg, spo2_pct, hrv_rmssd_ms, cbt_C, rr_bpm, cabin_ppCO2_mmHg) and Dheer/Frontend keys (heart_rate, blood_pressure_sys, spo2, hrv_ms, core_temp_c, respiration_rate, cabin_co2_mmhg)."
   }
 }

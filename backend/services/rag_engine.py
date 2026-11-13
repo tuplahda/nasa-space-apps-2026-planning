@@ -38,18 +38,22 @@ from backend.models.telemetry import AnomalyAssessment, TelemetryPacket
 
 
 # Static loop bounds per JPL Power-of-Ten Rule 2
-MAX_PROTOCOLS: int = 32
+MAX_PROTOCOLS: int = 64
 MAX_KEYWORDS: int = 64
 MAX_DYNAMIC_FILES: int = 20
 MAX_CANDIDATE_QUEUE: int = 50
 MAX_CACHE_ENTRIES: int = 256
 MAX_SYMPTOM_CHARS: int = 500
-MAX_CHUNKS: int = 64
+MAX_CHUNKS: int = 256
 MODE_A_CONFIDENCE_THRESHOLD: float = 0.75
 
 
 REPO_ROOT: Path = Path(__file__).resolve().parent.parent.parent
 PROTOCOLS_JSON_PATH: Path = REPO_ROOT / "data" / "rag_protocols_8_scenarios.json"
+EXPANDED_PROTOCOLS_JSON_PATH: Path = REPO_ROOT / "data" / "rag_protocols_expanded.json"
+CHECS_FORMULARY_JSON_PATH: Path = REPO_ROOT / "data" / "checs_formulary.json"
+NASA_RULES_JSON_PATH: Path = REPO_ROOT / "data" / "nasa_std_3001_rules.json"
+LAB_INTERVALS_JSON_PATH: Path = REPO_ROOT / "data" / "lab_reference_intervals.json"
 RESEARCH_MD_PATH: Path = REPO_ROOT / "data" / "nasa_space_medicine_research.md"
 ARXIV_JSON_PATH: Path = REPO_ROOT / "data" / "arxiv_literature_citations.json"
 OFFICIAL_PROTOCOLS_DIR: Path = REPO_ROOT / "data" / "nasa_official_protocols"
@@ -470,11 +474,38 @@ class LocalMedicalRAGEngine:
                     self.protocols.append(item)
                     self.protocol_by_id[sid] = item
 
+        if EXPANDED_PROTOCOLS_JSON_PATH.exists():
+            with open(EXPANDED_PROTOCOLS_JSON_PATH, "r", encoding="utf-8") as ef:
+                exp_data = json.load(ef)
+            cpgs = exp_data.get("clinical_practice_guidelines", [])
+            for cpg in cpgs:
+                if len(self.protocols) >= MAX_PROTOCOLS:
+                    break
+                pid = str(cpg.get("protocol_id", ""))
+                if not pid or pid in self.protocol_by_id:
+                    continue
+                normalized_cpg = {
+                    "scenario_id": pid,
+                    "title": cpg.get("title", pid),
+                    "category": cpg.get("category", "Space Medicine CPG"),
+                    "nasa_citations": cpg.get("nasa_citations", []),
+                    "symptoms_by_severity": {
+                        "MODERATE": cpg.get("search_text", ""),
+                        "DIAGNOSTIC_CRITERIA": "; ".join(cpg.get("diagnostic_criteria", [])),
+                    },
+                    "autonomous_checklist": cpg.get("autonomous_checklist", []),
+                    "checs_medications": cpg.get("prescribed_meds", []),
+                    "drug_lockouts": cpg.get("drug_lockouts", []),
+                }
+                self.protocols.append(normalized_cpg)
+                self.protocol_by_id[pid] = normalized_cpg
+
         if ARXIV_JSON_PATH.exists():
             with open(ARXIV_JSON_PATH, "r", encoding="utf-8") as af:
                 self.arxiv_citations = json.load(af)
 
         self._parse_research_markdown_chunks()
+        self._load_preprocessed_reference_chunks()
         self._load_dynamic_official_protocols()
         self._build_hybrid_search_index()
 
@@ -509,6 +540,33 @@ class LocalMedicalRAGEngine:
                         + " ".join(sec.splitlines()[1:])[:600]
                     )
                     self.research_chunks[f"SCENARIO_{num}"] = tagged
+
+    def _load_preprocessed_reference_chunks(self) -> None:
+        """Index pre-processed CHeCS formulary, NASA-STD-3001 rules, and lab intervals."""
+        if CHECS_FORMULARY_JSON_PATH.exists():
+            with open(CHECS_FORMULARY_JSON_PATH, "r", encoding="utf-8") as cf:
+                meds = json.load(cf).get("medications", [])
+            for med in meds[:MAX_CHUNKS]:
+                mid = str(med.get("med_id", ""))
+                if mid:
+                    self.research_chunks[mid] = f"[Source: checs_formulary.json | {mid}] {med.get('search_text', '')}"
+
+        if NASA_RULES_JSON_PATH.exists():
+            with open(NASA_RULES_JSON_PATH, "r", encoding="utf-8") as nf:
+                rules = json.load(nf).get("rules", [])
+            for rule in rules[:MAX_CHUNKS]:
+                rid = str(rule.get("standard_id", ""))
+                if rid:
+                    self.research_chunks[f"RULE_{rid}"] = f"[Source: nasa_std_3001_rules.json | {rid}] {rule.get('verbatim_rule', '')}"
+
+        if LAB_INTERVALS_JSON_PATH.exists():
+            with open(LAB_INTERVALS_JSON_PATH, "r", encoding="utf-8") as lf:
+                lab_data = json.load(lf)
+            for group in ("blood_gas_and_lactate", "electrolytes_and_glucose", "hematology_cbc"):
+                for item in lab_data.get(group, []):
+                    analyte = str(item.get("analyte", ""))
+                    if analyte:
+                        self.research_chunks[f"LAB_{analyte}"] = f"[Source: lab_reference_intervals.json | {analyte}] {item.get('search_text', '')}"
 
     def _build_hybrid_search_index(self) -> None:
         """Pre-compute Okapi BM25 IDF weights and Character Trigram Vectors at startup."""

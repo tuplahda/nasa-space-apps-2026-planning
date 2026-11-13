@@ -16,8 +16,10 @@ Build the **Autonomous Astronaut Agent (Digital Twin)** that generates realistic
 
 | Resource | Path | How You Use It |
 | :--- | :--- | :--- |
-| **Microgravity Baselines** | [`data/nasa_baselines_and_thresholds.json`](../data/nasa_baselines_and_thresholds.json) | Reference numbers for resting HR, BP, SpO2, Core Temp, and cabin CO2 in zero-G. |
-| **8 Emergency Protocols** | [`data/rag_protocols_8_scenarios.json`](../data/rag_protocols_8_scenarios.json) | Mathematical parameters for the 8 spaceflight anomalies you will inject. |
+| **Microgravity Baselines & Physics** | [`data/nasa_baselines_and_thresholds.json`](../data/nasa_baselines_and_thresholds.json) | **PRIMARY:** Resting Zero-G ranges, circadian cosinor HR model, fluid-shift timeline, EVA thermal limits, DONKI/GOES/SRAG space weather gates, and mechanistic recovery anchors. |
+| **Unified Scenario Seeds (24 + 6)** | [`data/simulation_scenario_seeds.json`](../data/simulation_scenario_seeds.json) | 6 quantitative crisis trajectories (with 21 first-person symptom logs), 24 synthetic scenario vectors mapped to Yohan's `CPG-*` IDs, state-space ODEs, and PhysioNet/OSDR manifests. |
+| **Lab Reference Intervals** | [`data/lab_reference_intervals.json`](../data/lab_reference_intervals.json) | Specimen-aware `i-STAT CG8+/CG4+` & `CBC` reference/warning/critical bands for diagnostic simulation. |
+| **Expanded Clinical Protocols** | [`data/rag_protocols_expanded.json`](../data/rag_protocols_expanded.json) | Shared `CPG-01`–`CPG-32` & 8 legacy `SCENARIO_*` IDs so your simulator aligns 1-to-1 with Yohan's RAG. |
 | **Safety Guardrails** | [`artifacts/security_and_safety_guardrails.md`](../artifacts/security_and_safety_guardrails.md) | JPL Power-of-Ten rules (no recursion, bounded loops, error handling). |
 | **System Mechanics** | [`artifacts/system_mechanics_deep_dive.md`](../artifacts/system_mechanics_deep_dive.md) | Deep breakdown of physiological equations and microgravity fluid shifts. |
 | **Frontend Architecture** | [`artifacts/vanilla_frontend_architecture.md`](../artifacts/vanilla_frontend_architecture.md) | WebSocket packet structure expected by Tivesh's UI. |
