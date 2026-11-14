@@ -57,6 +57,9 @@ async function liveCase(seed) {
     phase.textContent='Checklist acknowledged; requesting backend treatment and waiting for nominal telemetry…';q('apply-treatment').click();
     await until(async()=>{const p=await api.snapshot();return p.blind_incident?.id===ack.incident_id&&p.blind_incident.phase==='complete'&&p.anomaly_assessment.alert_level==='NOMINAL';},'Recovery did not complete nominally',18000);
     await until(()=>!q('run-assessment').disabled,'Simulate Crisis did not re-enable');
+    await until(()=>q('result-mode').textContent==='AWAITING ASSESSMENT','Doctor panel did not reset after nominal recovery');
+    if(q('assessment-details').children.length || !q('send-earth').hidden || !q('download-report').hidden || !q('apply-treatment').disabled)throw new Error('Stale clinical content or controls survived recovery');
+    if(doc.querySelector('.clinical-panel').scrollTop!==0)throw new Error('Doctor panel did not scroll back to its default view');
     log(`PASS ${a.mode}: acknowledgements alone had no effect; backend recovery completed nominally; next crisis enabled.`);
     phase.textContent='Live recovery/report check passed. Inspect the browser download and PDF contents.';
     await dimensions(width,height);

@@ -1,5 +1,6 @@
 """Report delivery and simulator completion; no clinical classification changes."""
 from collections import OrderedDict
+import builtins
 from copy import deepcopy
 from io import BytesIO
 import re
@@ -104,3 +105,22 @@ def test_report_store_is_immutable_and_bounded(monkeypatch):
     assert len(report_store._reports) == report_store.MAX_REPORTS
     with pytest.raises(report_store.ReportNotFound):
         report_store.retrieve_report(saved['report_ref'])
+
+
+def test_missing_pdf_dependency_returns_actionable_error_not_fake_pdf(simulation, monkeypatch):
+    frame = assess(2)
+    original_import = builtins.__import__
+
+    def without_reportlab(name, *args, **kwargs):
+        if name == 'reportlab':
+            raise ModuleNotFoundError('ReportLab missing from the backend interpreter')
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, '__import__', without_reportlab)
+    response = TestClient(server.app).post('/api/reports/download?format=pdf', json={
+        'report_ref': frame['rag_diagnosis']['earth_report']['report_ref'],
+    })
+    assert response.status_code == 503
+    assert response.headers['content-type'].startswith('application/json')
+    assert 'python -m pip install -r backend/requirements.txt' in response.json()['detail']
+    assert not response.content.startswith(b'%PDF-')

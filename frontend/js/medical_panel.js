@@ -8,7 +8,7 @@ export class MedicalPanel {
     this.submit.addEventListener('click',()=>this.recover());
   }
   reset(message='Waiting for the astronaut agent assessment.') {
-    this.signature=null; this.assessment=null; this.version++; this.submitted=false; this.pending=false;
+    this.signature=null; this.assessment=null; this.version++; this.submitted=false; this.pending=false; this.checks=[]; this.ready=false;
     setText('result-mode','AWAITING ASSESSMENT'); setText('result-severity','—'); setText('diagnosis-title','Monitoring telemetry');setText('diagnosis-summary',message);
     setText('confidence-value','—');document.getElementById('confidence-meter').style.width='0%';
     document.getElementById('treatment-checklist').replaceChildren(el('li','No assessment actions available.','empty-action'));
@@ -18,6 +18,7 @@ export class MedicalPanel {
     this.submit.hidden=false;
     this.submit.textContent='Administer Treatment';
     this.submit.disabled=true; setText('checklist-status','Checklist records operator acknowledgement only.');this.error('');
+    const panel=document.querySelector?.('.clinical-panel');if(panel)panel.scrollTop=0;
   }
   error(message) { const node=document.getElementById('clinical-error');node.hidden=!message;node.textContent=message; }
   render(a) {

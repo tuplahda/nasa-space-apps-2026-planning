@@ -82,10 +82,19 @@ function ingest(p,source) {
   const states=view.update(p,source);body?.update(p,states);updateAlerts(states);
   setText('packet-source',`SIMULATED TELEMETRY · ${formatTime(p.timestamp)} MUT`);
   setText('data-badge','AGENT · 1 Hz');
-  showIncident(p.blind_incident);
+  const resolved=p.anomaly_assessment?.alert_level==='NOMINAL'
+    && (p.blind_incident?.phase==='complete' || (!p.blind_incident && p.recovery_status==='COMPLETE' && p.active_scenario_id==='nominal'));
+  if(resolved && consultation) {
+    // A completed treatment response alone is not proof of recovery. Clear the
+    // consultation only on the server's completed, nominal telemetry snapshot.
+    generation++;consultation=null;reports.reset();
+    panel.reset('Recovery complete. Monitoring telemetry; consult the doctor when a new assessment is needed.');
+    setText('assessment-latency','ENGINE STANDBY');
+  }
+  showIncident(resolved?null:p.blind_incident);
   // The blind streaming contract truly gates Layer 3 on the server. Unsolicited
   // diagnoses from legacy/non-blind streams are not displayed as consultations.
-  if(consultation && consultation.incidentId===p.simulation_incident && p.rag_diagnosis
+  if(!resolved && consultation && consultation.incidentId===p.simulation_incident && p.rag_diagnosis
     && ['assessed','recovering','complete'].includes(p.blind_incident?.phase)) {
     if(consultation.status==='pending' || consultation.status==='failed') {
       consultation.status='complete';consultation.receivedAt=new Date().toISOString();consultation.sourceTimestamp=p.timestamp;

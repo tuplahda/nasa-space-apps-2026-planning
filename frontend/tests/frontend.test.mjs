@@ -202,9 +202,9 @@ test('dashboard separates random simulation from explicit consultation and ignor
     calls.push([url.pathname,options?.body?JSON.parse(options.body):null]);
     return {ok:true,json:async()=>({status:'ok',incident_id:3})};
   };
-  function send(incident,tick,phase,diagnosis) {
+  function send(incident,tick,phase,diagnosis,alert='NOMINAL') {
     const p={...sample(),simulation_incident:incident,timestamp:new Date(Date.UTC(2026,10,15,12,0,tick)).toISOString()};
-    if(phase) {delete p.active_scenario_id;p.blind_incident={id:incident,phase,actions:[]};}
+    if(phase) {delete p.active_scenario_id;p.blind_incident={id:incident,phase,actions:[]};p.anomaly_assessment={alert_level:alert};}
     if(phase==='awaiting_doctor'){p.vitals.spo2=86;p.anomaly_assessment={organ_hud_status:{'ECLSS-03':'RED'}};}
     if(diagnosis)p.rag_diagnosis=diagnosis;
     Socket.current.onmessage({data:JSON.stringify(p)});
@@ -232,6 +232,31 @@ test('dashboard separates random simulation from explicit consultation and ignor
     send(3,5,'recovering',data.cases.hypercapnia.assessment);
     assert.match(document.getElementById('assessment-freshness').textContent,/newer telemetry/);
     send(2,6,null,data.cases['zero-day'].assessment);assert.match(document.getElementById('result-mode').textContent,/MODE A/);
+    // Completion must also be nominal; the old diagnosis remains until then.
+    send(3,7,'complete',data.cases.hypercapnia.assessment,'CRITICAL');
+    assert.match(document.getElementById('result-mode').textContent,/MODE A/);
+    assert.equal(button.disabled,true);
+    send(3,8,'complete',data.cases.hypercapnia.assessment);
+    assert.equal(document.getElementById('result-mode').textContent,'AWAITING ASSESSMENT');
+    assert.equal(document.getElementById('diagnosis-title').textContent,'Monitoring telemetry');
+    assert.equal(document.getElementById('confidence-meter').style.width,'0%');
+    assert.equal(document.getElementById('assessment-details').children.length,0);
+    assert.equal(document.getElementById('apply-treatment').disabled,true);
+    assert.equal(document.getElementById('send-earth').hidden,true);
+    assert.equal(document.getElementById('download-report').hidden,true);
+    assert.equal(document.getElementById('blind-status').hidden,true);
+    assert.equal(button.disabled,false);
+    send(3,9,'complete',data.cases.hypercapnia.assessment);
+    assert.equal(document.getElementById('result-mode').textContent,'AWAITING ASSESSMENT');
+    // A subsequent Mode B incident must clear in exactly the same way.
+    await button.events.click();send(4,10,'awaiting_doctor');await consult.events.click();
+    send(4,11,'assessed',data.cases['zero-day'].assessment);
+    assert.match(document.getElementById('result-mode').textContent,/MODE B/);
+    send(4,12,'recovering',data.cases['zero-day'].assessment);
+    assert.match(document.getElementById('result-mode').textContent,/MODE B/);
+    send(4,13,'complete',data.cases['zero-day'].assessment);
+    assert.equal(document.getElementById('result-mode').textContent,'AWAITING ASSESSMENT');
+    assert.equal(button.disabled,false);
     const html=await readFile(new URL('../index.html',import.meta.url),'utf8');
     assert.ok(!html.includes('id="rehearsal-toggle"'));assert.ok(!html.includes('id="data-mode"'));
     assert.ok(!calls.some(x=>x[0]==='/api/diagnose'));
