@@ -18,6 +18,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 import logging
 import os
+import re
 from threading import Event, RLock, Thread
 from time import monotonic
 from typing import Any, Dict, List, Literal
@@ -37,6 +38,7 @@ from backend.routes.diagnose import (
 )
 from backend.services.astronaut_sim import NOMINAL_SYMPTOM_LOG, astronaut_sim
 from backend.services.donki_service import donki_service
+from backend.services.report_store import capture_report, retrieve_report, ReportNotFound
 
 logger = logging.getLogger("ares_med.server")
 
@@ -224,8 +226,8 @@ def request_blind_assessment(payload: Dict[str, Any]) -> Dict[str, Any]:
     return {"status": "ok", "incident_id": incident_id, "phase": "analyzing"}
 
 
-# Only checklist-backed environmental controls have a modeled physical effect.
-# Text-only clinical items remain acknowledgements, including in Mode B.
+# Checklist-backed environmental controls retain their modeled effects.
+# Other cases expose an explicitly simulation-only completion action.
 BLIND_ACTIONS = {
     "hypercapnia": ("restore_airflow", "Restore simulated cabin airflow", ("ventilat", "scrubber", "airflow", "cdra"), 0.48),
     "solar_flare": ("reduce_exposure", "Move simulator to shielded area", ("shelter", "shield"), 0.70),
@@ -234,15 +236,18 @@ BLIND_ACTIONS = {
 }
 
 
-def blind_actions(decision: Dict[str, Any]) -> List[Dict[str, str]]:
-    action = BLIND_ACTIONS.get(astronaut_sim.blind_crisis)
-    if not action or decision.get("mode") != "MODE_A_KNOWN_CONDITION":
+def blind_actions(decision: Dict[str, Any]) -> List[Dict[str, Any]]:
+    if not decision or not decision.get("action_checklist"):
         return []
-    action_id, label, terms, _ = action
-    if any(term in step["action"].lower() for step in decision.get("action_checklist", [])
-           for term in terms):
-        return [{"id": action_id, "label": label}]
-    return []
+    action = BLIND_ACTIONS.get(astronaut_sim.blind_crisis)
+    if action and decision.get("mode") == "MODE_A_KNOWN_CONDITION":
+        action_id, label, terms, _ = action
+        if any(term in step["action"].lower() for step in decision["action_checklist"] for term in terms):
+            return [{"id": action_id, "label": label, "kind": "modeled_countermeasure", "physical_effect_modeled": True}]
+    # This is a simulator completion control, not a new medical treatment or
+    # a claim that a novel condition has a validated physical intervention.
+    return [{"id": "complete_simulated_care", "label": "Complete simulated stabilization",
+             "kind": "simulation_only", "physical_effect_modeled": False}]
 
 
 def apply_blind_action(payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -257,11 +262,19 @@ def apply_blind_action(payload: Dict[str, Any]) -> Dict[str, Any]:
     action = next((item for item in incident["actions"] if item["id"] == payload.get("action_id")), None)
     if action is None:
         return {"status": "error", "message": "This action is unavailable for the current assessment."}
+    if "acknowledged_steps" in payload:
+        steps = (snapshot.get("rag_diagnosis") or {}).get("action_checklist", [])
+        required = [(index, step) for index, step in enumerate(steps) if step.get("critical")] or list(enumerate(steps))
+        supplied = payload["acknowledged_steps"]
+        if (not isinstance(supplied, list) or len(supplied) > 128
+                or any(type(value) not in (int, str) for value in supplied)
+                or not {str(step.get("step", index + 1)) for index, step in required}.issubset({str(value) for value in supplied})):
+            return {"status": "error", "message": "Acknowledge the required current checklist steps before starting simulated recovery."}
     result = astronaut_sim.apply_treatment("standard countermeasure protocol")
     if result.get("action") == "TREATMENT_APPLIED":
         astronaut_sim.blind_recovery_cause = "operator"
         astronaut_sim.active_treatment = action["label"]
-        astronaut_sim.blind_recovery_rate = BLIND_ACTIONS[astronaut_sim.blind_crisis][3]
+        astronaut_sim.blind_recovery_rate = BLIND_ACTIONS.get(astronaut_sim.blind_crisis, (None, None, None, 0.35))[3]
     else:
         return {"status": "error", "message": "The simulator could not start recovery."}
     return {"status": "ok", "incident_id": astronaut_sim.incident_id, "action_id": action["id"]}
@@ -294,6 +307,8 @@ def generate_report_from_payload(payload: Dict[str, Any] | None = None) -> Dict[
     """Generate downloadable Earth report for either posted telemetry or latest state."""
     global latest_earth_report
     data = payload if isinstance(payload, dict) else {}
+    if "report_ref" in data:
+        return retrieve_report(data["report_ref"])
     if "vitals" in data:
         rag_result = execute_diagnosis_pipeline(data)
         report = rag_result["earth_report"]
@@ -316,8 +331,8 @@ def prepare_earth_report_download(report: Dict[str, Any], output_format: str) ->
 
         content = render_earth_report_pdf(report)
         source_filename = os.path.basename(str(report.get("filename") or "ares_med_earth_report.txt"))
-        filename = f"{os.path.splitext(source_filename)[0]}.pdf"
-        return content, filename, "application/pdf"
+        filename = f"{os.path.splitext(source_filename)[0]}{'_' + report['report_ref'][:12] if report.get('report_ref') else ''}.pdf"
+        return content, re.sub(r"[^a-zA-Z0-9_.-]", "_", filename), "application/pdf"
     raise ValueError("Unsupported report format. Use 'txt' or 'pdf'.")
 
 
@@ -516,6 +531,15 @@ def advance_telemetry() -> Dict[str, Any]:
     elif isinstance(payload.get("rag_diagnosis"), dict) and isinstance(payload["rag_diagnosis"].get("earth_report"), dict):
         latest_earth_report = payload["rag_diagnosis"]["earth_report"]
 
+    decision = payload.get("rag_diagnosis")
+    if isinstance(decision, dict) and isinstance(decision.get("earth_report"), dict):
+        # Clone before adding delivery metadata; prior decision/cache entries
+        # remain read-only and confidence/clinical classification are unchanged.
+        decision = dict(decision)
+        decision["earth_report"] = capture_report(decision["earth_report"], confidence=decision.get("confidence"),
+            assessment_id=decision.get("diagnosis_id"), incident_id=astronaut_sim.incident_id)
+        payload["rag_diagnosis"] = decision
+        latest_earth_report = decision["earth_report"]
     if blind:
         decision = payload.get("rag_diagnosis")
         complete = astronaut_sim.active_scenario == "nominal"
@@ -617,7 +641,7 @@ if FASTAPI_AVAILABLE:
         allow_credentials=True,
         allow_methods=["GET", "POST", "OPTIONS"],
         allow_headers=["Content-Type", "Authorization"],
-        expose_headers=["Content-Disposition"],
+        expose_headers=["Content-Disposition", "X-ARES-Report-Ref"],
     )
 
     app.include_router(diagnose_router)
@@ -721,7 +745,7 @@ if FASTAPI_AVAILABLE:
         return Response(
             content=content,
             media_type=media_type,
-            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+            headers={"Content-Disposition": f'attachment; filename="{filename}"', "X-ARES-Report-Ref": str(report.get("report_ref", ""))},
         )
 
     @app.post("/api/reports/download", tags=["Earth Uplink Reports"])
@@ -732,6 +756,8 @@ if FASTAPI_AVAILABLE:
         """Generate and download an Earth uplink report for telemetry or latest assessment."""
         try:
             report = generate_report_from_payload(payload)
+        except ReportNotFound as exc:
+            raise HTTPException(status_code=410, detail=str(exc)) from exc
         except (ValueError, TypeError) as exc:
             raise HTTPException(status_code=422, detail="Invalid telemetry payload.") from exc
         if report.get("status") == "pending":
@@ -743,7 +769,7 @@ if FASTAPI_AVAILABLE:
         return Response(
             content=content,
             media_type=media_type,
-            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+            headers={"Content-Disposition": f'attachment; filename="{filename}"', "X-ARES-Report-Ref": str(report.get("report_ref", ""))},
         )
 
     @app.post("/api/treatments/apply", tags=["Simulation Control"])
@@ -951,7 +977,7 @@ class AresMedStdlibRequestHandler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Origin", allowed)
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
-        self.send_header("Access-Control-Expose-Headers", "Content-Disposition")
+        self.send_header("Access-Control-Expose-Headers", "Content-Disposition, X-ARES-Report-Ref")
 
     def _send_json(self, status_code: int, payload: Dict[str, Any]) -> None:
         body = json.dumps(payload, indent=2).encode("utf-8")
@@ -966,9 +992,10 @@ class AresMedStdlibRequestHandler(BaseHTTPRequestHandler):
         body = text.encode("utf-8")
         self._send_download(status_code, body, filename, "text/plain; charset=utf-8")
 
-    def _send_download(self, status_code: int, body: bytes, filename: str, media_type: str) -> None:
+    def _send_download(self, status_code: int, body: bytes, filename: str, media_type: str, report_ref: str = "") -> None:
         self.send_response(status_code)
         self.send_header("Content-Type", media_type)
+        self.send_header("X-ARES-Report-Ref", report_ref)
         self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
         self.send_header("Content-Length", str(len(body)))
         self._send_cors_headers()
@@ -1005,7 +1032,7 @@ class AresMedStdlibRequestHandler(BaseHTTPRequestHandler):
             except RuntimeError as exc:
                 self._send_json(503, {"detail": str(exc)})
                 return
-            self._send_download(200, content, filename, media_type)
+            self._send_download(200, content, filename, media_type, str(report.get("report_ref", "")))
             return
         status, snapshot = simulation_response(parsed.path)
         if status != 404:
@@ -1063,6 +1090,9 @@ class AresMedStdlibRequestHandler(BaseHTTPRequestHandler):
         if parsed.path == "/api/reports/download":
             try:
                 report = generate_report_from_payload(data)
+            except ReportNotFound as exc:
+                self._send_json(410, {"detail": str(exc)})
+                return
             except (ValueError, TypeError):
                 self._send_json(422, {"detail": [{"loc": ["body"], "type": "value_error",
                                                 "msg": "Invalid telemetry payload."}]})
@@ -1079,7 +1109,7 @@ class AresMedStdlibRequestHandler(BaseHTTPRequestHandler):
             except RuntimeError as exc:
                 self._send_json(503, {"detail": str(exc)})
                 return
-            self._send_download(200, content, filename, media_type)
+            self._send_download(200, content, filename, media_type, str(report.get("report_ref", "")))
             return
 
         if parsed.path == "/api/scenarios/cure":

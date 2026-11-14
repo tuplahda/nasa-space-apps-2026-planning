@@ -135,27 +135,34 @@
             <div class="organ-selector" role="group" aria-label="Focus an anatomical system">
             <div class="body-callout callout-head">
               <span class="organ-pin pin-sans" id="pin-brain"></span>
-              <span><b>Brain · SANS-01</b><small id="head-organ-value">—</small></span>
+              <span><b title="SANS-01">Brain</b><small id="head-organ-value">—</small></span>
             </div>
             <div class="body-callout callout-eyes">
               <span class="organ-pin pin-sans" id="pin-eyes"></span>
-              <span><b>Eyes · SANS-01</b><small id="eyes-organ-value">Independent ocular focus</small></span>
+              <span><b title="SANS-01">Eyes</b><small id="eyes-organ-value">No status</small></span>
             </div>
             <div class="body-callout callout-heart">
               <span class="organ-pin pin-cv" id="pin-heart"></span>
-              <span><b>Heart · CV-02</b><small id="heart-organ-value">—</small></span>
+              <span><b title="CV-02">Heart</b><small id="heart-organ-value">—</small></span>
             </div>
             <div class="body-callout callout-lungs">
               <span class="organ-pin pin-eclss" id="pin-lungs"></span>
-              <span><b>Lungs · ECLSS-03</b><small id="lungs-organ-value">—</small></span>
+              <span><b title="ECLSS-03">Lungs</b><small id="lungs-organ-value">—</small></span>
             </div>
             <div class="body-callout callout-core">
               <span class="organ-pin pin-rad" id="pin-core"></span>
-              <span><b>Core · RAD-04</b><small id="core-organ-value">—</small></span>
+              <span><b title="RAD-04">Core</b><small id="core-organ-value">—</small></span>
             </div>
             </div>
             <div id="selected-region" role="status">Overview · select an organ to inspect its telemetry.</div>
-            <p id="animation-status">Physiological motion awaiting backend rates</p>
+            <div class="crew-report">
+              <span class="eyebrow">CREW REPORT</span>
+              <span id="symptom-feed">Waiting for telemetry.</span>
+            </div>
+            <div class="model-meta" aria-label="Telemetry source and assessment timing">
+              <span id="packet-source">WAITING FOR TELEMETRY</span>
+              <span id="assessment-latency">ENGINE STANDBY</span>
+            </div>
             <div class="body-legend">
               <span><i class="legend-dot nominal"></i>NOMINAL</span>
               <span><i class="legend-dot warning"></i>ATTENTION</span>
@@ -208,11 +215,17 @@
               </ol>
             </div>
 
-            <button id="apply-treatment" class="recovery-button" type="button" disabled>Start simulated recovery</button>
+            <button id="apply-treatment" class="recovery-button" type="button" disabled>Administer Treatment</button>
             <p id="checklist-status" role="status">Checklist records operator acknowledgement only.</p>
             <p id="blind-status" role="status" hidden></p>
             <button id="reset-simulation" class="mode-button" type="button" hidden>Reset simulation</button>
             <button id="reveal-incident" class="mode-button" type="button" hidden>Reveal simulated incident</button>
+            <section class="report-controls" aria-label="Consultation PDF report">
+              <button id="send-earth" class="report-button" type="button" hidden>Send to Earth</button>
+              <button id="download-report" class="report-button" type="button" hidden>Download Report</button>
+              <p id="report-status" role="status">PDF report available after consultation.</p>
+              <p id="report-error" class="clinical-error" role="alert" hidden></p>
+            </section>
             <div class="citation" id="nasa-citation">
               <span class="citation-mark" aria-hidden="true">§</span>
               <span><b>CLINICAL SOURCE</b><small id="citation-text">Verified NASA citation unavailable until returned by the backend.</small></span>
@@ -222,18 +235,7 @@
         </aside>
       </section>
 
-      <footer class="statusbar">
-        <div class="symptom-feed">
-          <span class="feed-dot"></span>
-          <span class="eyebrow">CREW REPORT</span>
-          <span id="symptom-feed">Waiting for telemetry.</span>
-        </div>
-        <div class="statusbar-right">
-          <span id="packet-source">WAITING FOR TELEMETRY</span>
-          <span class="footer-divider"></span>
-          <span id="assessment-latency">ENGINE STANDBY</span>
-        </div>
-      </footer>
+
     </main>
     <script type="importmap">{"imports":{"three":"./vendor/three/three.module.js","three/addons/":"./vendor/three/addons/"}}</script>
     <script type="module" src="js/app.js"></script>

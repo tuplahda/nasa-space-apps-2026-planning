@@ -125,3 +125,25 @@ NASA's official private challenge dataset is expected to be released within ~24 
 │   └── ROY-GUIDE.md                            <-- Integration, Testing & Pitch Lead Guide
 └── README.md                                   <-- This master documentation file
 ```
+
+
+## Running the dashboard locally
+
+Run these commands from the repository root. Install dependencies with the same Python interpreter that starts the backend; PDF reports require ReportLab.
+
+Backend terminal:
+
+```powershell
+python -m pip install -r backend/requirements.txt
+python -m backend.main
+```
+
+Frontend terminal:
+
+```powershell
+python -m http.server 5500 --bind 127.0.0.1 --directory frontend
+```
+
+Open `http://localhost:5500`. Below 75% confidence, a completed anomaly consultation requests its assessment-specific PDF automatically once. At 75% or above, use **Send to Earth**. If the browser blocks an automatic download, use **Download Report**; a download does not confirm Earth transmission. HTTP 503 mentioning ReportLab means the dependency is missing from the running backend's Python environment. Install the requirements there and restart that backend.
+
+After **Administer Treatment**, the doctor panel returns to its default monitoring state only when backend telemetry confirms both completed recovery and nominal status. Checklist acknowledgement alone does not resolve the incident.

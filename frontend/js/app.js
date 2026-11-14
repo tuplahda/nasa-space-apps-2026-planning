@@ -2,6 +2,7 @@ import { TelemetryView, setText } from './telemetry.js';
 import { TelemetryConnection } from './websocket.js';
 import { Backend } from './scenarios.js';
 import { MedicalPanel } from './medical_panel.js';
+import { ReportDownloads } from './reports.js';
 
 const query=new URLSearchParams(location.search);
 const api=new Backend(query.get('api') || `${location.protocol==='https:'?'https:':'http:'}//localhost:8000`);
@@ -11,6 +12,7 @@ const simulateButton=document.getElementById('run-assessment');
 const consultButton=document.getElementById('analyze-crisis');
 const revealButton=document.getElementById('reveal-incident');
 const resetSimulation=document.getElementById('reset-simulation');
+const reports=new ReportDownloads(api);
 const formatTime=timestamp=>new Date(timestamp).toLocaleTimeString('en-GB',{timeZone:'Indian/Mauritius'});
 const fresh=()=>mode==='backend' && packet && connection?.lastAt && Date.now()-connection.lastAt<=5000;
 const panel=new MedicalPanel(async()=> {
@@ -19,7 +21,7 @@ const panel=new MedicalPanel(async()=> {
   if(incident) {
     if(incident.phase!=='assessed' || incident.id!==consultation?.incidentId)throw new Error('There is no matching current consultation action.');
     const action=incident.actions?.[0];if(!action)throw new Error('No modeled recovery action was returned.');
-    return api.applyBlindAction(incident.id,action.id);
+    return api.applyBlindAction(incident.id,action.id,panel.checks.filter(step=>step.input.checked).map(step=>step.step));
   }
   return api.recover(packet.active_scenario_id);
 });
@@ -27,7 +29,7 @@ function controlError(message='') {
   const node=document.getElementById('control-error');node.hidden=!message;node.textContent=message;
 }
 function updateControls() {
-  const incident=packet?.blind_incident,active=incident && incident.phase!=='complete';
+  const incident=packet?.blind_incident,active=incident && (incident.phase!=='complete' || packet?.anomaly_assessment?.alert_level!=='NOMINAL');
   simulateButton.disabled=!fresh() || starting || !!active || expectedIncident!==null
     || (!!packet?.active_scenario_id && packet.active_scenario_id!=='nominal');
   const pending=consultation?.status==='pending';
@@ -42,8 +44,8 @@ function showIncident(incident) {
   const node=document.getElementById('blind-status');node.hidden=!incident;
   revealButton.hidden=!incident?.reveal || revealedIncident===incident.id;
   if(!incident)return;
-  const recovery=incident.recovery_cause==='operator'?'Operator-triggered recovery':'Automatic recovery';
-  node.textContent=({observing:'Crisis telemetry is developing. Doctor idle.',awaiting_doctor:'Abnormal telemetry detected. Consult Doctor when ready.',analyzing:'The backend doctor is assessing the current telemetry.',assessed:'Consultation available for this incident.',recovering:`${recovery} in progress.`,complete:`${recovery} complete.`})[incident.phase] || 'Monitoring the current incident.';
+  const recovery=incident.recovery_cause==='operator'?'Requested simulated recovery':'Automatic recovery';
+  node.textContent=({observing:'Crisis telemetry is developing. Doctor idle.',awaiting_doctor:'Abnormal telemetry detected. Consult Doctor when ready.',analyzing:'The backend doctor is assessing the current telemetry.',assessed:'Consultation available for this incident.',recovering:`${recovery} in progress.`,complete:packet?.anomaly_assessment?.alert_level==='NOMINAL'?'Backend confirms recovery complete · monitoring is nominal.':'Backend reports recovery completion · waiting for nominal telemetry.'})[incident.phase] || 'Monitoring the current incident.';
   if(incident.phase==='assessed' && !incident.actions?.length)node.textContent+=' No physical recovery action is modeled for this incident; reset the simulation to start another test.';
   if(revealedIncident===incident.id && incident.reveal)node.textContent+=` Simulated incident: ${incident.reveal}.`;
 }
@@ -73,23 +75,36 @@ function ingest(p,source) {
     || (lastIncident!==null && Number.isInteger(p.simulation_incident) && p.simulation_incident<lastIncident))return;
   if(expectedIncident!==null && p.simulation_incident>=expectedIncident)expectedIncident=null;
   if(lastIncident!==p.simulation_incident) {
-    lastIncident=p.simulation_incident;generation++;consultation=null;
+    lastIncident=p.simulation_incident;generation++;consultation=null;reports.reset();
     panel.reset('Telemetry monitoring is active. Press Consult Doctor to request an assessment.');
   }
   packet=p;transport=source;mode='backend';
   const states=view.update(p,source);body?.update(p,states);updateAlerts(states);
-  setText('packet-source',`SIMULATED TELEMETRY · ASTRONAUT AGENT · ${transport}`);
+  setText('packet-source',`SIMULATED TELEMETRY · ${formatTime(p.timestamp)} MUT`);
   setText('data-badge','AGENT · 1 Hz');
-  showIncident(p.blind_incident);
+  const resolved=p.anomaly_assessment?.alert_level==='NOMINAL'
+    && (p.blind_incident?.phase==='complete' || (!p.blind_incident && p.recovery_status==='COMPLETE' && p.active_scenario_id==='nominal'));
+  if(resolved && consultation) {
+    // A completed treatment response alone is not proof of recovery. Clear the
+    // consultation only on the server's completed, nominal telemetry snapshot.
+    generation++;consultation=null;reports.reset();
+    panel.reset('Recovery complete. Monitoring telemetry; consult the doctor when a new assessment is needed.');
+    setText('assessment-latency','ENGINE STANDBY');
+  }
+  showIncident(resolved?null:p.blind_incident);
   // The blind streaming contract truly gates Layer 3 on the server. Unsolicited
   // diagnoses from legacy/non-blind streams are not displayed as consultations.
-  if(consultation && consultation.incidentId===p.simulation_incident && p.rag_diagnosis
+  if(!resolved && consultation && consultation.incidentId===p.simulation_incident && p.rag_diagnosis
     && ['assessed','recovering','complete'].includes(p.blind_incident?.phase)) {
     if(consultation.status==='pending' || consultation.status==='failed') {
       consultation.status='complete';consultation.receivedAt=new Date().toISOString();consultation.sourceTimestamp=p.timestamp;
       setText('assessment-latency',`CONSULTATION ${(performance.now()-consultation.start).toFixed(0)} ms`);
     }
-    if(consultation.status==='complete')panel.render({...p.rag_diagnosis,blindIncident:p.blind_incident});
+    if(consultation.status==='complete') {
+      const assessment={...p.rag_diagnosis,blindIncident:p.blind_incident};
+      panel.render(assessment);
+      if(!consultation.reportBound){reports.setAssessment(assessment,{incidentId:p.simulation_incident});consultation.reportBound=true;}
+    }
   }
   updateProvenance();updateControls();
 }
@@ -101,7 +116,7 @@ simulateButton.addEventListener('click',async()=> {
     const result=await api.startBlindCrisis();
     if(version!==generation)return;
     if(!Number.isInteger(result.incident_id))throw new Error('The backend did not acknowledge a random streaming incident.');
-    expectedIncident=result.incident_id;consultation=null;
+    expectedIncident=result.incident_id;consultation=null;reports.reset();
     panel.reset('Random crisis started. Monitoring changing vitals; doctor remains idle until consultation.');
     showIncident(null);setText('assessment-latency','MONITORING TELEMETRY');updateProvenance();
   } catch(error) {controlError(`${error.message} Random streaming simulation requires the existing simulate-crisis endpoint; no local fallback is used.`);}
@@ -120,7 +135,7 @@ consultButton.addEventListener('click',async()=> {
     } else {
       const result=await api.diagnose(observed);
       if(version!==generation || consultation?.incidentId!==observed.simulation_incident)return;
-      panel.render(result);consultation.status='complete';consultation.receivedAt=new Date().toISOString();
+      panel.render(result);reports.setAssessment(result,{incidentId:observed.simulation_incident});consultation.reportBound=true;consultation.status='complete';consultation.receivedAt=new Date().toISOString();
       setText('assessment-latency',`CONSULTATION ${(performance.now()-consultation.start).toFixed(0)} ms`);
     }
   } catch(error) {
@@ -166,6 +181,6 @@ async function init() {
     connection.start();
   } catch(error) {setText('api-state-label','FRONTEND ERROR');controlError(`${error.message} Serve the frontend through HTTP.`);}
 }
-window.addEventListener('pagehide',()=>{connection?.stop();body?.dispose();});
+window.addEventListener('pagehide',()=>{connection?.stop();body?.dispose();reports.dispose();});
 window.addEventListener('pageshow',event=>{if(event.persisted)location.reload();});
 init();

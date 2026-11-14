@@ -200,8 +200,7 @@ export class AresBodyHUD {
   }
   describeSelection() {
     if(!this.selectedTarget)return;
-    const values=regions[this.selected].fields.filter(path=>finite(get(this.packet,path))).map(path=>`${path.split('.').at(-1)}: ${get(this.packet,path)}`);
-    setText('selected-region',`${focusTargets[this.selectedTarget].label} · ${(this.statuses[this.selected]||'unknown').toUpperCase()} · ${values.join(' · ')||'No region-specific measurements supplied'}`);
+    setText('selected-region',`${focusTargets[this.selectedTarget].label} · ${(this.statuses[this.selected]||'unknown').toUpperCase()} · focused view`);
   }
   update(packet,statuses,received=true) {
     this.packet=packet;this.statuses=statuses||{};
@@ -218,7 +217,7 @@ export class AresBodyHUD {
     const fresh=now-this.freshAt<=5000;
     const hr=fresh&&finite(this.heartRate)&&this.heartRate>0,rr=fresh&&finite(this.respirationRate)&&this.respirationRate>0;
     const label=this.reduced?.matches?'Physiological motion paused · reduced motion':`Heart ${hr?fmt(this.heartRate)+' bpm':'unavailable / paused'} · Breathing ${rr?fmt(this.respirationRate)+' /min':'unavailable / paused'}`;
-    if(label!==this.animationLabel){setText('animation-status',label);this.animationLabel=label;}
+    if(label!==this.animationLabel){this.container?.setAttribute('aria-description',label);this.animationLabel=label;}
     return {hr,rr};
   }
   stepPhysiology(delta,now) {

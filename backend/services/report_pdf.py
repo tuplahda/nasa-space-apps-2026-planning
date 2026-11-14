@@ -34,8 +34,11 @@ def render_earth_report_pdf(report: Mapping[str, Any]) -> bytes:
         from reportlab.pdfbase import pdfmetrics
         from reportlab.pdfbase.ttfonts import TTFont
         from reportlab.platypus import KeepInFrame, Paragraph, SimpleDocTemplate
-    except ImportError as exc:  # Keep text downloads and server startup available without the optional extra.
-        raise RuntimeError("PDF export requires ReportLab. Install backend/requirements.txt.") from exc
+    except ImportError as exc:  # Other monitoring endpoints remain available.
+        raise RuntimeError(
+            "PDF export requires ReportLab in the Python environment running this backend. "
+            "Run: python -m pip install -r backend/requirements.txt, then restart the backend."
+        ) from exc
 
     font_dir = Path(reportlab.__file__).parent / "fonts"
     font_faces = {

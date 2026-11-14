@@ -12,7 +12,7 @@ const fixture=JSON.parse(await readFile(new URL('../data/demo_cases.json',import
 const health=await api.request('/health');assert.equal(health.status,'NOMINAL');
 let connection;
 try {
-  for(const path of ['/','/style.css','/js/app.js','/js/body_dynamics.js','/js/body_hud.js','/js/websocket.js','/js/telemetry.js','/js/scenarios.js','/js/mock_data.js','/js/medical_panel.js','/vendor/three/three.module.js','/vendor/three/addons/loaders/GLTFLoader.js','/vendor/three/addons/controls/OrbitControls.js','/vendor/three/addons/utils/BufferGeometryUtils.js','/assets/models/ares_upper_body_hologram.glb','/data/baselines.json','/data/demo_cases.json']) {
+  for(const path of ['/','/style.css','/js/app.js','/js/reports.js','/js/body_dynamics.js','/js/body_hud.js','/js/websocket.js','/js/telemetry.js','/js/scenarios.js','/js/mock_data.js','/js/medical_panel.js','/vendor/three/three.module.js','/vendor/three/addons/loaders/GLTFLoader.js','/vendor/three/addons/controls/OrbitControls.js','/vendor/three/addons/utils/BufferGeometryUtils.js','/assets/models/ares_upper_body_hologram.glb','/data/baselines.json','/data/demo_cases.json']) {
     const response=await fetch(frontend+path);assert.equal(response.status,200,path);await response.arrayBuffer();
   }
   console.log('PASS: all HTML, CSS, modules, GLB and local dependencies served via HTTP');
@@ -62,9 +62,10 @@ try {
   const knownFrame=await waitForFrame(known.incident_id,p=>p.blind_incident.phase==='assessed');
   assert.equal(knownFrame.rag_diagnosis.mode,'MODE_A_KNOWN_CONDITION');
   assert.ok(knownFrame.environment.cabin_co2_mmhg>initial.environment.cabin_co2_mmhg);
+  const knownPDF=await api.downloadReport(knownFrame.rag_diagnosis.earth_report.report_ref);assert.ok(knownPDF.blob.size>1000);
   const action=knownFrame.blind_incident.actions[0].id;
   await assert.rejects(api.applyBlindAction(known.incident_id-1,action));
-  await api.applyBlindAction(known.incident_id,action);
+  await api.applyBlindAction(known.incident_id,action,knownFrame.rag_diagnosis.action_checklist.map(step=>step.step));
   await assert.rejects(api.applyBlindAction(known.incident_id,action));
   await waitForFrame(known.incident_id,p=>p.blind_incident.phase==='recovering' && p.blind_incident.recovery_cause==='operator');
   const complete=await waitForFrame(known.incident_id,p=>p.blind_incident.phase==='complete');
@@ -75,8 +76,12 @@ try {
   await api.analyzeBlindCrisis(unknown.incident_id);
   const abstained=await waitForFrame(unknown.incident_id,p=>p.blind_incident.phase==='assessed');
   assert.equal(abstained.rag_diagnosis.mode,'MODE_B_NOVEL_ANOMALY');
-  assert.deepEqual(abstained.blind_incident.actions,[]);
-  console.log('PASS: random streaming onset; no diagnosis before consultation; known match and modeled recovery; Mode B abstention; stale/duplicate action rejection');
+  const fallback=abstained.blind_incident.actions[0];assert.equal(fallback.kind,'simulation_only');assert.equal(fallback.physical_effect_modeled,false);
+  const unknownPDF=await api.downloadReport(abstained.rag_diagnosis.earth_report.report_ref);assert.ok(unknownPDF.blob.size>1000);
+  await api.applyBlindAction(unknown.incident_id,fallback.id,abstained.rag_diagnosis.action_checklist.map(step=>step.step));
+  const recovered=await waitForFrame(unknown.incident_id,p=>p.blind_incident.phase==='complete');assert.equal(recovered.anomaly_assessment.alert_level,'NOMINAL');
+  const originalAgain=await api.downloadReport(knownFrame.rag_diagnosis.earth_report.report_ref);assert.equal(originalAgain.filename,knownPDF.filename);
+  console.log('PASS: random streaming onset; no diagnosis before consultation; Mode A and B treatment-to-nominal recovery; matched original PDF downloads; stale/duplicate action rejection');
   console.log('ALL INTEGRATION CHECKS PASSED');
 } finally {
   connection?.stop();

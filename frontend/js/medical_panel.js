@@ -8,7 +8,7 @@ export class MedicalPanel {
     this.submit.addEventListener('click',()=>this.recover());
   }
   reset(message='Waiting for the astronaut agent assessment.') {
-    this.signature=null; this.assessment=null; this.version++; this.submitted=false; this.pending=false;
+    this.signature=null; this.assessment=null; this.version++; this.submitted=false; this.pending=false; this.checks=[]; this.ready=false;
     setText('result-mode','AWAITING ASSESSMENT'); setText('result-severity','—'); setText('diagnosis-title','Monitoring telemetry');setText('diagnosis-summary',message);
     setText('confidence-value','—');document.getElementById('confidence-meter').style.width='0%';
     document.getElementById('treatment-checklist').replaceChildren(el('li','No assessment actions available.','empty-action'));
@@ -16,8 +16,9 @@ export class MedicalPanel {
     setText('action-count','0');setText('citation-text','Verified NASA citation unavailable.');document.getElementById('citation-text').removeAttribute('title');
     document.getElementById('diagnosis-card').className='diagnosis-card';
     this.submit.hidden=false;
-    this.submit.textContent='Start simulated recovery';
+    this.submit.textContent='Administer Treatment';
     this.submit.disabled=true; setText('checklist-status','Checklist records operator acknowledgement only.');this.error('');
+    const panel=document.querySelector?.('.clinical-panel');if(panel)panel.scrollTop=0;
   }
   error(message) { const node=document.getElementById('clinical-error');node.hidden=!message;node.textContent=message; }
   render(a) {
@@ -83,11 +84,13 @@ export class MedicalPanel {
     setText('action-count',`${done}/${checks.length}`);
     const blind = this.assessment?.blindIncident;
     const action = blind?.actions?.[0];
-    this.submit.textContent = action?.label || 'Start simulated recovery';
-    this.submit.hidden = !!blind && !action;
-    this.submit.disabled=!this.ready || this.pending || this.submitted || (!!blind && !action);
+    const recovering=blind?.phase==='recovering',complete=blind?.phase==='complete';
+    this.submit.textContent=recovering?'Recovering…':complete?'Recovery complete':'Administer Treatment';
+    this.submit.title=action?.label || 'Request backend simulated recovery';
+    this.submit.hidden=false;
+    this.submit.disabled=!this.ready || this.pending || this.submitted || (!!blind && (!action || blind.phase!=='assessed'));
     for(const c of checks) c.input.disabled=this.pending || this.submitted;
-    setText('checklist-status',this.submitted?'Simulated recovery requested. Acknowledgements do not record treatment administration.':this.pending?'Requesting simulated recovery…':`${this.assessment?.demo?'LOCAL DEMONSTRATION · ':''}${done}/${checks.length} acknowledged · session only; no medical administration recorded.`);
+    setText('checklist-status',recovering?'Backend recovery in progress. Waiting for nominal telemetry.':complete?'Backend recovery completed. Acknowledgements are not administration records.':action?.kind==='simulation_only' && !this.pending && !this.submitted?`${done}/${checks.length} acknowledged · simulation-only completion; no validated physical treatment is implied.`:this.submitted?'Simulated recovery requested. Acknowledgements do not record treatment administration.':this.pending?'Requesting simulated recovery…':`${this.assessment?.demo?'LOCAL DEMONSTRATION · ':''}${done}/${checks.length} acknowledged · session only; no medical administration recorded.`);
   }
   async recover() {
     if(!this.ready || this.pending || this.submitted || this.submit.disabled) return;
