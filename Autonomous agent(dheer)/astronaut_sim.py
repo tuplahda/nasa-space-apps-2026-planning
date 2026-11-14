@@ -207,6 +207,12 @@ class AstronautSimulationEngine:
         self.dynamic_perturbation: Dict[str, float] = {}
         self.dynamic_overrides: Dict[str, float] = {}
         self.dynamic_symptom_log: Optional[str] = None
+        self.blind_crisis: Optional[str] = None
+        self.blind_onset_ticks = 0
+        self.blind_progression_rate = 0.12
+        self.blind_noise: Optional[random.Random] = None
+        self.blind_recovery_cause: Optional[str] = None
+        self.blind_recovery_rate = 0.35
 
         # Mission Elapsed Time base (Day 84, 10:15:00)
         self.met_seconds: int = (84 * 86400) + (10 * 3600) + (15 * 60)
@@ -376,6 +382,7 @@ class AstronautSimulationEngine:
         normalized = SCENARIO_ALIASES.get(normalized, normalized)
         if normalized in ("nominal", "normal", "healthy", "baseline"):
             self._clear_dynamic_crisis_state()
+            self.blind_crisis = self.blind_noise = self.blind_recovery_cause = None
             self.incident_id += 1
             self._treatment_options.clear()
             self._treatment_policy_key = None
@@ -396,6 +403,7 @@ class AstronautSimulationEngine:
         elif normalized not in TRAJECTORY_SCENARIOS.values() and normalized not in ("dehydration", "zero_day"):
             return {"status": "error", "message": "Unknown simulation scenario."}
         self._clear_dynamic_crisis_state()
+        self.blind_crisis = self.blind_noise = self.blind_recovery_cause = None
         self.incident_id += 1
         self._treatment_options.clear()
         self._treatment_policy_key = None
@@ -426,6 +434,10 @@ class AstronautSimulationEngine:
         self.active_treatment = "Temporary Demo Crisis Timeout (Auto-Recovery)"
         self.recovery_tick = 0
         self.recovery_start = max(0.25, self.scenario_progression)
+        if self.blind_crisis:
+            self.blind_recovery_cause = "automatic"
+            self.temporary_crisis_auto_recover = False
+            return
         self.temporary_crisis_ticks_remaining = 0
         self.temporary_crisis_auto_recover = False
         self.dynamic_crisis_label = None
@@ -440,6 +452,7 @@ class AstronautSimulationEngine:
         mode_preference: Optional[str] = None,
         duration_ticks: int = 15,
         seed: Optional[int] = None,
+        streaming: bool = False,
     ) -> Dict[str, Any]:
         """
         Dynamically inject a random, non-hardcoded temporary vital problem for demo
@@ -462,7 +475,7 @@ class AstronautSimulationEngine:
         else:
             candidates = list(MODE_A_CRISIS_SCENARIOS) + list(MODE_B_CRISIS_SCENARIOS)
 
-        if len(candidates) > 1 and self.last_simulated_crisis in candidates:
+        if seed is None and len(candidates) > 1 and self.last_simulated_crisis in candidates:
             candidates = [candidate for candidate in candidates if candidate != self.last_simulated_crisis]
 
         chosen = rng.choice(candidates)
@@ -545,6 +558,14 @@ class AstronautSimulationEngine:
             }
             self.dynamic_symptom_log = None
 
+        if streaming:
+            self.blind_crisis = chosen
+            self.blind_onset_ticks = 2
+            self.blind_progression_rate = rng.uniform(0.08, 0.13)
+            self.blind_noise = random.Random(rng.getrandbits(64))
+            self.scenario_progression = 0.0
+            self.target_progression = rng.uniform(0.87, 1.0)
+
         return {
             "status": "ok",
             "scenario": chosen,
@@ -556,7 +577,7 @@ class AstronautSimulationEngine:
             "message": f"Dynamic temporary crisis '{chosen}' injected for {ticks} ticks.",
         }
 
-    def _apply_dynamic_crisis_modifiers(self, packet: TelemetryPacket) -> None:
+    def _apply_dynamic_crisis_modifiers(self, packet: TelemetryPacket, strength: float = 1.0) -> None:
         """Apply active dynamic crisis overrides or jitter while clamping physiological bounds."""
         bounds = {
             "heart_rate": (30.0, 220.0, 1),
@@ -571,16 +592,17 @@ class AstronautSimulationEngine:
             for field_name, target_value in self.dynamic_overrides.items():
                 if hasattr(packet.vitals, field_name) and field_name in bounds:
                     low, high, digits = bounds[field_name]
-                    clamped = max(low, min(high, float(target_value)))
+                    baseline = float(getattr(packet.vitals, field_name))
+                    clamped = max(low, min(high, baseline + strength * (float(target_value) - baseline)))
                     setattr(packet.vitals, field_name, round(clamped, digits))
         if self.dynamic_perturbation:
             for field_name, delta in self.dynamic_perturbation.items():
                 if hasattr(packet.vitals, field_name) and field_name in bounds:
                     low, high, digits = bounds[field_name]
                     current = float(getattr(packet.vitals, field_name))
-                    clamped = max(low, min(high, current + float(delta)))
+                    clamped = max(low, min(high, current + strength * float(delta)))
                     setattr(packet.vitals, field_name, round(clamped, digits))
-        if self.dynamic_symptom_log:
+        if self.dynamic_symptom_log and strength >= 0.35 and not self.is_recovering:
             packet.symptom_log = self.dynamic_symptom_log
 
     def set_treatment_options(self, treatments: List[str], policy_key=None) -> None:
@@ -634,12 +656,18 @@ class AstronautSimulationEngine:
         """
         self.tick_count += 1
         self.met_seconds += 1
+        before_onset = bool(self.blind_crisis and self.blind_onset_ticks > 0)
+        if before_onset:
+            self.blind_onset_ticks -= 1
+        progression_rate = self.blind_progression_rate if self.blind_crisis else self.progression_rate
 
         # Smooth scenario progression towards target
         if self.is_recovering:
             self.recovery_tick += 1
             # Exponential washout biological decay curve: e^(-0.35 * t)
-            decay_factor = math.exp(-0.35 * self.recovery_tick)
+            decay_rate = (self.blind_recovery_rate
+                          if self.blind_recovery_cause == "operator" else 0.35)
+            decay_factor = math.exp(-decay_rate * self.recovery_tick)
             self.scenario_progression = max(0.0, self.recovery_start * decay_factor)
             if self.recovery_tick >= 10:
                 self.scenario_progression = 0.0
@@ -649,16 +677,16 @@ class AstronautSimulationEngine:
                 self._treatment_options.clear()
                 self._treatment_policy_key = None
                 self._clear_dynamic_crisis_state()
-        else:
+        elif not before_onset:
             if self.scenario_progression < self.target_progression:
                 self.scenario_progression = min(
                     self.target_progression,
-                    self.scenario_progression + self.progression_rate,
+                    self.scenario_progression + progression_rate,
                 )
             elif self.scenario_progression > self.target_progression:
                 self.scenario_progression = max(
                     self.target_progression,
-                    self.scenario_progression - self.progression_rate,
+                    self.scenario_progression - progression_rate,
                 )
 
         # Baseline resolution
@@ -698,15 +726,16 @@ class AstronautSimulationEngine:
         sinus_arrhythmia = 3.0 * math.sin(2.0 * math.pi * resp_freq_hz * self.tick_count)
 
         # Subtle organic noise (+/- 0.4 bpm, +/- 0.3 mmHg, +/- 0.02 deg C)
-        noise_hr = random.uniform(-0.4, 0.4)
-        noise_bp = random.uniform(-0.3, 0.3)
-        noise_temp = random.uniform(-0.02, 0.02)
+        noise = self.blind_noise or random
+        noise_hr = noise.uniform(-0.4, 0.4)
+        noise_bp = noise.uniform(-0.3, 0.3)
+        noise_temp = noise.uniform(-0.02, 0.02)
 
         # Environmental defaults
         cabin_ppo2 = 160.0
         suit_pressure = 4.3 if self.activity_state == "EVA_SPACEWALK" else 14.7
         space_weather = donki_service.get_space_weather(
-            force_active_flare=(self.active_scenario in ("solar_flare", "traj-ars-spe"))
+            force_active_flare=(not self.blind_crisis and self.active_scenario in ("solar_flare", "traj-ars-spe"))
         )
         ambient_radiation = space_weather.ambient_radiation_msv_h
         donki_spe_active = space_weather.spe_active
@@ -716,11 +745,13 @@ class AstronautSimulationEngine:
         quality_flags = {}
         # Scenario-specific physiological shifts
         p = self.scenario_progression
-        scen = self.active_scenario
+        scen = "nominal" if before_onset else self.active_scenario
+        if self.blind_crisis and self.dynamic_overrides:
+            scen = "nominal"  # The sampled profile supplies the vital changes.
 
         if scen in ("hypercapnia", "traj-hypercapnia", "scenario_1_hypercapnia"):
             cabin_co2 = 2.4 + (10.4 * p)
-            delta_co2 = max(0.0, cabin_co2 - 2.0)
+            delta_co2 = max(0.0, cabin_co2 - (2.4 if self.blind_crisis else 2.0))
             rr_base += 0.45 * delta_co2
             hr_base += 1.8 * delta_co2
             sbp_base += 1.4 * delta_co2
@@ -741,7 +772,7 @@ class AstronautSimulationEngine:
 
         elif scen in ("solar_flare", "traj-ars-spe", "scenario_4_solar_radiation_ars"):
             ambient_radiation = 0.065 + (4.785 * p)
-            donki_spe_active = True
+            donki_spe_active = not self.blind_crisis or p >= 0.35
             hr_base += 14.0 * p
             rr_base += 4.0 * p
             hrv_base = max(12.0, hrv_base - (15.0 * p))
@@ -758,7 +789,7 @@ class AstronautSimulationEngine:
             )
 
         elif scen in ("decompression", "hypoxia", "traj-hypoxia", "scenario_3_decompression_hypoxia"):
-            suit_pressure = 4.3 - (1.1 * p)
+            suit_pressure = (suit_pressure if self.blind_crisis else 4.3) - (1.1 * p)
             spo2_base = max(76.0, spo2_base - (17.5 * p))
             hr_base += 38.0 * p
             rr_base += 14.0 * p
@@ -823,15 +854,19 @@ class AstronautSimulationEngine:
             symptom_log = (
                 f"Treatment active ({treatment_desc}). Vitals stabilizing smoothly back to nominal microgravity baseline."
             )
+            if self.blind_crisis:
+                symptom_log = "Simulated readings are trending back toward baseline."
+        elif self.blind_crisis and p < 0.35:
+            symptom_log = NOMINAL_SYMPTOM_LOG
 
         # Assemble finalized physiological values with noise and bounds
         calc_hr = max(35.0, min(220.0, hr_base + sinus_arrhythmia + noise_hr))
         calc_sbp = max(60.0, min(230.0, sbp_base + noise_bp))
         calc_dbp = max(40.0, min(140.0, dbp_base + (noise_bp * 0.5)))
-        calc_spo2 = max(70.0, min(100.0, spo2_base + random.uniform(-0.1, 0.1)))
-        calc_hrv = max(5.0, min(150.0, hrv_base + random.uniform(-0.8, 0.8)))
+        calc_spo2 = max(70.0, min(100.0, spo2_base + noise.uniform(-0.1, 0.1)))
+        calc_hrv = max(5.0, min(150.0, hrv_base + noise.uniform(-0.8, 0.8)))
         calc_temp = max(34.0, min(42.0, temp_base + noise_temp))
-        calc_rr = max(6.0, min(45.0, rr_base + random.uniform(-0.2, 0.2)))
+        calc_rr = max(6.0, min(45.0, rr_base + noise.uniform(-0.2, 0.2)))
         calc_ve = max(4.0, min(60.0, (calc_rr * 0.55)))
 
         vitals = Vitals(
@@ -883,9 +918,12 @@ class AstronautSimulationEngine:
             symptom_log=symptom_log,
             quality_flags=quality_flags or None,
         )
-        if not self.is_recovering and self.active_scenario != "nominal":
-            self._apply_dynamic_crisis_modifiers(packet)
-            if self.temporary_crisis_ticks_remaining > 0:
+        if not before_onset and self.active_scenario != "nominal":
+            if self.blind_crisis:
+                self._apply_dynamic_crisis_modifiers(packet, p)
+            elif not self.is_recovering:
+                self._apply_dynamic_crisis_modifiers(packet)
+            if not self.is_recovering and self.temporary_crisis_ticks_remaining > 0:
                 self.temporary_crisis_ticks_remaining -= 1
                 if self.temporary_crisis_ticks_remaining == 0 and self.temporary_crisis_auto_recover:
                     self._start_temporary_crisis_recovery()

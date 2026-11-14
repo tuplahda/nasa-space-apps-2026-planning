@@ -13,6 +13,14 @@ export class Backend {
     if(!(key in scenarioNames)) throw new Error('Unknown scenario');
     return this.request('/api/scenarios/trigger',{scenario:scenarioNames[key]});
   }
+  startBlindCrisis(seed) {
+    const payload = {streaming: true};
+    if (seed !== undefined) payload.seed = seed;
+    return this.request('/api/scenarios/simulate-crisis', payload);
+  }
+  applyBlindAction(incidentId, actionId) {
+    return this.request('/api/treatments/apply', {incident_id: incidentId, action_id: actionId});
+  }
   async snapshot(key) {
     for(let i=0;i<6;i++) {
       const raw=await this.request('/api/telemetry/current');

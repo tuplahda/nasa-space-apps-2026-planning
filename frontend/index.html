@@ -29,7 +29,8 @@
         </div>
 
         <div class="top-controls">
-          <label class="case-picker">
+          <button id="rehearsal-toggle" class="mode-button" type="button" aria-pressed="false" aria-controls="rehearsal-cases">Rehearsal mode</button>
+          <label class="case-picker" id="rehearsal-cases" hidden>
             <span class="eyebrow">TELEMETRY CASE</span>
             <select id="case-select" aria-label="Choose a telemetry case">
               <option value="nominal">Nominal rest</option>
@@ -40,7 +41,7 @@
           </label>
           <button class="run-button" id="run-assessment" type="button">
             <span class="run-icon" aria-hidden="true">&#9655;</span>
-            Simulate crisis
+            <span id="run-label">Simulate crisis</span>
           </button>
           <button id="data-mode" class="mode-button" type="button" title="Switch between the backend astronaut agent and the local demonstration">Use local demo</button>
           <div class="api-state" id="api-state" role="status" aria-live="polite">
@@ -198,6 +199,8 @@
 
             <button id="apply-treatment" class="recovery-button" type="button" disabled>Start simulated recovery</button>
             <p id="checklist-status" role="status">Checklist records operator acknowledgement only.</p>
+            <p id="blind-status" role="status" hidden></p>
+            <button id="reveal-incident" class="mode-button" type="button" hidden>Reveal simulated incident</button>
             <div class="citation" id="nasa-citation">
               <span class="citation-mark" aria-hidden="true">§</span>
               <span><b>CLINICAL SOURCE</b><small id="citation-text">Verified NASA citation unavailable until returned by the backend.</small></span>

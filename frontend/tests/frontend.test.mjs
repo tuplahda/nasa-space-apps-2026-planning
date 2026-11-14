@@ -64,6 +64,39 @@ test('HTTP errors are surfaced, not converted into successful mock assessments',
   const original=globalThis.fetch;globalThis.fetch=async()=>({ok:false,status:422,json:async()=>({detail:'invalid packet'})});
   try {await assert.rejects(new Backend('http://localhost:8000').diagnose(sample()),/invalid packet/);}finally{globalThis.fetch=original;}
 });
+test('blind launch opts into streaming and keeps replay seed optional', async () => {
+  const calls = [];
+  const api = new Backend('http://localhost:8000');
+  api.request = async (path, body) => { calls.push([path, body]); };
+  await api.startBlindCrisis();
+  await api.startBlindCrisis(0);
+  await api.applyBlindAction(4, 'restore_airflow');
+  assert.deepEqual(calls, [
+    ['/api/scenarios/simulate-crisis', {streaming: true}],
+    ['/api/scenarios/simulate-crisis', {streaming: true, seed: 0}],
+    ['/api/treatments/apply', {incident_id: 4, action_id: 'restore_airflow'}],
+  ]);
+});
+test('blind acknowledgement enables only a currently available simulated action', async () => {
+  let submitted = 0;
+  const panel = new MedicalPanel(async () => { submitted++; });
+  const assessment = {...data.cases.hypercapnia.assessment, blindIncident: {
+    id: 4, actions: [{id: 'restore_airflow', label: 'Restore airflow'}],
+  }};
+  panel.reset();
+  panel.render(assessment);
+  for (const entry of panel.checks) {
+    entry.input.checked = true;
+    entry.input.events.change();
+  }
+  assert.equal(submitted, 0);
+  assert.equal(panel.submit.textContent, 'Restore airflow');
+  assert.equal(panel.submit.disabled, false);
+  panel.render({...assessment, blindIncident: {id: 4, actions: []}});
+  await panel.recover();
+  assert.equal(panel.submit.hidden, true);
+  assert.equal(submitted, 0);
+});
 test('checklist acknowledgements survive stream refresh and recovery submits once',async()=>{
   let submitted=0;const p=new MedicalPanel(async()=>{submitted++;});p.reset();const a={...data.cases.hypercapnia.assessment,demo:true};p.render(a);
   for(const c of p.checks){c.input.checked=true;c.input.events.change();}
@@ -135,4 +168,70 @@ test('real HTML preserves unique IDs and all static module DOM references',async
   }
   assert.ok(html.includes('href="style.css"'));assert.ok(!html.includes('https://fonts.googleapis.com'));
   const {fmt}=await import('../js/telemetry.js');assert.equal(fmt(null),'\u2014');
+});
+
+test('dashboard waits for current incident frames and keeps named cases in rehearsal', async () => {
+  const originals = {fetch: globalThis.fetch, WebSocket: globalThis.WebSocket,
+    location: globalThis.location, window: globalThis.window, querySelector: document.querySelector};
+  const events = {};
+  const calls = [];
+  class Socket {
+    static OPEN = 1;
+    static CONNECTING = 0;
+    readyState = 1;
+    constructor() { Socket.current = this; }
+    close() { this.readyState = 3; }
+  }
+  globalThis.location = {search: '', protocol: 'http:'};
+  globalThis.window = {addEventListener: (name, callback) => { events[name] = callback; }};
+  globalThis.WebSocket = Socket;
+  document.querySelector = document.getElementById;
+  const button = document.getElementById('run-assessment');
+  button.classList = {add() {}, remove() {}};
+  document.getElementById('case-select').value = 'nominal';
+  globalThis.fetch = async (url, options) => {
+    if (url === 'data/baselines.json') return {ok: true, json: async () => baselines};
+    if (url === 'data/demo_cases.json') return {ok: true, json: async () => data};
+    calls.push([url.pathname, JSON.parse(options.body)]);
+    return {ok: true, json: async () => ({status: 'ok', incident_id: 3})};
+  };
+  function send(incident, tick, phase, diagnosis) {
+    const p = {...sample(), simulation_incident: incident,
+      timestamp: new Date(Date.UTC(2026, 10, 14, 12, 0, tick)).toISOString()};
+    if (phase) {
+      delete p.active_scenario_id;
+      p.blind_incident = {id: incident, phase, actions: []};
+    }
+    if (diagnosis) p.rag_diagnosis = diagnosis;
+    Socket.current.onmessage({data: JSON.stringify(p)});
+  }
+  try {
+    await import('../js/app.js');
+    for (let i = 0; i < 30 && !Socket.current; i++) {
+      await new Promise(resolve => setTimeout(resolve, 5));
+    }
+    assert.ok(Socket.current);
+    Socket.current.onopen();
+    send(2, 0);
+    assert.equal(document.getElementById('rehearsal-cases').hidden, true);
+    document.getElementById('rehearsal-toggle').events.click();
+    assert.equal(document.getElementById('rehearsal-cases').hidden, false);
+    document.getElementById('rehearsal-toggle').events.click();
+    await button.events.click();
+    assert.deepEqual(calls, [['/api/scenarios/simulate-crisis', {streaming: true}]]);
+    const diagnosis = data.cases.hypercapnia.assessment;
+    send(2, 1, null, diagnosis);
+    assert.equal(document.getElementById('result-mode').textContent, 'AWAITING ASSESSMENT');
+    send(3, 2, 'observing');
+    assert.equal(document.getElementById('blind-status').textContent, 'Collecting streamed telemetry.');
+    send(3, 3, 'assessed', diagnosis);
+    assert.match(document.getElementById('result-mode').textContent, /MODE A/);
+    send(2, 4, null, data.cases['zero-day'].assessment);
+    assert.match(document.getElementById('result-mode').textContent, /MODE A/);
+  } finally {
+    events.pagehide?.();
+    document.querySelector = originals.querySelector;
+    delete originals.querySelector;
+    Object.assign(globalThis, originals);
+  }
 });

@@ -107,6 +107,10 @@ def run_simulation_command(action: Any, payload: Dict[str, Any]) -> Dict[str, An
     if action in ("simulate_crisis", "random_crisis", "trigger_random_crisis"):
         return simulate_crisis_action(payload)
     if action == "apply_treatment":
+        if astronaut_sim.blind_crisis:
+            return apply_blind_action(payload)
+        if "incident_id" in payload or "action_id" in payload:
+            return {"status": "error", "message": "The blind incident is no longer active."}
         return astronaut_sim.apply_treatment(payload.get("treatment") or payload.get("action"))
     if action == "set_activity":
         return astronaut_sim.set_activity_state(payload.get("activity_state") or payload.get("activity"))
@@ -119,11 +123,12 @@ def simulate_crisis_action(payload: Dict[str, Any] | None = None) -> Dict[str, A
     Inject a dynamic random temporary vital problem for demo purposes, immediately
     advance telemetry for RAG decisioning, and capture the automatic Earth report.
     """
-    global latest_earth_report
+    global latest_earth_report, latest_telemetry
     data = payload if isinstance(payload, dict) else {}
+    streaming = data.get("streaming") is True
     only_if_nominal = bool(data.get("only_if_nominal", False))
     mode_pref = data.get("mode_preference") or data.get("mode")
-    raw_duration = data.get("duration_ticks", 15)
+    raw_duration = data.get("duration_ticks", 45 if streaming else 15)
     try:
         duration_ticks = max(3, min(120, int(raw_duration)))
     except (TypeError, ValueError):
@@ -136,15 +141,24 @@ def simulate_crisis_action(payload: Dict[str, Any] | None = None) -> Dict[str, A
         except (TypeError, ValueError):
             return {"status": "error", "message": "Invalid seed parameter."}
 
-    immediate_ticks = 3
+    if streaming and mode_pref is not None:
+        return {"status": "error", "message": "Blind simulation does not accept a mode preference."}
+    immediate_ticks = 0 if streaming else 3
     sim_result = astronaut_sim.simulate_crisis(
-        only_if_nominal=only_if_nominal,
+        only_if_nominal=streaming or only_if_nominal,
         mode_preference=mode_pref,
         duration_ticks=duration_ticks + immediate_ticks,
         seed=seed,
+        streaming=streaming,
     )
     if sim_result.get("status") != "ok":
+        if streaming:
+            return {"status": "error", "message": "Return to nominal before starting another blind crisis."}
         return sim_result
+    if streaming:
+        latest_telemetry = latest_earth_report = None
+        anomaly_detector.get_or_create_buffer(astronaut_sim.astronaut_id).reset()
+        return {"status": "ok", "incident_id": astronaut_sim.incident_id}
 
     snapshot: Dict[str, Any] | None = None
     for _ in range(immediate_ticks):
@@ -190,12 +204,57 @@ def simulate_crisis_action(payload: Dict[str, Any] | None = None) -> Dict[str, A
     }
 
 
+# Only checklist-backed environmental controls have a modeled physical effect.
+# Text-only clinical items remain acknowledgements, including in Mode B.
+BLIND_ACTIONS = {
+    "hypercapnia": ("restore_airflow", "Restore simulated cabin airflow", ("ventilat", "scrubber", "airflow", "cdra"), 0.48),
+    "solar_flare": ("reduce_exposure", "Move simulator to shielded area", ("shelter", "shield"), 0.70),
+    "heat_strain": ("restore_cooling", "Restore simulated cooling", ("cooling", "lcvg"), 0.42),
+    "decompression": ("restore_pressure", "Restore simulated pressure", ("repressur", "airlock", "pressure"), 0.55),
+}
+
+
+def blind_actions(decision: Dict[str, Any]) -> List[Dict[str, str]]:
+    action = BLIND_ACTIONS.get(astronaut_sim.blind_crisis)
+    if not action or decision.get("mode") != "MODE_A_KNOWN_CONDITION":
+        return []
+    action_id, label, terms, _ = action
+    if any(term in step["action"].lower() for step in decision.get("action_checklist", [])
+           for term in terms):
+        return [{"id": action_id, "label": label}]
+    return []
+
+
+def apply_blind_action(payload: Dict[str, Any]) -> Dict[str, Any]:
+    snapshot = latest_telemetry or {}
+    incident = snapshot.get("blind_incident") or {}
+    if (astronaut_sim.is_recovering or astronaut_sim.active_scenario == "nominal"
+            or type(payload.get("incident_id")) is not int
+            or payload["incident_id"] != astronaut_sim.incident_id
+            or snapshot.get("simulation_incident") != astronaut_sim.incident_id
+            or incident.get("phase") != "assessed"):
+        return {"status": "error", "message": "There is no matching active assessment for this action."}
+    action = next((item for item in incident["actions"] if item["id"] == payload.get("action_id")), None)
+    if action is None:
+        return {"status": "error", "message": "This action is unavailable for the current assessment."}
+    result = astronaut_sim.apply_treatment("standard countermeasure protocol")
+    if result.get("action") == "TREATMENT_APPLIED":
+        astronaut_sim.blind_recovery_cause = "operator"
+        astronaut_sim.active_treatment = action["label"]
+        astronaut_sim.blind_recovery_rate = BLIND_ACTIONS[astronaut_sim.blind_crisis][3]
+    else:
+        return {"status": "error", "message": "The simulator could not start recovery."}
+    return {"status": "ok", "incident_id": astronaut_sim.incident_id, "action_id": action["id"]}
+
+
 @_simulation_locked
 def get_or_create_latest_earth_report() -> Dict[str, Any]:
     """Return the latest Earth uplink report, generating one from current telemetry if absent."""
     global latest_earth_report
     if isinstance(latest_earth_report, dict) and latest_earth_report.get("report_text"):
         return latest_earth_report
+    if astronaut_sim.blind_crisis:
+        return {"status": "pending", "message": "Waiting for streamed assessment."}
     snapshot = latest_telemetry if isinstance(latest_telemetry, dict) else advance_telemetry()
     existing = snapshot.get("rag_diagnosis")
     if isinstance(existing, dict) and isinstance(existing.get("earth_report"), dict):
@@ -226,6 +285,8 @@ def generate_report_from_payload(payload: Dict[str, Any] | None = None) -> Dict[
 @_simulation_locked
 def cure_simulation() -> Dict[str, Any]:
     """Apply the existing recovery alias under the shared state lock."""
+    if astronaut_sim.blind_crisis:
+        return {"status": "error", "message": "Use a current assessment action during a blind incident."}
     return astronaut_sim.cure_scenario()
 
 
@@ -235,6 +296,15 @@ def command_status(result: Dict[str, Any]) -> int:
 
 def simulation_state_snapshot() -> Dict[str, Any]:
     """Read state while the caller holds simulation_lock."""
+    if astronaut_sim.blind_crisis:
+        return {
+            "astronaut_id": astronaut_sim.astronaut_id,
+            "name": astronaut_sim.name,
+            "activity_state": astronaut_sim.activity_state,
+            "blind_incident": (latest_telemetry or {}).get("blind_incident", {
+                "id": astronaut_sim.incident_id, "phase": "observing",
+            }),
+        }
     return {
         "astronaut_id": astronaut_sim.astronaut_id,
         "name": astronaut_sim.name,
@@ -260,7 +330,7 @@ def simulation_response(path: str):
             "operation_mode": "100%_OFFLINE_AIR_GAPPED_READY",
             "active_astronaut": astronaut_sim.name,
             "activity_state": astronaut_sim.activity_state,
-            "active_scenario": astronaut_sim.active_scenario,
+            "active_scenario": None if astronaut_sim.blind_crisis else astronaut_sim.active_scenario,
         }
     if path == "/api/simulation/state":
         return 200, simulation_state_snapshot()
@@ -273,7 +343,9 @@ def simulation_response(path: str):
     if path == "/api/simulation/schedule":
         return 200, astronaut_sim.get_routine_schedule()
     if path == "/api/space-weather":
-        report = donki_service.get_space_weather(force_active_flare=(astronaut_sim.active_scenario == "solar_flare"))
+        report = donki_service.get_space_weather(force_active_flare=(
+            not astronaut_sim.blind_crisis and astronaut_sim.active_scenario == "solar_flare"
+        ))
         return 200, report.to_dict()
     if path == "/api/reports/latest":
         return 200, get_or_create_latest_earth_report()
@@ -339,6 +411,9 @@ def advance_telemetry() -> Dict[str, Any]:
     was_recovering = astronaut_sim.is_recovering
     packet = astronaut_sim.step()
     payload = packet.model_dump()
+    blind = astronaut_sim.blind_crisis
+    if blind:
+        payload.pop("active_scenario_id", None)
     payload["simulation_incident"] = astronaut_sim.incident_id
     previous = latest_telemetry or {}
     same_incident = (previous.get("simulation_incident") == astronaut_sim.incident_id
@@ -351,7 +426,7 @@ def advance_telemetry() -> Dict[str, Any]:
     payload["stateless_evaluation"] = False
     # Localized symptoms can be meaningful with nominal monitored vitals.
     has_symptoms = bool(packet.symptom_log.strip()) and packet.symptom_log != NOMINAL_SYMPTOM_LOG
-    if has_symptoms and not astronaut_sim.is_recovering:
+    if has_symptoms and not blind and not astronaut_sim.is_recovering:
         assessment.trigger_rag_consultation = True
     recovery_monitoring = was_recovering or astronaut_sim.is_recovering
     status = "NONE"
@@ -363,6 +438,8 @@ def advance_telemetry() -> Dict[str, Any]:
             payload["rag_diagnosis"] = recovery_diagnosis(previous["rag_diagnosis"], packet, assessment, status, policy)
             if astronaut_sim.is_recovering:
                 refresh_treatment_options(payload["rag_diagnosis"], packet, assessment, policy)
+    if blind and astronaut_sim.active_scenario == "nominal":
+        assessment.trigger_rag_consultation = False
     payload["recovery_status"] = status
     payload["anomaly_assessment"] = assessment.model_dump()
     payload["routine_schedule"] = astronaut_sim.get_routine_schedule(assessment.readiness_score_0_100)
@@ -382,6 +459,18 @@ def advance_telemetry() -> Dict[str, Any]:
             logger.exception("Diagnosis failed for a simulation tick")
     elif isinstance(payload.get("rag_diagnosis"), dict) and isinstance(payload["rag_diagnosis"].get("earth_report"), dict):
         latest_earth_report = payload["rag_diagnosis"]["earth_report"]
+
+    if blind:
+        decision = payload.get("rag_diagnosis")
+        complete = astronaut_sim.active_scenario == "nominal"
+        phase = ("complete" if complete else "recovering" if status == "ACTIVE"
+                 else "assessed" if decision else "observing")
+        payload["blind_incident"] = {
+            "id": astronaut_sim.incident_id, "phase": phase,
+            "recovery_cause": astronaut_sim.blind_recovery_cause,
+            "actions": blind_actions(decision) if phase == "assessed" else [],
+            **({"reveal": blind.replace("_", " ")} if complete else {}),
+        }
 
     latest_telemetry = payload
     return payload
@@ -558,6 +647,8 @@ if FASTAPI_AVAILABLE:
     async def download_latest_earth_report_endpoint() -> Response:
         """Download the latest auto-generated Earth uplink report as a text file attachment."""
         report = get_or_create_latest_earth_report()
+        if report.get("status") == "pending":
+            return JSONResponse(report, status_code=409)
         return Response(
             content=report["report_text"],
             media_type="text/plain; charset=utf-8",
@@ -573,6 +664,8 @@ if FASTAPI_AVAILABLE:
             report = generate_report_from_payload(payload)
         except (ValueError, TypeError) as exc:
             raise HTTPException(status_code=422, detail="Invalid telemetry payload.") from exc
+        if report.get("status") == "pending":
+            return JSONResponse(report, status_code=409)
         return Response(
             content=report["report_text"],
             media_type="text/plain; charset=utf-8",
@@ -588,7 +681,10 @@ if FASTAPI_AVAILABLE:
     @app.post("/api/scenarios/cure", tags=["Simulation Control"])
     async def cure_scenario_endpoint() -> Dict[str, Any]:
         """Convenience alias for recovery initiation."""
-        return cure_simulation()
+        result = cure_simulation()
+        if result.get("status") == "error":
+            raise HTTPException(status_code=400, detail=result["message"])
+        return result
 
     @app.get("/api/simulation/state", tags=["Simulation Control"])
     async def simulation_state_endpoint() -> Dict[str, Any]:
@@ -801,6 +897,9 @@ class AresMedStdlibRequestHandler(BaseHTTPRequestHandler):
             return
         if parsed.path == "/api/reports/latest/download":
             report = get_or_create_latest_earth_report()
+            if report.get("status") == "pending":
+                self._send_json(409, report)
+                return
             self._send_text_download(200, report["report_text"], report["filename"])
             return
         status, snapshot = simulation_response(parsed.path)
@@ -861,6 +960,9 @@ class AresMedStdlibRequestHandler(BaseHTTPRequestHandler):
             except (ValueError, TypeError):
                 self._send_json(422, {"detail": [{"loc": ["body"], "type": "value_error",
                                                 "msg": "Invalid telemetry payload."}]})
+                return
+            if report.get("status") == "pending":
+                self._send_json(409, report)
                 return
             self._send_text_download(200, report["report_text"], report["filename"])
             return

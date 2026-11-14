@@ -15,6 +15,8 @@ export class MedicalPanel {
     document.getElementById('assessment-details').replaceChildren();
     setText('action-count','0');setText('citation-text','Verified NASA citation unavailable.');
     document.getElementById('diagnosis-card').className='diagnosis-card';
+    this.submit.hidden=false;
+    this.submit.textContent='Start simulated recovery';
     this.submit.disabled=true; setText('checklist-status','Checklist records operator acknowledgement only.');this.error('');
   }
   error(message) { const node=document.getElementById('clinical-error');node.hidden=!message;node.textContent=message; }
@@ -71,20 +73,24 @@ export class MedicalPanel {
         });
       });
       if(!steps.length) list.append(el('li','No action checklist returned.','empty-action'));
-      this.progress();
     }
+    this.progress();
   }
   progress() {
     const checks=this.checks || [], done=checks.filter(x=>x.input.checked).length;
     const required=checks.some(x=>x.critical)?checks.filter(x=>x.critical):checks;
     this.ready=checks.length>0 && required.every(x=>x.input.checked);
     setText('action-count',`${done}/${checks.length}`);
-    this.submit.disabled=!this.ready || this.pending || this.submitted;
+    const blind = this.assessment?.blindIncident;
+    const action = blind?.actions?.[0];
+    this.submit.textContent = action?.label || 'Start simulated recovery';
+    this.submit.hidden = !!blind && !action;
+    this.submit.disabled=!this.ready || this.pending || this.submitted || (!!blind && !action);
     for(const c of checks) c.input.disabled=this.pending || this.submitted;
     setText('checklist-status',this.submitted?'Simulated recovery requested. Acknowledgements do not record treatment administration.':this.pending?'Requesting simulated recovery…':`${this.assessment?.demo?'LOCAL DEMONSTRATION · ':''}${done}/${checks.length} acknowledged · session only; no medical administration recorded.`);
   }
   async recover() {
-    if(!this.ready || this.pending || this.submitted) return;
+    if(!this.ready || this.pending || this.submitted || this.submit.disabled) return;
     const version=this.version;this.pending=true;this.progress();this.error('');
     try { await this.onRecover(); if(version===this.version) this.submitted=true; }
     catch(e) { if(version===this.version)this.error(`Recovery failed: ${e.message}. You may retry.`); }
