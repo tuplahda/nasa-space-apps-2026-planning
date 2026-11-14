@@ -39,7 +39,7 @@ def print_frame(packet, assessment=None, prefix: str = "TICK") -> None:
         f"CO2: {e.cabin_co2_mmhg:4.1f} mmHg | "
         f"Alert: {alert:<14} | Readiness: {readiness}%"
     )
-    if packet.symptom_log and packet.active_scenario_id != "nominal":
+    if packet.symptom_log and prefix.startswith(("CRISIS", "RECOVERY")):
         print(f"       Symptom Feed: \"{packet.symptom_log}\"")
 
 
@@ -59,6 +59,7 @@ def run_golden_loop() -> None:
 
     for i in range(5):
         p = astronaut_sim.step()
+        p.active_scenario_id = None
         p.stateless_evaluation = False
         assessment = anomaly_detector.evaluate_packet(p)
         print_frame(p, assessment, prefix=f"NOMINAL {i+1}/5")
@@ -75,6 +76,7 @@ def run_golden_loop() -> None:
     crisis_assessment = None
     for i in range(8):
         p = astronaut_sim.step()
+        p.active_scenario_id = None
         p.stateless_evaluation = False
         assessment = anomaly_detector.evaluate_packet(p)
         print_frame(p, assessment, prefix=f"CRISIS  {i+1}/8")
@@ -107,11 +109,12 @@ def run_golden_loop() -> None:
     print("[TREATMENT APPLIED] LiOH Scrubber Canister Replacement + 100% O2 Flush")
     astronaut_sim.apply_treatment("LiOH Canister Replacement + 100% O2 Flush")
 
-    for i in range(8):
+    for i in range(10):
         p = astronaut_sim.step()
+        p.active_scenario_id = None
         p.stateless_evaluation = False
         assessment = anomaly_detector.evaluate_packet(p)
-        print_frame(p, assessment, prefix=f"RECOVERY {i+1}/8")
+        print_frame(p, assessment, prefix=f"RECOVERY {i+1}/10")
         time.sleep(0.8)
 
     print("\n--- DEMO COMPLETE: ASTRONAUT FULLY STABILIZED BACK TO NOMINAL BASELINE ---")

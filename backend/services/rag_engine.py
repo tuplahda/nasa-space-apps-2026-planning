@@ -929,7 +929,7 @@ class LocalMedicalRAGEngine:
         act = assessment.normalized_activity_state
         effective_co2 = max(e.cabin_co2_mmhg, e.suit_pico2_mmhg or 0.0)
 
-        if sid == "SCENARIO_1_HYPERCAPNIA":
+        if sid in ("SCENARIO_1_HYPERCAPNIA", "CPG-07"):
             if effective_co2 >= 4.5:
                 return 0.85
             if effective_co2 >= 2.8:
@@ -1179,6 +1179,11 @@ class LocalMedicalRAGEngine:
             or VERBATIM_NASA_QUOTES.get(scenario_id, fallback_excerpt)
         )
 
+        protocol_medications = [
+            medication if isinstance(medication, dict) else {"drug": medication}
+            for medication in proto.get("checs_medications", [])
+            if isinstance(medication, (dict, str))
+        ]
         raw_prescriptions = STRUCTURED_CHECS_PRESCRIPTIONS.get(
             scenario_id,
             [
@@ -1188,20 +1193,20 @@ class LocalMedicalRAGEngine:
                     "checs_pack": m.get("pack", ""),
                     "dosage": m.get("drug", ""),
                 }
-                for m in proto.get("checs_medications", [])
+                for m in protocol_medications
             ],
         )
         raw_contraindications = SCENARIO_CONTRAINDICATIONS.get(
             scenario_id,
             [
                 m.get("contraindication", "")
-                for m in proto.get("checs_medications", [])
+                for m in protocol_medications
                 if m.get("contraindication")
             ],
         )
         prescriptions, checs_meds, contraindications = self._apply_deterministic_safety_filter(
             raw_prescriptions,
-            proto.get("checs_medications", []),
+            protocol_medications,
             raw_contraindications,
             packet,
             assessment,

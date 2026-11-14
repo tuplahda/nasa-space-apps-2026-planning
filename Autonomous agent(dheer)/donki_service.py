@@ -9,6 +9,7 @@ Includes offline air-gapped fallback using local JSON cache per JPL Power-of-Ten
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 import json
+import math
 import logging
 import os
 from pathlib import Path
@@ -33,12 +34,13 @@ class SpaceWeatherReport:
     """Standardized Space Weather telemetry packet segment."""
     spe_active: bool
     ambient_radiation_msv_h: float
-    proton_flux_pfu: float
+    proton_flux_pfu: Optional[float]
     flare_class: Optional[str]
     severity: str
     recommended_action: str
     source: str
     timestamp: str
+    dose_is_simulated: bool = True
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -201,22 +203,38 @@ class DonkiSpaceWeatherService:
             self._last_report = rep
             return rep
 
-        event = live_data[0]
+        event = max(
+            (item for item in live_data if isinstance(item, dict)),
+            key=lambda item: str(item.get("eventTime") or ""),
+            default={},
+        )
+        if not event:
+            return self._get_cache_fallback()
         flare_cls = None
-        for item in event.get("linkedEvents", []):
-            if "classType" in item:
+        for item in event.get("linkedEvents") or []:
+            if isinstance(item, dict) and "classType" in item:
                 flare_cls = item["classType"]
                 break
 
+        # SEP event metadata can be available without flux or an onboard dose measurement.
+        def number(*keys: str) -> Optional[float]:
+            for key in keys:
+                value = event.get(key)
+                if isinstance(value, (int, float)) and math.isfinite(value) and value >= 0:
+                    return float(value)
+            return None
+
+        flux = number("proton_flux_gt_10mev_pfu", "proton_flux_pfu")
+        simulated_dose = self._get_cache_fallback(force_active_flare=True).ambient_radiation_msv_h
         rep = SpaceWeatherReport(
             spe_active=True,
-            ambient_radiation_msv_h=4.20,
-            proton_flux_pfu=180.0,
-            flare_class=flare_cls or "M5.0",
-            severity="WARNING_HIGH_FLUX",
-            recommended_action="Elevated solar radiation detected; abort non-critical EVA",
+            ambient_radiation_msv_h=simulated_dose,
+            proton_flux_pfu=flux,
+            flare_class=flare_cls,
+            severity="SEP_EVENT_RECORDED",
+            recommended_action="Check onboard dosimetry before evaluating crew exposure.",
             source="LIVE_DONKI_API",
-            timestamp=now_iso,
+            timestamp=str(event.get("eventTime") or now_iso),
         )
         self._last_report = rep
         return rep

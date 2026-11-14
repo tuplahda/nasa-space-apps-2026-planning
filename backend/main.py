@@ -17,7 +17,9 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 import logging
 import os
-from typing import Any, Dict, List, Optional, Set
+from threading import Event, Lock, Thread
+from time import monotonic
+from typing import Any, Dict, List
 from urllib.parse import parse_qs, urlparse
 
 os.environ.setdefault("SystemRoot", r"C:\Windows")
@@ -74,44 +76,57 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
-async def broadcast_telemetry_loop() -> None:
-    """
-    Background 1000ms loop:
-    1. Steps the Autonomous Astronaut Simulation (Cmdr. Maya Lin).
-    2. Feeds packet into Yohan's 60s Ring Buffer & Anomaly Detector.
-    3. Broadcasts the full telemetry packet over WebSocket to Tivesh's HUD.
-    """
-    while True:
+latest_telemetry: Dict[str, Any] | None = None
+offline_simulation_lock = Lock()
+
+
+def advance_telemetry() -> Dict[str, Any]:
+    """Advance the shared simulation and publish one snapshot for all readers."""
+    global latest_telemetry
+    packet = astronaut_sim.step()
+    payload = packet.model_dump()
+
+    # Keep the scenario label for the dashboard. The evaluator receives observations.
+    packet.active_scenario_id = None
+    packet.stateless_evaluation = False
+    assessment = anomaly_detector.evaluate_packet(packet)
+    payload["stateless_evaluation"] = False
+    payload["anomaly_assessment"] = assessment.model_dump()
+    payload["routine_schedule"] = astronaut_sim.get_routine_schedule()
+    payload["mission_readiness_pct"] = assessment.readiness_score_0_100
+
+    if assessment.trigger_rag_consultation:
         try:
-            packet = astronaut_sim.step()
-            packet.stateless_evaluation = False
+            payload["rag_diagnosis"] = rag_engine.diagnose(packet, assessment)
+        except Exception:
+            logger.exception("Diagnosis failed for a simulation tick")
 
-            # Feed tick into edge anomaly detector and 60-second sliding ring buffer
-            assessment = anomaly_detector.evaluate_packet(packet)
+    latest_telemetry = payload
+    return payload
 
-            # Assemble payload for WebSocket broadcast
-            p_dict = packet.model_dump()
-            p_dict["anomaly_assessment"] = assessment.model_dump()
-            p_dict["routine_schedule"] = astronaut_sim.get_routine_schedule()
-            p_dict["mission_readiness_pct"] = assessment.readiness_score_0_100
 
-            if assessment.trigger_rag_consultation:
-                rag_out = rag_engine.diagnose(packet, assessment)
-                p_dict["rag_diagnosis"] = (
-                    rag_out.model_dump()
-                    if hasattr(rag_out, "model_dump")
-                    else rag_out
-                )
+async def broadcast_telemetry_loop() -> None:
+    """Broadcast one shared frame per second."""
+    clock = asyncio.get_running_loop()
+    while True:
+        started = clock.time()
+        try:
+            await manager.broadcast(json.dumps(advance_telemetry()))
+        except Exception:
+            logger.exception("Simulation tick failed")
+        await asyncio.sleep(max(0.0, 1.0 - (clock.time() - started)))
 
-            msg_json = json.dumps(p_dict)
-            await manager.broadcast(msg_json)
 
-        except asyncio.CancelledError:
-            break
-        except Exception as exc:
-            logger.error("Simulation tick error: %s", exc)
-
-        await asyncio.sleep(1.0)
+def run_offline_telemetry(stop: Event) -> None:
+    """Advance the standard-library server without relying on dashboard polling."""
+    while not stop.is_set():
+        started = monotonic()
+        try:
+            with offline_simulation_lock:
+                advance_telemetry()
+        except Exception:
+            logger.exception("Simulation tick failed")
+        stop.wait(max(0.0, 1.0 - (monotonic() - started)))
 
 
 if FASTAPI_AVAILABLE:
@@ -123,13 +138,14 @@ if FASTAPI_AVAILABLE:
     async def lifespan(app: FastAPI):
         # Start background 1Hz simulation loop
         sim_task = asyncio.create_task(broadcast_telemetry_loop())
-        yield
-        # Graceful shutdown
-        sim_task.cancel()
         try:
-            await sim_task
-        except asyncio.CancelledError:
-            pass
+            yield
+        finally:
+            sim_task.cancel()
+            try:
+                await sim_task
+            except asyncio.CancelledError:
+                pass
 
     app = FastAPI(
         title="A.R.E.S. Med — Astronaut Rapid Evaluation Support & Medical System API",
@@ -179,14 +195,8 @@ if FASTAPI_AVAILABLE:
         """
         await manager.connect(websocket)
         try:
-            # Emit immediate initial frame upon connection
-            init_packet = astronaut_sim.step()
-            init_dict = init_packet.model_dump()
-            assessment = anomaly_detector.evaluate_packet(init_packet)
-            init_dict["anomaly_assessment"] = assessment.model_dump()
-            init_dict["routine_schedule"] = astronaut_sim.get_routine_schedule()
-            init_dict["mission_readiness_pct"] = assessment.readiness_score_0_100
-            await websocket.send_text(json.dumps(init_dict))
+            if latest_telemetry is not None:
+                await websocket.send_text(json.dumps(latest_telemetry))
 
             while True:
                 data_text = await websocket.receive_text()
@@ -208,16 +218,19 @@ if FASTAPI_AVAILABLE:
                 except Exception as parse_err:
                     await websocket.send_text(json.dumps({"type": "ERROR", "message": str(parse_err)}))
         except WebSocketDisconnect:
+            pass
+        finally:
             manager.disconnect(websocket)
 
     @app.post("/api/scenarios/trigger", tags=["Simulation Control"])
-    async def trigger_scenario_endpoint(payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def trigger_scenario_endpoint(payload: Dict[str, Any]) -> JSONResponse:
         """
         Trigger an acute emergency scenario in the astronaut simulation.
         Supported scenarios: 'nominal', 'hypercapnia', 'solar_flare', 'sans', 'decompression', 'dehydration'.
         """
         scen = payload.get("scenario") or payload.get("scenario_id") or "nominal"
-        return astronaut_sim.trigger_scenario(scen)
+        result = astronaut_sim.trigger_scenario(scen)
+        return JSONResponse(result, status_code=400 if result["status"] == "error" else 200)
 
     @app.post("/api/treatments/apply", tags=["Simulation Control"])
     async def apply_treatment_endpoint(payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -258,15 +271,13 @@ if FASTAPI_AVAILABLE:
         astronaut_sim.set_activity_state(act)
         return {"status": "ok", "activity_state": astronaut_sim.activity_state}
 
+    @app.get("/api/astronaut/status", tags=["Simulation Control"])
     @app.get("/api/telemetry/current", tags=["Simulation Control"])
-    async def current_telemetry_endpoint() -> Dict[str, Any]:
-        """Fetch the current instant telemetry packet over HTTP without WebSocket."""
-        packet = astronaut_sim.step()
-        packet.stateless_evaluation = False
-        assessment = anomaly_detector.evaluate_packet(packet)
-        p_dict = packet.model_dump()
-        p_dict["anomaly_assessment"] = assessment.model_dump()
-        return p_dict
+    async def current_telemetry_endpoint() -> JSONResponse:
+        """Read the latest simulation snapshot without advancing the clock."""
+        if latest_telemetry is None:
+            return JSONResponse({"message": "Telemetry is starting."}, status_code=503)
+        return JSONResponse(latest_telemetry)
 
     @app.get("/api/scenarios/list", tags=["Simulation Control"])
     async def list_scenarios_endpoint() -> List[Dict[str, str]]:
@@ -463,13 +474,12 @@ class AresMedStdlibRequestHandler(BaseHTTPRequestHandler):
                 },
             )
             return
-        if parsed.path == "/api/telemetry/current":
-            packet = astronaut_sim.step()
-            packet.stateless_evaluation = False
-            assessment = anomaly_detector.evaluate_packet(packet)
-            p_dict = packet.model_dump()
-            p_dict["anomaly_assessment"] = assessment.model_dump()
-            self._send_json(200, p_dict)
+        if parsed.path in ("/api/telemetry/current", "/api/astronaut/status"):
+            snapshot = latest_telemetry
+            if snapshot is None:
+                self._send_json(503, {"message": "Telemetry is starting."})
+            else:
+                self._send_json(200, snapshot)
             return
         if parsed.path == "/api/scenarios/list":
             self._send_json(200, astronaut_sim.list_available_scenarios())
@@ -515,7 +525,9 @@ class AresMedStdlibRequestHandler(BaseHTTPRequestHandler):
 
         if parsed.path == "/api/scenarios/trigger":
             scen = data.get("scenario") or data.get("scenario_id") or "nominal"
-            self._send_json(200, astronaut_sim.trigger_scenario(scen))
+            with offline_simulation_lock:
+                result = astronaut_sim.trigger_scenario(scen)
+            self._send_json(400 if result["status"] == "error" else 200, result)
             return
 
         if parsed.path == "/api/treatments/apply":
@@ -524,16 +536,19 @@ class AresMedStdlibRequestHandler(BaseHTTPRequestHandler):
                 or data.get("action")
                 or "Standard Emergency Countermeasure"
             )
-            self._send_json(200, astronaut_sim.apply_treatment(treatment))
+            with offline_simulation_lock:
+                self._send_json(200, astronaut_sim.apply_treatment(treatment))
             return
 
         if parsed.path == "/api/scenarios/cure":
-            self._send_json(200, astronaut_sim.cure_scenario())
+            with offline_simulation_lock:
+                self._send_json(200, astronaut_sim.cure_scenario())
             return
 
         if parsed.path == "/api/simulation/activity":
             act = data.get("activity_state") or data.get("activity") or "IVA_REST"
-            astronaut_sim.set_activity_state(act)
+            with offline_simulation_lock:
+                astronaut_sim.set_activity_state(act)
             self._send_json(200, {"status": "ok", "activity_state": astronaut_sim.activity_state})
             return
 
@@ -580,7 +595,15 @@ def run_server(host: str = "127.0.0.1", port: int = 8000) -> None:
             pass
     server = HTTPServer((host, port), AresMedStdlibRequestHandler)
     print(f"[A.R.E.S. Med] Offline Server & Swagger UI listening on http://{host}:{port}/docs")
-    server.serve_forever()
+    stop = Event()
+    telemetry_thread = Thread(target=run_offline_telemetry, args=(stop,), daemon=True)
+    telemetry_thread.start()
+    try:
+        with server:
+            server.serve_forever()
+    finally:
+        stop.set()
+        telemetry_thread.join()
 
 
 if __name__ == "__main__":

@@ -5,6 +5,7 @@ Maintained by Dheer. Strictly adheres to JPL Power-of-Ten rules (zero emojis).
 
 import sys
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 # Ensure workspace root is in sys.path
@@ -132,7 +133,8 @@ class TestAstronautSimulationEngine(unittest.TestCase):
             "DIA": "72.0",
             "O2_Sat": "97.8",
             "CBT": "37.5",
-            "ppCO2": "2.8",
+            "ppCO2_mmHg": "2.8",
+            "RR_breaths_min": "16.0",
         }
         norm = self.sim._normalize_external_row(raw_row)
         self.assertEqual(norm.get("hr"), 74.5)
@@ -141,11 +143,33 @@ class TestAstronautSimulationEngine(unittest.TestCase):
         self.assertEqual(norm.get("spo2"), 97.8)
         self.assertEqual(norm.get("temp"), 37.5)
         self.assertEqual(norm.get("co2"), 2.8)
+        self.assertEqual(norm.get("rr"), 16.0)
 
-    def test_scenarios_catalog_count(self) -> None:
-        """Verify that all 31 trajectories and seeds are enumerated for UI dropdowns."""
+    def test_every_catalog_scenario_produces_valid_telemetry(self) -> None:
         catalog = self.sim.list_available_scenarios()
-        self.assertGreaterEqual(len(catalog), 30)
+        self.assertGreaterEqual(len(catalog), 31)
+        with patch.object(donki_service, "fetch_live_events", return_value=None):
+            for entry in catalog:
+                with self.subTest(scenario=entry["id"]):
+                    self.sim.trigger_scenario("nominal")
+                    self.assertEqual(self.sim.trigger_scenario(entry["id"])["status"], "ok")
+                    for _ in range(10):
+                        packet = self.sim.step()
+                    self.assertEqual(packet.active_scenario_id, entry["id"].lower())
+                    if entry["id"] != "nominal":
+                        self.assertFalse(packet.symptom_log.startswith("Nominal resting"))
+                    if entry["id"] == "sans":
+                        self.assertGreater(packet.specialized_diagnostics.oct_rnfl_um, 95.0)
+
+    def test_zero_day_has_abnormal_vitals_and_invalid_trigger_preserves_state(self) -> None:
+        with patch.object(donki_service, "fetch_live_events", return_value=None):
+            self.assertEqual(self.sim.trigger_scenario("mode_b")["status"], "ok")
+            self.assertEqual(self.sim.trigger_scenario("typo")["status"], "error")
+            for _ in range(10):
+                packet = self.sim.step()
+        self.assertEqual(packet.active_scenario_id, "zero_day")
+        self.assertLess(packet.vitals.spo2, 92.0)
+        self.assertLess(packet.vitals.blood_pressure_sys, 90.0)
 
     def test_routine_schedule_feed(self) -> None:
         """Verify daily schedule blocks are generated with 94% readiness score."""

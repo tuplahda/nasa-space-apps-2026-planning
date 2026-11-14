@@ -35,8 +35,27 @@ from backend.services.donki_service import donki_service
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 NASA_DATASET_DIR = DATA_DIR / "nasa_official_dataset"
-BASELINES_FILE = DATA_DIR / "nasa_baselines_and_thresholds.json"
 SEEDS_FILE = DATA_DIR / "simulation_scenario_seeds.json"
+TRAJECTORY_SCENARIOS = {
+    "traj-hypercapnia": "hypercapnia",
+    "traj-ars-spe": "solar_flare",
+    "traj-eva-heat-strain": "heat_strain",
+    "traj-orthostatic-intolerance": "orthostatic_intolerance",
+    "traj-hypoxia": "decompression",
+    "traj-sans": "sans",
+}
+SCENARIO_ALIASES = {
+    **TRAJECTORY_SCENARIOS,
+    "scenario_1_hypercapnia": "hypercapnia",
+    "scenario_2_sans": "sans",
+    "scenario_3_orthostatic_intolerance": "orthostatic_intolerance",
+    "scenario_3_decompression_hypoxia": "decompression",
+    "scenario_4_solar_radiation_ars": "solar_flare",
+    "scenario_5_eva_thermal_dcs": "heat_strain",
+    "hypoxia": "decompression",
+    "mode_b": "zero_day",
+    "mode_b_zero_day": "zero_day",
+}
 
 
 class ActivityBaseline:
@@ -142,12 +161,12 @@ class AstronautSimulationEngine:
         self.is_recovering: bool = False
         self.active_treatment: Optional[str] = None
         self.recovery_tick: int = 0
+        self.recovery_start: float = 0.0
 
         # Mission Elapsed Time base (Day 84, 10:15:00)
         self.met_seconds: int = (84 * 86400) + (10 * 3600) + (15 * 60)
 
         # Loaded scenario seeds and trajectories
-        self.trajectory_library: Dict[str, Any] = {}
         self.seed_library: Dict[str, Any] = {}
         self._load_scenario_seeds()
 
@@ -158,20 +177,12 @@ class AstronautSimulationEngine:
         self._check_and_load_external_nasa_dataset()
 
     def _load_scenario_seeds(self) -> None:
-        """Load quantitative crisis trajectories and synthetic scenario seeds."""
+        """Load the synthetic scenario seed vectors."""
         if not SEEDS_FILE.exists():
             return
         try:
             with open(SEEDS_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            trajs = data.get("quantitative_crisis_trajectories_and_symptom_logs", [])
-            for t in trajs:
-                tid = t.get("trajectory_id", "").lower()
-                self.trajectory_library[tid] = t
-                legacy = t.get("linked_legacy_scenario", "").lower()
-                if legacy:
-                    self.trajectory_library[legacy] = t
-
             seeds = data.get("synthetic_scenario_seeds_24", [])
             for s in seeds:
                 sid = s.get("seed_id", "").lower()
@@ -190,50 +201,42 @@ class AstronautSimulationEngine:
         if not NASA_DATASET_DIR.exists():
             return
 
-        csv_files = list(NASA_DATASET_DIR.glob("*.csv"))
-        if csv_files:
+        for path in sorted(NASA_DATASET_DIR.glob("*.csv")) + sorted(NASA_DATASET_DIR.glob("*.json")):
             try:
-                with open(csv_files[0], "r", encoding="utf-8") as f:
-                    reader = csv.DictReader(f)
-                    rows = [row for row in reader]
-                if rows:
-                    self.external_rows = rows
+                with path.open(encoding="utf-8-sig", newline="") as source:
+                    rows = list(csv.DictReader(source)) if path.suffix == ".csv" else json.load(source)
+                if not isinstance(rows, list):
+                    continue
+                normalized = [self._normalize_external_row(row) for row in rows if isinstance(row, dict)]
+                self.external_rows = [row for row in normalized if row]
+                if self.external_rows:
                     self.external_dataset_loaded = True
                     return
-            except Exception:
-                pass
-
-        json_files = list(NASA_DATASET_DIR.glob("*.json"))
-        if json_files:
-            try:
-                with open(json_files[0], "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    if isinstance(data, list):
-                        self.external_rows = data
-                        self.external_dataset_loaded = True
-            except Exception:
-                pass
+            except (OSError, ValueError, csv.Error):
+                continue
 
     def _normalize_external_row(self, row: Dict[str, Any]) -> Dict[str, float]:
         """Map heterogeneous NASA CSV/JSON headers to standard biometric keys."""
         normalized: Dict[str, float] = {}
         cleaned_row = {str(k).strip().lower(): v for k, v in row.items()}
         aliases = {
-            "hr": ["hr", "heart_rate", "pulse", "bpm", "heartrate"],
+            "hr": ["hr", "heart_rate", "pulse", "bpm", "heartrate", "hr_bpm"],
             "sbp": ["sbp", "blood_pressure_sys", "sys", "systolic", "sbp_mmhg", "sys_bp"],
             "dbp": ["dbp", "blood_pressure_dia", "dia", "diastolic", "dbp_mmhg", "dia_bp"],
             "spo2": ["spo2", "o2_sat", "oxygen_saturation", "spo2_pct", "pulse_ox"],
             "hrv": ["hrv", "hrv_ms", "rmssd", "hrv_rmssd_ms"],
-            "temp": ["temp", "core_temp", "core_temp_c", "cbt", "cbt_c", "temperature"],
-            "rr": ["rr", "respiration_rate", "resp_rate", "rr_bpm", "breathing_rate"],
-            "co2": ["co2", "cabin_co2", "cabin_co2_mmhg", "ppco2", "cabin_ppco2_mmhg"],
+            "temp": ["temp", "core_temp", "core_temp_c", "cbt", "cbt_c", "temperature", "tcore_c"],
+            "rr": ["rr", "respiration_rate", "resp_rate", "rr_bpm", "breathing_rate", "rr_breaths_min"],
+            "co2": ["co2", "cabin_co2", "cabin_co2_mmhg", "ppco2", "cabin_ppco2_mmhg", "ppco2_mmhg"],
         }
         for target, keys in aliases.items():
             for k in keys:
                 if k in cleaned_row:
                     try:
-                        normalized[target] = float(cleaned_row[k])
-                        break
+                        value = float(cleaned_row[k])
+                        if math.isfinite(value):
+                            normalized[target] = value
+                            break
                     except (ValueError, TypeError):
                         pass
         return normalized
@@ -306,7 +309,9 @@ class AstronautSimulationEngine:
         Supports core trajectories ('hypercapnia', 'solar_flare', 'sans', 'decompression',
         'heat_strain', 'orthostatic_intolerance') as well as 24 seed IDs ('SEED-TOX-01', etc.).
         """
-        normalized = scenario_name.lower().strip()
+        name = scenario_name.lower().strip() if isinstance(scenario_name, str) else ""
+        normalized = name.replace(" ", "_")
+        normalized = SCENARIO_ALIASES.get(normalized, normalized)
         if normalized in ("nominal", "normal", "healthy", "baseline"):
             self.active_scenario = "nominal"
             self.target_progression = 0.0
@@ -319,6 +324,13 @@ class AstronautSimulationEngine:
                 "message": "Reset to nominal baseline.",
             }
 
+        seed = self.seed_library.get(name)
+        if seed:
+            normalized = seed["seed_id"].lower()
+        elif normalized not in TRAJECTORY_SCENARIOS.values() and normalized not in ("dehydration", "zero_day"):
+            return {"status": "error", "message": "Unknown simulation scenario."}
+        if self.active_scenario != normalized:
+            self.scenario_progression = 0.0
         self.active_scenario = normalized
         self.target_progression = 1.0
         self.is_recovering = False
@@ -334,9 +346,12 @@ class AstronautSimulationEngine:
         Administer countermeasure to initiate closed-loop biological recovery.
         Vitals will decay back to baseline over 5-10 seconds.
         """
+        if self.active_scenario == "nominal" or self.is_recovering:
+            return {"status": "ok", "message": "No new recovery was started."}
         self.is_recovering = True
         self.active_treatment = treatment_name
         self.recovery_tick = 0
+        self.recovery_start = self.scenario_progression
         self.target_progression = 0.0
         return {
             "status": "ok",
@@ -373,8 +388,8 @@ class AstronautSimulationEngine:
             self.recovery_tick += 1
             # Exponential washout biological decay curve: e^(-0.35 * t)
             decay_factor = math.exp(-0.35 * self.recovery_tick)
-            self.scenario_progression = max(0.0, self.scenario_progression * decay_factor)
-            if self.scenario_progression < 0.02:
+            self.scenario_progression = max(0.0, self.recovery_start * decay_factor)
+            if self.recovery_tick >= 10:
                 self.scenario_progression = 0.0
                 self.is_recovering = False
                 self.active_scenario = "nominal"
@@ -404,9 +419,8 @@ class AstronautSimulationEngine:
 
         # If official external NASA dataset was provided, override baseline values with real rows
         if self.external_dataset_loaded and self.external_rows:
-            raw_row = self.external_rows[self.external_row_index % len(self.external_rows)]
+            norm_vals = self.external_rows[self.external_row_index % len(self.external_rows)]
             self.external_row_index += 1
-            norm_vals = self._normalize_external_row(raw_row)
             if "hr" in norm_vals:
                 hr_base = norm_vals["hr"]
             if "sbp" in norm_vals:
@@ -514,6 +528,14 @@ class AstronautSimulationEngine:
                 "Profound dizziness and graying vision upon standing; extreme lightheadedness, nausea."
             )
 
+        elif scen == "zero_day":
+            sbp_base -= 42.0 * p
+            dbp_base -= 20.0 * p
+            spo2_base -= 14.0 * p
+            hr_base += 40.0 * p
+            rr_base += 15.0 * p
+            symptom_log = "I feel faint and short of breath. My hands are cold and I am having trouble focusing."
+
         elif scen in ("dehydration",):
             sbp_base = max(88.0, sbp_base - (20.0 * p))
             hr_base += 28.0 * p
@@ -526,12 +548,13 @@ class AstronautSimulationEngine:
         elif scen in self.seed_library:
             seed_info = self.seed_library[scen]
             vec = seed_info.get("vector", {})
-            hr_base += vec.get("dHR_bpm", 15.0) * p
-            sbp_base += vec.get("dSBP_mmHg", 0.0) * p
-            dbp_base += vec.get("dDBP_mmHg", 0.0) * p
-            spo2_base += vec.get("dSpO2_pct", 0.0) * p
-            rr_base += vec.get("dRR_bpm", 4.0) * p
-            temp_base += vec.get("dTcore_C", 0.0) * p
+            hr_base += (vec.get("dHR_bpm", 15.0) or 0.0) * p
+            sbp_base += (vec.get("dSBP_mmHg", 0.0) or 0.0) * p
+            dbp_base += (vec.get("dDBP_mmHg", 0.0) or 0.0) * p
+            spo2_base += (vec.get("dSpO2_pct", 0.0) or 0.0) * p
+            rr_base += (vec.get("dRR_bpm", 4.0) or 0.0) * p
+            temp_base += (vec.get("dTcore_C", 0.0) or 0.0) * p
+            hrv_base *= 1.0 + (vec.get("dRMSSD_pct") or 0.0) * p / 100.0
             symptom_log = seed_info.get("symptoms", "Somatic discomfort noted.")
 
         # Override symptom log during recovery
@@ -575,9 +598,8 @@ class AstronautSimulationEngine:
         if scen in ("sans", "traj-sans", "scenario_2_sans"):
             rnfl = 95.0 + (18.0 * math.log(1.0 + (max(0, self.mission_day - 15) / 30.0)))
             specialized = SpecializedDiagnostics(
-                oct_rnfl_thickness_um=round(rnfl, 1),
-                refraction_spherical_equivalent_diopters=round(0.25 * math.floor(max(0, self.mission_day - 21) / 25.0), 2),
-                cycloplegic_spherical_equivalent_d=1.25,
+                oct_rnfl_um=round(95.0 + (rnfl - 95.0) * p, 1),
+                refraction_shift_D=round(0.25 * math.floor(max(0, self.mission_day - 21) / 25.0) * p, 2),
             )
 
         now_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
