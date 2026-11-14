@@ -69,8 +69,8 @@ export class AresBodyHUD {
         if(!region) {mesh.visible=false;return;}
         this.meshes[mesh.name]=mesh; mesh.userData.region=region;
         for(const m of Array.isArray(mesh.material)?mesh.material:[mesh.material]) originalMaterials.add(m);
-        const skin=mesh.name==='BODY_SURFACE';
-        mesh.material=new THREE.MeshPhongMaterial({color:palette.cyan,emissive:0x174b55,emissiveIntensity:.45,shininess:45,transparent:skin || mesh.name.startsWith('LUNG'),opacity:skin ? .12 : mesh.name.startsWith('LUNG') ? .48 : 1,depthWrite:!skin && !mesh.name.startsWith('LUNG'),side:skin?THREE.FrontSide:THREE.DoubleSide});
+        const skin=mesh.name==='BODY_SURFACE', eye=mesh.name.startsWith('EYE_');
+        mesh.material=new THREE.MeshPhongMaterial({color:palette.cyan,emissive:0x174b55,emissiveIntensity:.45,shininess:45,vertexColors:eye,transparent:eye || skin || mesh.name.startsWith('LUNG'),opacity:skin ? .12 : mesh.name.startsWith('LUNG') ? .48 : 1,depthWrite:!skin && !mesh.name.startsWith('LUNG'),side:skin?THREE.FrontSide:THREE.DoubleSide});
         mesh.renderOrder=skin?3:mesh.name==='HEART'?2:1;
         if(skin) {
           this.edges=new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry,38),new THREE.LineBasicMaterial({color:0x76e3e3,transparent:true,opacity:.13,depthWrite:false}));
@@ -156,9 +156,10 @@ export class AresBodyHUD {
     this.controls.update(delta);
     for(const mesh of Object.values(this.meshes)) {
       const s=this.statuses[mesh.userData.region] || 'unknown', selected=this.selected===mesh.userData.region;
-      mesh.material.color.setHex(selected?0xceffff:palette[s]);
+      const eye=mesh.name.startsWith('EYE_');
+      mesh.material.color.setHex(selected?0xceffff:eye && s==='cyan'?0xffffff:palette[s]);
       mesh.material.emissive.setHex(selected?0x4b969e:palette[s]);
-      mesh.material.emissiveIntensity=selected ? .5 : s==='red' && motion ? .28+.2*(1+Math.sin(now*.006)) : .18;
+      mesh.material.emissiveIntensity=selected ? (eye?.1:.5) : s==='red' && motion ? .28+.2*(1+Math.sin(now*.006)) : eye?.025:.18;
     }
     const heart=this.meshes.HEART;
     if(heart) heart.scale.copy(heart.userData.baseScale).multiplyScalar(motion&&finite(this.heartRate)?1+.025*Math.pow(Math.max(0,Math.sin(now*.001*this.heartRate/60*Math.PI*2)),6):1);
