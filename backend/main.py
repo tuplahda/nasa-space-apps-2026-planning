@@ -34,7 +34,7 @@ from backend.routes.diagnose import (
     rag_engine,
     router as diagnose_router,
 )
-from backend.services.astronaut_sim import astronaut_sim
+from backend.services.astronaut_sim import NOMINAL_SYMPTOM_LOG, astronaut_sim
 from backend.services.donki_service import donki_service
 
 logger = logging.getLogger("ares_med.server")
@@ -80,6 +80,21 @@ latest_telemetry: Dict[str, Any] | None = None
 offline_simulation_lock = Lock()
 
 
+def run_simulation_command(action: Any, payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Validate controls consistently across REST, WebSocket, and offline HTTP."""
+    if action == "trigger_scenario":
+        return astronaut_sim.trigger_scenario(payload.get("scenario", payload.get("scenario_id")))
+    if action == "apply_treatment":
+        return astronaut_sim.apply_treatment(payload.get("treatment", payload.get("action")))
+    if action == "set_activity":
+        return astronaut_sim.set_activity_state(payload.get("activity_state", payload.get("activity")))
+    return {"status": "error", "message": "Unknown simulation command."}
+
+
+def command_status(result: Dict[str, Any]) -> int:
+    return 400 if result["status"] == "error" else 200
+
+
 def advance_telemetry() -> Dict[str, Any]:
     """Advance the shared simulation and publish one snapshot for all readers."""
     global latest_telemetry
@@ -91,6 +106,10 @@ def advance_telemetry() -> Dict[str, Any]:
     packet.stateless_evaluation = False
     assessment = anomaly_detector.evaluate_packet(packet)
     payload["stateless_evaluation"] = False
+    # Localized symptoms can be meaningful with nominal monitored vitals.
+    has_symptoms = bool(packet.symptom_log.strip()) and packet.symptom_log != NOMINAL_SYMPTOM_LOG
+    if has_symptoms and not astronaut_sim.is_recovering:
+        assessment.trigger_rag_consultation = True
     payload["anomaly_assessment"] = assessment.model_dump()
     payload["routine_schedule"] = astronaut_sim.get_routine_schedule()
     payload["mission_readiness_pct"] = assessment.readiness_score_0_100
@@ -132,7 +151,7 @@ def run_offline_telemetry(stop: Event) -> None:
 if FASTAPI_AVAILABLE:
     from fastapi import FastAPI, WebSocket, WebSocketDisconnect
     from fastapi.middleware.cors import CORSMiddleware
-    from fastapi.responses import JSONResponse, RedirectResponse
+    from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -155,8 +174,8 @@ if FASTAPI_AVAILABLE:
             "Closed-Loop Multi-Agent Spaceflight Biotelemetry, 60s JPL Ring Buffer, "
             "Microgravity Edge Anomaly Detector, and 2-Mode Neuro-Symbolic RAG Engine."
         ),
-        docs_url="/docs",
-        redoc_url="/redoc",
+        docs_url=None,
+        redoc_url=None,
         lifespan=lifespan,
     )
 
@@ -172,8 +191,13 @@ if FASTAPI_AVAILABLE:
 
     @app.get("/", include_in_schema=False)
     async def root_redirect() -> RedirectResponse:
-        """Redirect root URL directly to Swagger UI (/docs)."""
+        """Redirect root URL to the offline API console (/docs)."""
         return RedirectResponse(url="/docs")
+
+    @app.get("/docs", include_in_schema=False, response_class=HTMLResponse)
+    @app.get("/redoc", include_in_schema=False, response_class=HTMLResponse)
+    async def offline_api_docs() -> str:
+        return render_offline_api_docs(include_openapi=True)
 
     @app.get("/health", tags=["System Health"])
     async def health_check() -> Dict[str, str]:
@@ -202,21 +226,20 @@ if FASTAPI_AVAILABLE:
                 data_text = await websocket.receive_text()
                 try:
                     cmd = json.loads(data_text)
-                    action = cmd.get("action", "")
-                    if action == "trigger_scenario":
-                        scen = cmd.get("scenario", "nominal")
-                        res = astronaut_sim.trigger_scenario(scen)
-                        await websocket.send_text(json.dumps({"type": "COMMAND_ACK", "result": res}))
-                    elif action == "apply_treatment":
-                        treatment = cmd.get("treatment", "Standard Protocol")
-                        res = astronaut_sim.apply_treatment(treatment)
-                        await websocket.send_text(json.dumps({"type": "COMMAND_ACK", "result": res}))
-                    elif action == "set_activity":
-                        act = cmd.get("activity_state", "IVA_REST")
-                        astronaut_sim.set_activity_state(act)
-                        await websocket.send_text(json.dumps({"type": "COMMAND_ACK", "activity": astronaut_sim.activity_state}))
-                except Exception as parse_err:
-                    await websocket.send_text(json.dumps({"type": "ERROR", "message": str(parse_err)}))
+                    if not isinstance(cmd, dict):
+                        raise ValueError("Expected a JSON object.")
+                except ValueError as error:
+                    await websocket.send_text(json.dumps({"type": "ERROR", "message": str(error)}))
+                    continue
+
+                action = cmd.get("action")
+                payload = {"treatment": cmd.get("treatment")} if action == "apply_treatment" else cmd
+                result = run_simulation_command(action, payload)
+                if action == "set_activity" and result["status"] == "ok":
+                    reply = {"type": "COMMAND_ACK", "activity": result["activity_state"]}
+                else:
+                    reply = {"type": "COMMAND_ACK", "result": result}
+                await websocket.send_text(json.dumps(reply))
         except WebSocketDisconnect:
             pass
         finally:
@@ -228,21 +251,14 @@ if FASTAPI_AVAILABLE:
         Trigger an acute emergency scenario in the astronaut simulation.
         Supported scenarios: 'nominal', 'hypercapnia', 'solar_flare', 'sans', 'decompression', 'dehydration'.
         """
-        scen = payload.get("scenario") or payload.get("scenario_id") or "nominal"
-        result = astronaut_sim.trigger_scenario(scen)
-        return JSONResponse(result, status_code=400 if result["status"] == "error" else 200)
+        result = run_simulation_command("trigger_scenario", payload)
+        return JSONResponse(result, status_code=command_status(result))
 
     @app.post("/api/treatments/apply", tags=["Simulation Control"])
-    async def apply_treatment_endpoint(payload: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Administer a countermeasure treatment, triggering smooth biological recovery.
-        """
-        treatment = (
-            payload.get("treatment")
-            or payload.get("action")
-            or "Standard Emergency Countermeasure"
-        )
-        return astronaut_sim.apply_treatment(treatment)
+    async def apply_treatment_endpoint(payload: Dict[str, Any]) -> JSONResponse:
+        """Start recovery with a supported simulated countermeasure."""
+        result = run_simulation_command("apply_treatment", payload)
+        return JSONResponse(result, status_code=command_status(result))
 
     @app.post("/api/scenarios/cure", tags=["Simulation Control"])
     async def cure_scenario_endpoint() -> Dict[str, Any]:
@@ -265,11 +281,10 @@ if FASTAPI_AVAILABLE:
         }
 
     @app.post("/api/simulation/activity", tags=["Simulation Control"])
-    async def set_activity_endpoint(payload: Dict[str, Any]) -> Dict[str, Any]:
-        """Change current activity state: SLEEP, IVA_REST, ARED_EXERCISE, EVA_SPACEWALK."""
-        act = payload.get("activity_state") or payload.get("activity") or "IVA_REST"
-        astronaut_sim.set_activity_state(act)
-        return {"status": "ok", "activity_state": astronaut_sim.activity_state}
+    async def set_activity_endpoint(payload: Dict[str, Any]) -> JSONResponse:
+        """Change activity to SLEEP, IVA_REST, ARED_EXERCISE, or EVA_SPACEWALK."""
+        result = run_simulation_command("set_activity", payload)
+        return JSONResponse(result, status_code=command_status(result))
 
     @app.get("/api/astronaut/status", tags=["Simulation Control"])
     @app.get("/api/telemetry/current", tags=["Simulation Control"])
@@ -301,11 +316,11 @@ else:
     app = None  # type: ignore
 
 
-OFFLINE_SWAGGER_HTML = """<!DOCTYPE html>
+OFFLINE_API_DOCS = """<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>A.R.E.S. Med — Swagger UI (Offline Air-Gapped Edition)</title>
+  <title>A.R.E.S. Med — Offline API Console</title>
   <style>
     body { font-family: system-ui, -apple-system, sans-serif; background: #0b1120; color: #e2e8f0; margin: 0; padding: 24px; }
     .container { max-width: 1080px; margin: 0 auto; }
@@ -327,36 +342,32 @@ OFFLINE_SWAGGER_HTML = """<!DOCTYPE html>
     <div class="header">
       <div>
         <h1 style="margin:0;font-size:24px;">A.R.E.S. Med — Astronaut Rapid Evaluation Support &amp; Medical System API</h1>
-        <p style="margin:6px 0 0;color:#94a3b8;font-size:14px;">Interactive OpenAPI Console • Simulation Engine • 60s Ring Buffer • 2-Mode Clinical RAG</p>
+        <p style="margin:6px 0 0;color:#94a3b8;font-size:14px;">Simulation controls and diagnostic API examples</p>
+        __OPENAPI_LINK__
       </div>
-      <span class="badge">OAS 3.1 • 100% OFFLINE</span>
+      <span class="badge">OFFLINE</span>
     </div>
 
     <div class="endpoint">
       <div><span class="method-post">POST</span><span class="path">/api/scenarios/trigger</span> — Inject Crisis Scenario</div>
-      <p style="font-size:13px;color:#94a3b8;">Trigger emergency scenario: nominal, hypercapnia, solar_flare, sans, decompression, dehydration.</p>
-      <button onclick="sendPost('/api/scenarios/trigger', '{\\n  \\"scenario\\": \\"hypercapnia\\"\\n}')">Trigger Hypercapnia</button>
-      <button onclick="sendPost('/api/scenarios/trigger', '{\\n  \\"scenario\\": \\"solar_flare\\"\\n}')">Trigger Solar Flare</button>
-      <button onclick="sendPost('/api/scenarios/trigger', '{\\n  \\"scenario\\": \\"nominal\\"\\n}')">Reset to Nominal</button>
+      <p style="font-size:13px;color:#94a3b8;">Use these demo shortcuts or get the full scenario list.</p>
+      <button onclick="sendPost('/api/scenarios/trigger', JSON.stringify({scenario: 'hypercapnia'}))">Trigger Hypercapnia</button>
+      <button onclick="sendPost('/api/scenarios/trigger', JSON.stringify({scenario: 'solar_flare'}))">Trigger Solar Flare</button>
+      <button onclick="sendPost('/api/scenarios/trigger', JSON.stringify({scenario: 'zero_day'}))">Trigger Mode B Demo</button>
+      <button onclick="sendPost('/api/scenarios/trigger', JSON.stringify({scenario: 'nominal'}))">Reset to Nominal</button>
+      <button onclick="sendGet('/api/scenarios/list')">List Scenarios</button>
     </div>
 
     <div class="endpoint">
-      <div><span class="method-post">POST</span><span class="path">/api/treatments/apply</span> — Administer Countermeasure</div>
+      <div><span class="method-post">POST</span><span class="path">/api/scenarios/cure</span> - Start Simulated Recovery</div>
       <p style="font-size:13px;color:#94a3b8;">Initiate closed-loop biological recovery curve.</p>
-      <button onclick="sendPost('/api/treatments/apply', '{\\n  \\"treatment\\": \\"LiOH Canister Replacement & 100% O2 Flush\\"\\n}')">Apply Recovery Treatment</button>
+      <button onclick="sendPost('/api/scenarios/cure', '{}')">Start Simulated Recovery</button>
     </div>
 
     <div class="endpoint">
       <div><span class="method-post">POST</span><span class="path">/api/diagnose</span> — Run Level V Clinical RAG Triage</div>
       <label style="font-size:13px;color:#cbd5e1;">Select Scenario Payload: </label>
-      <select id="exampleSelect" onchange="loadExample(this.value)">
-        <option value="eva_hypercapnia">1. EVA Hypercapnia (Mode A - Known Condition &gt;= 75%)</option>
-        <option value="nominal_iva_rest">2. Nominal IVA Rest (Healthy Baseline)</option>
-        <option value="zero_day_unseen">3. Unseen Zero-Day Anomaly (Mode B - Certified Abstention)</option>
-        <option value="solar_particle_storm">4. Solar Particle Event (SPE Radiation Warning)</option>
-        <option value="sans_neuro_ocular">5. SANS Neuro-Ocular Syndrome (Oct/Globe Changes)</option>
-        <option value="hypoxia_decompression">6. Acute Cabin Decompression / Hypoxia</option>
-      </select>
+      <select id="exampleSelect" onchange="loadExample(this.value)"></select>
       <textarea id="reqBody"></textarea>
       <div>
         <button onclick="sendPost('/api/diagnose', document.getElementById('reqBody').value)">Execute /api/diagnose</button>
@@ -369,7 +380,7 @@ OFFLINE_SWAGGER_HTML = """<!DOCTYPE html>
       <button onclick="sendGet('/api/simulation/state')">Inspect Simulation State</button>
       <button onclick="sendGet('/api/telemetry/current')">Get Current Telemetry Packet</button>
       <button onclick="sendGet('/api/space-weather')">Check Space Weather</button>
-      <button onclick="sendGet('/api/diagnose/protocols')">Inspect 8 RAG Protocols</button>
+      <button onclick="sendGet('/api/diagnose/protocols')">Inspect RAG Protocols</button>
       <pre id="getResp">// Response will appear here...</pre>
     </div>
   </div>
@@ -377,9 +388,13 @@ OFFLINE_SWAGGER_HTML = """<!DOCTYPE html>
   <script>
     const examples = __EXAMPLES_JSON__;
     function loadExample(key) {
-      document.getElementById('reqBody').value = JSON.stringify(examples[key], null, 2);
+      document.getElementById('reqBody').value = JSON.stringify(examples[key].value, null, 2);
     }
-    loadExample('eva_hypercapnia');
+    const exampleSelect = document.getElementById('exampleSelect');
+    for (const [key, example] of Object.entries(examples)) {
+      exampleSelect.add(new Option(example.summary, key));
+    }
+    loadExample(exampleSelect.value);
 
     async function sendPost(url, bodyStr) {
       const out = document.getElementById('postResp');
@@ -406,6 +421,12 @@ OFFLINE_SWAGGER_HTML = """<!DOCTYPE html>
 </body>
 </html>
 """
+
+
+def render_offline_api_docs(*, include_openapi: bool = False) -> str:
+    examples = json.dumps(SWAGGER_DIAGNOSE_EXAMPLES).replace("<", "\\u003c")
+    link = '<a href="/openapi.json" style="color:#93c5fd;">OpenAPI schema</a>' if include_openapi else ""
+    return OFFLINE_API_DOCS.replace("__OPENAPI_LINK__", link).replace("__EXAMPLES_JSON__", examples)
 
 
 class AresMedStdlibRequestHandler(BaseHTTPRequestHandler):
@@ -439,11 +460,8 @@ class AresMedStdlibRequestHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
-        if parsed.path in ("/", "/docs"):
-            rendered = OFFLINE_SWAGGER_HTML.replace(
-                "__EXAMPLES_JSON__", json.dumps(SWAGGER_DIAGNOSE_EXAMPLES)
-            )
-            self._send_html(200, rendered)
+        if parsed.path in ("/", "/docs", "/redoc"):
+            self._send_html(200, render_offline_api_docs())
             return
         if parsed.path == "/health":
             self._send_json(
@@ -523,33 +541,25 @@ class AresMedStdlibRequestHandler(BaseHTTPRequestHandler):
             self._send_json(400, {"title": "Invalid JSON payload", "status": 400})
             return
 
-        if parsed.path == "/api/scenarios/trigger":
-            scen = data.get("scenario") or data.get("scenario_id") or "nominal"
-            with offline_simulation_lock:
-                result = astronaut_sim.trigger_scenario(scen)
-            self._send_json(400 if result["status"] == "error" else 200, result)
+        if not isinstance(data, dict):
+            self._send_json(400, {"status": "error", "message": "Expected a JSON object."})
             return
 
-        if parsed.path == "/api/treatments/apply":
-            treatment = (
-                data.get("treatment")
-                or data.get("action")
-                or "Standard Emergency Countermeasure"
-            )
+        action = {
+            "/api/scenarios/trigger": "trigger_scenario",
+            "/api/treatments/apply": "apply_treatment",
+            "/api/simulation/activity": "set_activity",
+        }.get(parsed.path)
+        if action:
             with offline_simulation_lock:
-                self._send_json(200, astronaut_sim.apply_treatment(treatment))
+                result = run_simulation_command(action, data)
+            self._send_json(command_status(result), result)
             return
 
         if parsed.path == "/api/scenarios/cure":
             with offline_simulation_lock:
-                self._send_json(200, astronaut_sim.cure_scenario())
-            return
-
-        if parsed.path == "/api/simulation/activity":
-            act = data.get("activity_state") or data.get("activity") or "IVA_REST"
-            with offline_simulation_lock:
-                astronaut_sim.set_activity_state(act)
-            self._send_json(200, {"status": "ok", "activity_state": astronaut_sim.activity_state})
+                result = astronaut_sim.cure_scenario()
+            self._send_json(command_status(result), result)
             return
 
         if parsed.path == "/api/diagnose":
@@ -594,7 +604,7 @@ def run_server(host: str = "127.0.0.1", port: int = 8000) -> None:
         except ImportError:
             pass
     server = HTTPServer((host, port), AresMedStdlibRequestHandler)
-    print(f"[A.R.E.S. Med] Offline Server & Swagger UI listening on http://{host}:{port}/docs")
+    print(f"[A.R.E.S. Med] Offline Server & API Console listening on http://{host}:{port}/docs")
     stop = Event()
     telemetry_thread = Thread(target=run_offline_telemetry, args=(stop,), daemon=True)
     telemetry_thread.start()

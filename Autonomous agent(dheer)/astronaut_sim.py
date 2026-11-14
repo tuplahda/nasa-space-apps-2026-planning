@@ -36,6 +36,17 @@ from backend.services.donki_service import donki_service
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 NASA_DATASET_DIR = DATA_DIR / "nasa_official_dataset"
 SEEDS_FILE = DATA_DIR / "simulation_scenario_seeds.json"
+NOMINAL_SYMPTOM_LOG = "Nominal resting baseline; no acute somatic complaints reported."
+GENERIC_TREATMENTS = {
+    "standard protocol",
+    "standard countermeasure protocol",
+    "standard emergency countermeasure",
+}
+HYPERCAPNIA_TREATMENTS = {
+    "li_oh_swap_and_o2",
+    "lioh canister replacement & 100% o2 flush",
+    "lioh canister replacement + 100% o2 flush",
+}
 TRAJECTORY_SCENARIOS = {
     "traj-hypercapnia": "hypercapnia",
     "traj-ars-spe": "solar_flare",
@@ -296,12 +307,13 @@ class AstronautSimulationEngine:
             "crew_readiness_score": 94,
         }
 
-    def set_activity_state(self, new_state: str) -> None:
-        """Change current activity context (SLEEP, IVA_REST, ARED_EXERCISE, EVA_SPACEWALK)."""
-        valid = {"SLEEP", "IVA_REST", "ARED_EXERCISE", "EVA_SPACEWALK"}
-        clean = new_state.upper().strip()
-        if clean in valid:
-            self.activity_state = clean
+    def set_activity_state(self, new_state: str) -> Dict[str, Any]:
+        """Change the activity if it is one of the simulator's supported states."""
+        clean = new_state.upper().strip() if isinstance(new_state, str) else ""
+        if clean not in ACTIVITY_PROFILES:
+            return {"status": "error", "message": "Unknown simulation activity."}
+        self.activity_state = clean
+        return {"status": "ok", "activity_state": clean}
 
     def trigger_scenario(self, scenario_name: str) -> Dict[str, Any]:
         """
@@ -346,6 +358,11 @@ class AstronautSimulationEngine:
         Administer countermeasure to initiate closed-loop biological recovery.
         Vitals will decay back to baseline over 5-10 seconds.
         """
+        treatment_id = treatment_name.strip().lower() if isinstance(treatment_name, str) else ""
+        if treatment_id not in GENERIC_TREATMENTS | HYPERCAPNIA_TREATMENTS:
+            return {"status": "error", "message": "Unknown simulation treatment."}
+        if treatment_id in HYPERCAPNIA_TREATMENTS and self.active_scenario not in ("nominal", "hypercapnia"):
+            return {"status": "error", "message": "This treatment is for the hypercapnia scenario."}
         if self.active_scenario == "nominal" or self.is_recovering:
             return {"status": "ok", "message": "No new recovery was started."}
         self.is_recovering = True
@@ -456,8 +473,9 @@ class AstronautSimulationEngine:
         ambient_radiation = space_weather.ambient_radiation_msv_h
         donki_spe_active = space_weather.spe_active
 
-        symptom_log = "Nominal resting baseline; no acute somatic complaints reported."
+        symptom_log = NOMINAL_SYMPTOM_LOG
 
+        quality_flags = {}
         # Scenario-specific physiological shifts
         p = self.scenario_progression
         scen = self.active_scenario
@@ -556,6 +574,10 @@ class AstronautSimulationEngine:
             temp_base += (vec.get("dTcore_C", 0.0) or 0.0) * p
             hrv_base *= 1.0 + (vec.get("dRMSSD_pct") or 0.0) * p / 100.0
             symptom_log = seed_info.get("symptoms", "Somatic discomfort noted.")
+            if vec.get("dRR_bpm") is None:
+                quality_flags["respiration_rate"] = "motion_artifact_unreliable"
+            if vec.get("dRMSSD_pct") is None:
+                quality_flags["hrv_ms"] = "non_autonomic_unreliable"
 
         # Override symptom log during recovery
         if self.is_recovering:
@@ -621,6 +643,7 @@ class AstronautSimulationEngine:
             environment=environment,
             specialized_diagnostics=specialized,
             symptom_log=symptom_log,
+            quality_flags=quality_flags or None,
         )
 
 

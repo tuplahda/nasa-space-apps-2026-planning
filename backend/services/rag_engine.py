@@ -1430,6 +1430,11 @@ class LocalMedicalRAGEngine:
             k in sym for k in ("anaphyl", "urticaria", "hives", "angioedema", "airway swelling", "swollen lip", "throat closing", "stridor")
         )
 
+        has_infection_signal = any(k in sym for k in ("sepsis", "pneumonia", "fever", "rigors", "hypothermic"))
+        abnormal_infection_temp = (
+            has_infection_signal and temp_valid and (v.core_temp_c >= 38.0 or v.core_temp_c <= 36.2)
+        )
+
         # --- Environmental Hypercapnia (SCENARIO_1 / CPG-07) ---
         if sid in ("SCENARIO_1_HYPERCAPNIA", "CPG-07"):
             if not co2_reliable:
@@ -1457,7 +1462,7 @@ class LocalMedicalRAGEngine:
 
         # --- Orthostatic Intolerance & Dehydration (SCENARIO_3 / CPG-14) ---
         if sid in ("SCENARIO_3_ORTHOSTATIC_INTOLERANCE", "CPG-14"):
-            if has_trauma_bleed or has_anaphylaxis:
+            if has_trauma_bleed or has_anaphylaxis or abnormal_infection_temp:
                 return -0.15
             if not (bp_valid and hr_valid):
                 return 0.0
@@ -1503,6 +1508,10 @@ class LocalMedicalRAGEngine:
             return 0.0
 
         if sid == "CPG-08":
+            if "fullness" in sym and "vertigo" in sym and any(
+                k in sym for k in ("ear pain", "ear/sinus pain", "hearing change", "tympanic")
+            ):
+                return 0.85
             if any(k in sym for k in ("barotrauma", "ear", "sinus", "tympanic", "hearing")) and ("fullness" in sym or "vertigo" in sym or "barotrauma" in sym):
                 if hr_valid and v.heart_rate >= 78.0:
                     return 0.85
@@ -1517,6 +1526,14 @@ class LocalMedicalRAGEngine:
 
         # --- Sleep Deprivation / Circadian / Panic (SCENARIO_6 / CPG-31 / CPG-32) ---
         if sid in ("SCENARIO_6_CIRCADIAN_SLEEP", "CPG-32"):
+            if (
+                sid == "CPG-32"
+                and "sleepiness" in sym
+                and any(k in sym for k in ("attention lapse", "slowed cognition"))
+                and hrv_valid and v.hrv_ms <= 50.0
+                and effective_co2 < 2.6 and rad_level < 0.25
+            ):
+                return 0.85
             if act == "SLEEP" and ((hr_valid and v.heart_rate >= 62.0) or (hrv_valid and v.hrv_ms <= 22.0) or (temp_valid and v.core_temp_c >= 37.5)):
                 return 0.83 if sid == "SCENARIO_6_CIRCADIAN_SLEEP" else 0.78
             if any(k in sym for k in ("sleepiness", "sleep depriv", "attention lapse", "irritability", "slowed cognition", "circadian", "sleep fragmentation", "insomnia")):
@@ -1640,6 +1657,12 @@ class LocalMedicalRAGEngine:
                 and act != "EVA_SPACEWALK"
             ):
                 return 0.86
+            if (
+                abnormal_infection_temp and bp_valid and v.blood_pressure_sys <= 94.0
+                and rr_valid and v.respiration_rate >= 22.0
+                and act != "EVA_SPACEWALK"
+            ):
+                return 0.86
             if any(k in sym for k in ("sepsis", "pneumonia", "clammy", "rigors")) and hr_valid and v.heart_rate >= 90.0:
                 return 0.84
             return 0.0
@@ -1654,6 +1677,10 @@ class LocalMedicalRAGEngine:
         if sid == "CPG-22":
             if any(k in sym for k in ("ammonia", "cough", "dyspnea", "wheeze")):
                 return -0.10
+            if "photophobia" in sym and "tearing" in sym and any(
+                k in sym for k in ("foreign body", "foreign-body", "opening eye", "eye scratch", "gritty eye")
+            ):
+                return 0.85
             if any(k in sym for k in ("corneal", "abrasion", "foreign body", "foreign-body", "photophobia", "opening eye", "fluorescein", "eye scratch", "gritty eye")):
                 if (hr_valid and v.heart_rate >= 76.0) or (bp_valid and v.blood_pressure_sys >= 120.0):
                     return 0.85
@@ -1661,6 +1688,11 @@ class LocalMedicalRAGEngine:
 
         # --- Odontogenic Abscess (CPG-23) ---
         if sid == "CPG-23":
+            if (
+                "tooth pain" in sym and "swelling" in sym
+                and "chewing" in sym and temp_valid and v.core_temp_c >= 37.8
+            ):
+                return 0.85
             if (
                 any(k in sym for k in ("abscess", "tooth", "dental", "chewing", "jaw swelling", "barodontalgia"))
                 and temp_valid and v.core_temp_c >= 37.4

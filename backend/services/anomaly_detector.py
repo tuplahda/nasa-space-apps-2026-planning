@@ -127,12 +127,11 @@ class EdgeAnomalyDetector:
         raw_evals = self._evaluate_all_thresholds(channel_vals, activity, packet.mission_day)
 
         raw_breach_flags = {k: (v[0] != "NOMINAL") for k, v in raw_evals.items()}
-        ring_mgr = self.get_or_create_buffer(packet.astronaut_id)
-
         if packet.stateless_evaluation:
-            ring_mgr.reset()
-            stats_map = ring_mgr.preload_persistent_state(channel_vals, raw_breach_flags)
+            snapshot_buffer = AstronautRingBufferManager(packet.astronaut_id)
+            stats_map = snapshot_buffer.preload_persistent_state(channel_vals, raw_breach_flags)
         else:
+            ring_mgr = self.get_or_create_buffer(packet.astronaut_id)
             stats_map = ring_mgr.ingest_tick(channel_vals, raw_breach_flags)
 
         breached_list, seu_filtered = self._build_breached_list(
