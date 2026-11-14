@@ -1,3 +1,7 @@
+@font-face { font-family: "Manrope"; src: url("vendor/fonts/Manrope-Variable.ttf") format("truetype"); font-weight: 200 800; font-style: normal; font-display: swap; }
+@font-face { font-family: "DM Mono"; src: url("vendor/fonts/DMMono-Regular.ttf") format("truetype"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "DM Mono"; src: url("vendor/fonts/DMMono-Medium.ttf") format("truetype"); font-weight: 500; font-style: normal; font-display: swap; }
+
 :root {
   color-scheme: dark;
   --bg: #07111b;
@@ -254,7 +258,7 @@ button:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid
   animation: ecg-flow 1.35s linear infinite;
 }
 .meter { height: 3px; margin-top: auto; overflow: hidden; border-radius: 4px; background: rgba(128, 166, 177, .13); }
-.meter span { display: block; width: 98%; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #54c7c0, #9ce8cb); transition: width .25s ease; }
+.meter span { display: block; width: 0; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #54c7c0, #9ce8cb); transition: width .25s ease; }
 
 .section-divider { height: 1px; margin: 15px 0 12px; background: var(--line); }
 .subsection-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -472,3 +476,107 @@ button:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
 }
+/* Runtime additions keep the prototype's panel, typography and color system. */
+[hidden] { display: none !important; }
+#body-canvas { position: absolute; inset: 3% 0 8%; z-index: 1; touch-action: none; }
+#body-canvas canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+#body-canvas canvas:active { cursor: grabbing; }
+#model-status { position: absolute; z-index: 3; inset: 44% 12% auto; color: var(--amber); font: 10px/1.6 var(--mono); text-align: center; background: #0b1b27e8; padding: 10px; border-radius: 8px; }
+.model-tools { position: absolute; bottom: 6px; left: 0; right: 0; z-index: 3; display: flex; justify-content: center; gap: 8px; }
+.model-tools button, .mode-button, .recovery-button { color: var(--cyan); background: #102632; border: 1px solid var(--line-strong); border-radius: 6px; padding: 6px 9px; font: 9px var(--mono); cursor: pointer; }
+.model-tools button[aria-pressed="false"] { color: var(--muted); }
+.mode-button { font-size: 8px; max-width: 115px; }
+button:disabled { opacity: .5; cursor: default; }
+.body-callout { cursor: pointer; text-align: left; max-width: 46%; }
+.body-callout small { font-size: 8px; line-height: 1.4; overflow-wrap: anywhere; }
+.body-callout[aria-pressed="true"] { border-color: var(--cyan); box-shadow: 0 0 12px #76e3e31c; }
+.body-callout:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+#selected-region { flex: 0 0 auto; min-height: 30px; margin: 6px 0; color: var(--muted); font: 8px/1.6 var(--mono); overflow-wrap: anywhere; }
+.body-legend { flex-wrap: wrap; gap: 8px; }
+.api-state[data-state="connected"] { color: var(--green); }
+.api-state[data-state="simulated"] { color: var(--amber); }
+.api-state[data-state="disconnected"], .api-state[data-state="stale"], .api-state[data-state="invalid"] { color: var(--red); }
+.api-state .state-light { background: currentColor; box-shadow: 0 0 8px currentColor; }
+.api-state { max-width: 150px; white-space: normal; line-height: 1.4; }
+[data-status="red"] { color: var(--red) !important; }
+[data-status="amber"] { color: var(--amber) !important; }
+[data-status="unknown"] { color: var(--muted) !important; }
+.clinical-panel { overflow-y: auto; scrollbar-width: thin; scrollbar-color: #31525c transparent; }
+.clinical-panel > * { flex-shrink: 0; }
+.clinical-detail { flex: 0 0 auto; min-height: 0; overflow: visible; }
+.action-list { max-height: none; overflow: visible; padding-left: 20px; }
+.action-list li { font-size: 10px; }
+.action-list label { display: flex; align-items: flex-start; gap: 7px; cursor: pointer; }
+.action-list input { accent-color: var(--cyan); margin: 2px 0 0; flex: 0 0 auto; width: 13px; height: 13px; }
+.action-list input:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.action-list li > small { display: block; color: var(--dim); margin: 3px 0 0 20px; font: 8px var(--mono); }
+.critical-label { color: var(--amber); font: 8px var(--mono); }
+.assessment-details { margin-top: 10px; }
+.assessment-details > div { border-top: 1px solid var(--line); padding: 7px 0; }
+.assessment-details b { color: var(--muted); font: 8px var(--mono); }
+.assessment-details p { margin: 4px 0 0; font-size: 10px; color: #afc5ca; line-height: 1.6; white-space: pre-line; overflow-wrap: anywhere; }
+.clinical-error { margin: 8px 0; color: var(--red); border: 1px solid #ff737944; padding: 8px; border-radius: 6px; font-size: 11px; overflow-wrap: anywhere; }
+.recovery-button { width: 100%; margin-top: 12px; }
+#checklist-status { color: var(--muted); font: 8px/1.5 var(--mono); margin: 6px 0 0; }
+.citation { align-items: flex-start; }
+.citation small { display: block; max-height: 100px; overflow: auto; -webkit-line-clamp: unset; }
+.citation a { color: var(--cyan); }
+.clinical-disclaimer { font-size: 9px; }
+.telemetry-panel { overflow-y: auto; scrollbar-width: thin; }
+.symptom-feed > span:last-child { white-space: normal; line-height: 1.4; }
+.heart-trace { pointer-events: none; }
+.top-controls { flex-wrap: wrap; }
+.console { grid-template-rows: auto minmax(0,1fr) auto; }
+.topbar { min-height: 62px; }
+.statusbar { min-height: 42px; }
+@media (max-width: 1150px) {
+  .mission-clock { flex-wrap: wrap; }
+  .topbar { grid-template-columns: auto auto minmax(0,1fr); }
+  .top-controls { gap: 7px; }
+  .mode-button { padding: 5px; }
+  .body-callout { min-width: 0; }
+  .body-callout small { font-size: 7px; }
+  .body-legend small { width: 100%; text-align: center; }
+}
+@media (max-width: 900px) {
+  html,body { height: auto; min-height: 100%; overflow-x: hidden; overflow-y: auto; }
+  .console { height: auto; min-height: 100vh; grid-template-rows: auto auto auto; padding: 12px; }
+  .topbar { grid-template-columns: auto 1fr; gap: 12px; }
+  .mission-clock { justify-self: end; }
+  .top-controls { grid-column: 1/-1; justify-content: space-between; }
+  .dashboard-grid { grid-template-columns: minmax(215px,.8fr) minmax(0,1.2fr); gap: 12px; }
+  .telemetry-column { grid-template-rows: auto 70px; }
+  .body-panel { min-height: 570px; }
+  .clinical-column { grid-column: 1/-1; }
+  .clinical-panel { max-height: 680px; }
+  .statusbar { flex-wrap: wrap; padding: 10px 0; }
+  .statusbar-right { flex-wrap: wrap; white-space: normal; }
+  .symptom-feed { align-items: flex-start; }
+}
+@media (max-width: 580px) {
+  .console { padding: 10px; gap: 12px; }
+  .dashboard-grid { display: flex; flex-direction: column; }
+  .telemetry-column { display: flex; flex-direction: column; gap: 10px; }
+  .body-panel { height: 540px; min-height: 540px; }
+  .clinical-panel { max-height: 760px; }
+  .mission-clock > strong { font-size: 10px; }
+  .mission-clock .clock-divider { display: none; }
+  .mission-clock .eyebrow { font-size: 7px; }
+  .brand-copy strong { font-size: 17px; }
+  .top-controls { justify-content: flex-start; }
+  .top-controls .api-state { margin-left: auto; font-size: 7px; }
+  .case-picker { flex: 1 1 140px; }
+  .run-button { min-height: 36px; }
+  .secondary-metric { min-height: 38px; }
+  .body-callout small { font-size: 8px; }
+  .vital-card { min-height: 105px; }
+  .clinical-disclaimer { line-height: 1.6; }
+}
+@media (max-height: 560px) and (min-width: 901px) {
+  html,body { overflow-y: auto; height: auto; }
+  .console { min-height: 670px; height: 100vh; }
+}
+
+.statusbar-right { max-width: 100%; }
+.citation { overflow-wrap: anywhere; }
+@media (max-width: 900px) { .statusbar-right { flex: 1 1 100%; } }
