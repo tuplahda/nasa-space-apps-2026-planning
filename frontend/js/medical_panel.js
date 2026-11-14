@@ -13,7 +13,7 @@ export class MedicalPanel {
     setText('confidence-value','—');document.getElementById('confidence-meter').style.width='0%';
     document.getElementById('treatment-checklist').replaceChildren(el('li','No assessment actions available.','empty-action'));
     document.getElementById('assessment-details').replaceChildren();
-    setText('action-count','0');setText('citation-text','Verified NASA citation unavailable.');
+    setText('action-count','0');setText('citation-text','Verified NASA citation unavailable.');document.getElementById('citation-text').removeAttribute('title');
     document.getElementById('diagnosis-card').className='diagnosis-card';
     this.submit.hidden=false;
     this.submit.textContent='Start simulated recovery';

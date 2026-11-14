@@ -154,9 +154,22 @@ test('actual GLB is upright, skeleton-free and pickable through translucent skin
     await loaded.load();assert.equal(loaded.container.dataset.loaded,'true',nodes.get('model-status').textContent);
     assert.ok(loaded.meshes.BODY_SURFACE.material.transparent);assert.ok(loaded.meshes.BODY_SURFACE.material.opacity<.25);assert.equal(loaded.meshes.BODY_SURFACE.material.depthWrite,false);
     assert.equal(loaded.meshes.LUNG_LEFT.material.depthWrite,false);
-    for(const name of ['EYE_LEFT','EYE_RIGHT']) {assert.ok(loaded.meshes[name].material.vertexColors);assert.ok(loaded.meshes[name].geometry.getAttribute('color'));assert.equal(loaded.meshes[name].userData.region,'SANS-01');}
+    for(const name of ['EYE_LEFT','EYE_RIGHT']) {assert.equal(loaded.meshes[name].material.vertexColors,false);assert.ok(loaded.meshes[name].geometry.getAttribute('color'));assert.equal(loaded.meshes[name].userData.region,'SANS-01');}
     for(const name of ['OPTIC_NERVE_LEFT','OPTIC_NERVE_RIGHT']) assert.equal(loaded.meshes[name].userData.region,'SANS-01');
-    const wide=loaded.distance;loaded.camera.aspect=.5;loaded.reset();assert.ok(loaded.distance>=wide);
+    const wide=loaded.distance;loaded.camera.aspect=.5;loaded.reset(false);assert.ok(loaded.distance>=wide);
+    loaded.selectedTarget='heart';loaded.focusOn('heart',false);loaded.model.updateMatrixWorld(true);
+    const heartCenter=new THREE.Box3().setFromObject(loaded.meshes.HEART).getCenter(new THREE.Vector3());
+    assert.ok(loaded.controls.target.distanceTo(heartCenter)<1e-8);
+    loaded.focusOn('lungs',true);const oldGoal=loaded.cameraTransition.target.clone();loaded.focusOn('brain',true);
+    assert.ok(loaded.cameraTransition.target.distanceTo(oldGoal)>.01);loaded.stepCamera(performance.now()+1200);assert.equal(loaded.cameraTransition,null);
+    loaded.reset(false);assert.equal(loaded.selectedTarget,null);assert.equal(loaded.meshes.EYE_LEFT.visible,true);
+    loaded.setLayerVisibility('eyes',false);assert.equal(loaded.meshes.EYE_LEFT.visible,false);assert.equal(loaded.meshes.BRAIN.visible,true);
+    loaded.reset(false);loaded.reduced={matches:false};const now=performance.now();loaded.freshAt=now;loaded.heartRate=120;loaded.respirationRate=15;
+    const heartPosition=loaded.meshes.HEART.position.clone(),lungPosition=loaded.meshes.LUNG_LEFT.position.clone();
+    loaded.stepPhysiology(.125,now);assert.ok(loaded.meshes.HEART.scale.x>1);assert.ok(loaded.meshes.LUNG_LEFT.scale.z>1);
+    assert.ok(loaded.meshes.HEART.position.equals(heartPosition));assert.ok(loaded.meshes.LUNG_LEFT.position.equals(lungPosition));
+    const phase=loaded.heartPhase;loaded.stepPhysiology(.1,now+6000);assert.equal(loaded.heartPhase,phase);
+    assert.equal(loaded.scan.parent,loaded.model);assert.ok(Math.abs(loaded.scan.rotation.x+Math.PI/2)<1e-8);
   } finally {globalThis.fetch=savedFetch;loaded.scene.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});}
   gltf.scene.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});
 });
@@ -172,68 +185,56 @@ test('real HTML preserves unique IDs and all static module DOM references',async
   const {fmt}=await import('../js/telemetry.js');assert.equal(fmt(null),'\u2014');
 });
 
-test('dashboard waits for current incident frames and keeps named cases in rehearsal', async () => {
-  const originals = {fetch: globalThis.fetch, WebSocket: globalThis.WebSocket,
-    location: globalThis.location, window: globalThis.window, querySelector: document.querySelector};
-  const events = {};
-  const calls = [];
+test('dashboard separates random simulation from explicit consultation and ignores stale incident results', async () => {
+  const originals={fetch:globalThis.fetch,WebSocket:globalThis.WebSocket,location:globalThis.location,window:globalThis.window,querySelector:document.querySelector};
+  const events={},calls=[];
   class Socket {
-    static OPEN = 1;
-    static CONNECTING = 0;
-    readyState = 1;
-    constructor() { Socket.current = this; }
-    close() { this.readyState = 3; }
+    static OPEN=1;static CONNECTING=0;readyState=1;
+    constructor(){Socket.current=this;}close(){this.readyState=3;}
   }
-  globalThis.location = {search: '', protocol: 'http:'};
-  globalThis.window = {addEventListener: (name, callback) => { events[name] = callback; }};
-  globalThis.WebSocket = Socket;
-  document.querySelector = document.getElementById;
-  const button = document.getElementById('run-assessment');
-  button.classList = {add() {}, remove() {}};
-  document.getElementById('case-select').value = 'nominal';
-  globalThis.fetch = async (url, options) => {
-    if (url === 'data/baselines.json') return {ok: true, json: async () => baselines};
-    if (url === 'data/demo_cases.json') return {ok: true, json: async () => data};
-    calls.push([url.pathname, JSON.parse(options.body)]);
-    return {ok: true, json: async () => ({status: 'ok', incident_id: 3})};
+  globalThis.location={search:'',protocol:'http:'};
+  globalThis.window={addEventListener:(name,cb)=>{events[name]=cb;}};
+  globalThis.WebSocket=Socket;document.querySelector=document.getElementById;
+  const button=document.getElementById('run-assessment');button.classList={add(){},remove(){}};
+  globalThis.fetch=async(url,options)=> {
+    if(url==='data/baselines.json')return {ok:true,json:async()=>baselines};
+    calls.push([url.pathname,options?.body?JSON.parse(options.body):null]);
+    return {ok:true,json:async()=>({status:'ok',incident_id:3})};
   };
-  function send(incident, tick, phase, diagnosis) {
-    const p = {...sample(), simulation_incident: incident,
-      timestamp: new Date(Date.UTC(2026, 10, 14, 12, 0, tick)).toISOString()};
-    if (phase) {
-      delete p.active_scenario_id;
-      p.blind_incident = {id: incident, phase, actions: []};
-    }
-    if (diagnosis) p.rag_diagnosis = diagnosis;
-    Socket.current.onmessage({data: JSON.stringify(p)});
+  function send(incident,tick,phase,diagnosis) {
+    const p={...sample(),simulation_incident:incident,timestamp:new Date(Date.UTC(2026,10,15,12,0,tick)).toISOString()};
+    if(phase) {delete p.active_scenario_id;p.blind_incident={id:incident,phase,actions:[]};}
+    if(phase==='awaiting_doctor'){p.vitals.spo2=86;p.anomaly_assessment={organ_hud_status:{'ECLSS-03':'RED'}};}
+    if(diagnosis)p.rag_diagnosis=diagnosis;
+    Socket.current.onmessage({data:JSON.stringify(p)});
   }
   try {
     await import('../js/app.js');
-    for (let i = 0; i < 30 && !Socket.current; i++) {
-      await new Promise(resolve => setTimeout(resolve, 5));
-    }
-    assert.ok(Socket.current);
-    Socket.current.onopen();
-    send(2, 0);
-    assert.equal(document.getElementById('rehearsal-cases').hidden, true);
-    document.getElementById('rehearsal-toggle').events.click();
-    assert.equal(document.getElementById('rehearsal-cases').hidden, false);
-    document.getElementById('rehearsal-toggle').events.click();
+    for(let i=0;i<30&&!Socket.current;i++)await new Promise(r=>setTimeout(r,5));
+    assert.ok(Socket.current);Socket.current.onopen();
+    send(2,0,null,data.cases.hypercapnia.assessment);
+    assert.equal(document.getElementById('result-mode').textContent,'AWAITING ASSESSMENT');
     await button.events.click();
-    assert.deepEqual(calls, [['/api/scenarios/simulate-crisis', {streaming: true}]]);
-    const diagnosis = data.cases.hypercapnia.assessment;
-    send(2, 1, null, diagnosis);
-    assert.equal(document.getElementById('result-mode').textContent, 'AWAITING ASSESSMENT');
-    send(3, 2, 'observing');
-    assert.equal(document.getElementById('blind-status').textContent, 'Collecting streamed telemetry.');
-    send(3, 3, 'assessed', diagnosis);
-    assert.match(document.getElementById('result-mode').textContent, /MODE A/);
-    send(2, 4, null, data.cases['zero-day'].assessment);
-    assert.match(document.getElementById('result-mode').textContent, /MODE A/);
+    assert.deepEqual(calls,[['/api/scenarios/simulate-crisis',{streaming:true}]]);
+    send(2,1,null,data.cases.hypercapnia.assessment);
+    assert.equal(document.getElementById('result-mode').textContent,'AWAITING ASSESSMENT');
+    send(3,2,'observing');assert.equal(document.getElementById('analyze-crisis').disabled,true);
+    send(3,3,'awaiting_doctor');
+    assert.match(document.getElementById('telemetry-alert').textContent,/Critical telemetry/);
+    assert.equal(document.getElementById('result-mode').textContent,'AWAITING ASSESSMENT');
+    const consult=document.getElementById('analyze-crisis');assert.equal(consult.disabled,false);
+    await consult.events.click();await consult.events.click();
+    assert.deepEqual(calls[1],['/api/scenarios/analyze-crisis',{incident_id:3}]);assert.equal(calls.length,2);
+    send(3,4,'assessed',data.cases.hypercapnia.assessment);
+    assert.match(document.getElementById('result-mode').textContent,/MODE A/);
+    assert.match(document.getElementById('assessment-latency').textContent,/CONSULTATION \d+ ms/);
+    send(3,5,'recovering',data.cases.hypercapnia.assessment);
+    assert.match(document.getElementById('assessment-freshness').textContent,/newer telemetry/);
+    send(2,6,null,data.cases['zero-day'].assessment);assert.match(document.getElementById('result-mode').textContent,/MODE A/);
+    const html=await readFile(new URL('../index.html',import.meta.url),'utf8');
+    assert.ok(!html.includes('id="rehearsal-toggle"'));assert.ok(!html.includes('id="data-mode"'));
+    assert.ok(!calls.some(x=>x[0]==='/api/diagnose'));
   } finally {
-    events.pagehide?.();
-    document.querySelector = originals.querySelector;
-    delete originals.querySelector;
-    Object.assign(globalThis, originals);
+    events.pagehide?.();document.querySelector=originals.querySelector;delete originals.querySelector;Object.assign(globalThis,originals);
   }
 });

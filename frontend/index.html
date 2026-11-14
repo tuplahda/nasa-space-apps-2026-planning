@@ -29,27 +29,17 @@
         </div>
 
         <div class="top-controls">
-          <button id="rehearsal-toggle" class="mode-button" type="button" aria-pressed="false" aria-controls="rehearsal-cases">Rehearsal mode</button>
-          <label class="case-picker" id="rehearsal-cases" hidden>
-            <span class="eyebrow">TELEMETRY CASE</span>
-            <select id="case-select" aria-label="Choose a telemetry case">
-              <option value="nominal">Nominal rest</option>
-              <option value="hypercapnia">EVA / elevated CO₂</option>
-              <option value="solar">Solar event</option>
-              <option value="zero-day">Unclassified anomaly</option>
-            </select>
-          </label>
-          <button class="run-button" id="run-assessment" type="button">
+<button class="run-button" id="run-assessment" type="button" disabled>
             <span class="run-icon" aria-hidden="true">&#9655;</span>
             <span id="run-label">Simulate crisis</span>
           </button>
-          <button class="run-button analyze-button" id="analyze-crisis" type="button" hidden>Analyze &amp; Treat</button>
-          <button id="data-mode" class="mode-button" type="button" title="Switch between the backend astronaut agent and the local demonstration">Use local demo</button>
+          <button class="run-button analyze-button" id="analyze-crisis" type="button" disabled>Consult Doctor</button>
           <div class="api-state" id="api-state" role="status" aria-live="polite">
             <span class="state-light"></span>
             <span id="api-state-label">CHECKING API</span>
           </div>
         </div>
+        <p id="control-error" class="clinical-error" role="alert" hidden></p>
       </header>
 
       <section class="dashboard-grid" aria-label="Crew health overview">
@@ -120,39 +110,57 @@
               <span class="eyebrow">ANATOMICAL TELEMETRY</span>
               <h2 id="body-panel-title">Crew health model</h2>
             </div>
-            <span class="model-badge"><span class="model-dot"></span> ORGAN STATUS</span>
+            <span class="model-badge"><span class="model-dot"></span> DIGITAL TWIN</span>
           </div>
 
+          <p id="telemetry-alert" class="telemetry-alert" role="status">Waiting for backend telemetry</p>
           <div class="body-stage">
             <div class="body-halo" aria-hidden="true"></div>
-            <div class="body-callout callout-head">
-              <span class="organ-pin pin-sans" id="pin-brain"></span>
-              <span><b>SANS-01</b><small id="head-organ-value">—</small></span>
-            </div>
-            <div class="body-callout callout-heart">
-              <span class="organ-pin pin-cv" id="pin-heart"></span>
-              <span><b>CV-02</b><small id="heart-organ-value">—</small></span>
-            </div>
-            <div class="body-callout callout-lungs">
-              <span class="organ-pin pin-eclss" id="pin-lungs"></span>
-              <span><b>ECLSS-03</b><small id="lungs-organ-value">—</small></span>
-            </div>
-            <div class="body-callout callout-core">
-              <span class="organ-pin pin-rad" id="pin-core"></span>
-              <span><b>RAD-04</b><small id="core-organ-value">—</small></span>
-            </div>
+
+
+
+
 
             <div id="body-canvas" aria-label="Interactive anatomical model"></div>
             <p id="model-status" role="status">Loading anatomical model…</p>
-            <div class="model-tools"><button id="reset-view" type="button">Reset view</button><button id="auto-rotate" type="button" aria-pressed="true">Auto rotate</button></div>
+            <div class="model-tools">
+              <button id="reset-view" type="button">Reset view</button>
+              <button id="auto-rotate" type="button" aria-pressed="true">Auto rotate</button>
+              <label class="layer-toggle"><input id="layer-brain" type="checkbox" checked /> Brain layer</label>
+              <label class="layer-toggle"><input id="layer-eyes" type="checkbox" checked /> Eye layer</label>
+            </div>
           </div>
 
-          <div id="selected-region" role="status">Select an organ or region label to inspect telemetry.</div>
-          <div class="body-legend">
-            <span><i class="legend-dot nominal"></i>NOMINAL</span>
-            <span><i class="legend-dot warning"></i>ATTENTION</span>
-            <span><i class="legend-dot critical"></i>CRITICAL</span>
-            <small>PIN COLORS FROM EDGE ASSESSMENT</small>
+          <div class="model-bottom-panel">
+            <div class="organ-selector" role="group" aria-label="Focus an anatomical system">
+            <div class="body-callout callout-head">
+              <span class="organ-pin pin-sans" id="pin-brain"></span>
+              <span><b>Brain · SANS-01</b><small id="head-organ-value">—</small></span>
+            </div>
+            <div class="body-callout callout-eyes">
+              <span class="organ-pin pin-sans" id="pin-eyes"></span>
+              <span><b>Eyes · SANS-01</b><small id="eyes-organ-value">Independent ocular focus</small></span>
+            </div>
+            <div class="body-callout callout-heart">
+              <span class="organ-pin pin-cv" id="pin-heart"></span>
+              <span><b>Heart · CV-02</b><small id="heart-organ-value">—</small></span>
+            </div>
+            <div class="body-callout callout-lungs">
+              <span class="organ-pin pin-eclss" id="pin-lungs"></span>
+              <span><b>Lungs · ECLSS-03</b><small id="lungs-organ-value">—</small></span>
+            </div>
+            <div class="body-callout callout-core">
+              <span class="organ-pin pin-rad" id="pin-core"></span>
+              <span><b>Core · RAD-04</b><small id="core-organ-value">—</small></span>
+            </div>
+            </div>
+            <div id="selected-region" role="status">Overview · select an organ to inspect its telemetry.</div>
+            <p id="animation-status">Physiological motion awaiting backend rates</p>
+            <div class="body-legend">
+              <span><i class="legend-dot nominal"></i>NOMINAL</span>
+              <span><i class="legend-dot warning"></i>ATTENTION</span>
+              <span><i class="legend-dot critical"></i>CRITICAL</span>
+            </div>
           </div>
         </section>
 
@@ -178,12 +186,14 @@
                 <span class="result-severity" id="result-severity">—</span>
               </div>
               <h3 id="diagnosis-title">Telemetry ready</h3>
-              <p id="diagnosis-summary">Simulate a crisis to stream changing vitals. Analyze &amp; Treat becomes available when anomalous telemetry appears.</p>
+              <p id="diagnosis-summary">Simulate a random crisis to stream changing vitals. Press Consult Doctor when anomalous telemetry appears.</p>
               <div class="confidence-row">
                 <span>ENGINE CONFIDENCE</span>
                 <strong id="confidence-value">—</strong>
               </div>
               <div class="confidence-track"><span id="confidence-meter"></span></div>
+              <p id="assessment-time">No consultation requested</p>
+              <p id="assessment-freshness">Live telemetry alerts are monitoring observations, not a diagnosis.</p>
             </div>
 
             <div id="assessment-details" class="assessment-details"></div>
@@ -201,6 +211,7 @@
             <button id="apply-treatment" class="recovery-button" type="button" disabled>Start simulated recovery</button>
             <p id="checklist-status" role="status">Checklist records operator acknowledgement only.</p>
             <p id="blind-status" role="status" hidden></p>
+            <button id="reset-simulation" class="mode-button" type="button" hidden>Reset simulation</button>
             <button id="reveal-incident" class="mode-button" type="button" hidden>Reveal simulated incident</button>
             <div class="citation" id="nasa-citation">
               <span class="citation-mark" aria-hidden="true">§</span>
