@@ -103,11 +103,11 @@ test('actual GLB is upright, skeleton-free and pickable through translucent skin
   const bytes=await readFile(new URL('../assets/models/ares_upper_body_hologram.glb',import.meta.url));
   const gltf=await new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),'');
   const meshes={};gltf.scene.traverse(o=>{if(o.isMesh)meshes[o.name]=o;});
-  assert.deepEqual(Object.keys(meshes).sort(),['BODY_SURFACE','BRAIN','HEART','LUNG_LEFT','LUNG_RIGHT'].sort());
+  assert.deepEqual(Object.keys(meshes).sort(),['BODY_SURFACE','BRAIN','HEART','LUNG_LEFT','LUNG_RIGHT','EYE_LEFT','EYE_RIGHT','OPTIC_NERVE_LEFT','OPTIC_NERVE_RIGHT'].sort());
   const bounds=new THREE.Box3().setFromObject(gltf.scene).getSize(new THREE.Vector3());assert.ok(bounds.y>bounds.x && bounds.y>bounds.z);
   const camera=new THREE.PerspectiveCamera(36,1,.01,30);camera.position.set(0,0,1.5);camera.lookAt(0,0,0);camera.updateMatrixWorld();gltf.scene.updateMatrixWorld(true);
   let selected;const hud={camera,meshes,raycaster:new THREE.Raycaster(),renderer:{domElement:{getBoundingClientRect:()=>({left:0,top:0,width:500,height:500})}},select:(region,name)=>{selected=name;}};
-  for(const name of ['BRAIN','HEART','LUNG_LEFT','LUNG_RIGHT']){
+  for(const name of ['BRAIN','HEART','LUNG_LEFT','LUNG_RIGHT','EYE_LEFT','EYE_RIGHT']){
     const center=new THREE.Box3().setFromObject(meshes[name]).getCenter(new THREE.Vector3()).project(camera);
     AresBodyHUD.prototype.pick.call(hud,(center.x+1)*250,(-center.y+1)*250);assert.ok(selected && selected!=='BODY_SURFACE',`${name} should select an internal organ through skin`);
   }
@@ -121,6 +121,8 @@ test('actual GLB is upright, skeleton-free and pickable through translucent skin
     await loaded.load();assert.equal(loaded.container.dataset.loaded,'true',nodes.get('model-status').textContent);
     assert.ok(loaded.meshes.BODY_SURFACE.material.transparent);assert.ok(loaded.meshes.BODY_SURFACE.material.opacity<.25);assert.equal(loaded.meshes.BODY_SURFACE.material.depthWrite,false);
     assert.equal(loaded.meshes.LUNG_LEFT.material.depthWrite,false);
+    for(const name of ['EYE_LEFT','EYE_RIGHT']) {assert.ok(loaded.meshes[name].material.vertexColors);assert.ok(loaded.meshes[name].geometry.getAttribute('color'));assert.equal(loaded.meshes[name].userData.region,'SANS-01');}
+    for(const name of ['OPTIC_NERVE_LEFT','OPTIC_NERVE_RIGHT']) assert.equal(loaded.meshes[name].userData.region,'SANS-01');
     const wide=loaded.distance;loaded.camera.aspect=.5;loaded.reset();assert.ok(loaded.distance>=wide);
   } finally {globalThis.fetch=savedFetch;loaded.scene.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});}
   gltf.scene.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});

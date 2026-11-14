@@ -39,7 +39,7 @@ Created:
 - `vendor/`: pinned Three.js r170, required addons, original Manrope/DM Mono fonts and licenses; no external runtime dependencies.
 - `tests/frontend.test.mjs`, `tests/integration.mjs`: focused tests without npm. Node is only a developer test tool.
 
-Reused `assets/models/ares_upper_body_hologram.glb` without modification. Left the older models/ assets untouched.
+The Blender source is `models/ares_upper_body_hologram.blend`; matching GLB copies contain the original five meshes plus only two eyes and two optic nerves.
 
 ## Confirmed endpoints
 
@@ -56,7 +56,7 @@ The crisis button triggers the astronaut agent, then diagnoses the next matching
 
 ## Anatomy
 
-Actual GLB nodes: BODY_SURFACE, BRAIN, HEART, LUNG_LEFT, LUNG_RIGHT. Mesh resources have corresponding _Mesh names. No skeleton exists or is required. Export is already +Y up, +Z forward.
+Actual GLB nodes: BODY_SURFACE, BRAIN, HEART, LUNG_LEFT, LUNG_RIGHT, EYE_LEFT, EYE_RIGHT, OPTIC_NERVE_LEFT, OPTIC_NERVE_RIGHT. The eyes and optic nerves reuse the hidden source anatomy from the Blender file, and map to SANS-01. Mesh resources have corresponding _Mesh names. No skeleton exists or is required. Export is already +Y up, +Z forward.
 
 Viewer includes translucent skin, depth-safe visible internals, restrained edge/scanning effects, heartbeat/critical pulses, drag rotation, bounded zoom, idle orbit, reset, resize and disposal. Internal organs are raycast first, skin only as fallback. Labels also support keyboard selection. The window event `ares:organ-selected` supplies regionId/region_id, meshName/selected_mesh_name and available telemetry. Selecting an organ creates no diagnosis.
 

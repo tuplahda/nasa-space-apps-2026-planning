@@ -1,5 +1,5 @@
 export const regions = {
-  'SANS-01': { pin: 'pin-brain', meshes: ['BRAIN'], label: 'Neuro-ocular', fields: ['specialized_diagnostics.oct_rnfl_um', 'specialized_diagnostics.refraction_shift_D'] },
+  'SANS-01': { pin: 'pin-brain', meshes: ['BRAIN', 'EYE_LEFT', 'EYE_RIGHT', 'OPTIC_NERVE_LEFT', 'OPTIC_NERVE_RIGHT'], label: 'Neuro-ocular', fields: ['specialized_diagnostics.oct_rnfl_um', 'specialized_diagnostics.refraction_shift_D'] },
   'CV-02': { pin: 'pin-heart', meshes: ['HEART'], label: 'Cardiovascular', fields: ['vitals.heart_rate', 'vitals.blood_pressure_sys', 'vitals.blood_pressure_dia', 'vitals.hrv_ms'] },
   'ECLSS-03': { pin: 'pin-lungs', meshes: ['LUNG_LEFT', 'LUNG_RIGHT'], label: 'Respiratory', fields: ['vitals.spo2', 'vitals.respiration_rate', 'environment.cabin_co2_mmhg'] },
   'RAD-04': { pin: 'pin-core', meshes: ['BODY_SURFACE'], label: 'Radiation / thermal', fields: ['environment.ambient_radiation_msv_h', 'vitals.core_temp_c'] }
