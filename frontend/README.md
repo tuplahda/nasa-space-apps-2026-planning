@@ -1,97 +1,83 @@
 # A.R.E.S. Med frontend
 
-Uses the original HTML/CSS prototype. No build step, npm, framework, or new backend.
+Vanilla HTML/CSS/JavaScript, the existing GLB, and local Three.js r170/font dependencies. No build step or npm installation is required for the application.
 
-## Launch
+## Run
 
-From the repository root:
+From the repository root, use separate terminals:
 
 ```powershell
+# Existing backend, in its usual Python environment:
+python -m pip install -r backend/requirements.txt
+python -m backend.main
+
+# Frontend:
 python -m http.server 5500 --bind 127.0.0.1 --directory frontend
 ```
 
-Open http://127.0.0.1:5500/ in a modern WebGL 2 browser. Do not use file://. Port 5500 is already allowed by the backend CORS configuration.
+Open http://localhost:5500/ . Use normal browser zoom (Ctrl+0) if this site was previously zoomed out. Do not open index.html through file://. Port 5500 is already allowed by the backend CORS configuration. An existing compatible API can be selected with `?api=http%3A%2F%2Flocalhost%3A8001`; HTTPS hosting needs an HTTPS backend and a permitted frontend origin.
 
-Explicit offline demo: http://127.0.0.1:5500/?mode=demo
+The application now requires backend telemetry. There is no rehearsal selector, local-demo switch, automatic mock fallback, or production import of mock_data.js. Existing mock_data.js and demo_cases.json remain as legacy test fixtures only; mode=demo does not enable a local mode.
 
-Default API: http://localhost:8000. Override an existing compatible server with `?api=http%3A%2F%2F127.0.0.1%3A8000`. HTTPS hosting requires an HTTPS backend and a permitted origin.
+## Simulation and doctor consultation
 
-Run the existing backend in its usual Python environment:
+Simulate Crisis calls `POST /api/scenarios/simulate-crisis` with `{ "streaming": true }`. The server chooses a random crisis and advances the astronaut agent. The frontend does not choose a named scenario or make a diagnosis request as part of this action.
 
-```powershell
-python -m pip install -r backend/requirements.txt
-python -m backend.main
-```
+Live vitals, the HR trace, threshold colors, organ status and telemetry-alert banner continue updating immediately from the incoming observations and edge assessment. These are monitoring alerts, not diagnoses.
 
-## Files
+Consult Doctor is a separate control. For a streaming incident it calls `POST /api/scenarios/analyze-crisis` with `{ "incident_id": current_id }`. This endpoint evaluates the server's current telemetry; it does not accept a client packet. The current backend enables it only after anomalous telemetry has appeared (awaiting_doctor). Layer 3 remains idle in this streaming flow until the operator request. The next assessment is delivered through the telemetry stream. Duplicate requests and results for obsolete incidents are guarded.
 
-Modified `index.html`, `style.css`, `js/body_hud.js`. Preserved prototype structure, IDs, color system and panel hierarchy. Corrected the broken stylesheet link. Replaced only the static anatomical SVG with the bounded real-model viewport and controls.
+Outside the streaming-incident flow, the explicit consultation button uses `POST /api/diagnose` with the latest validated client snapshot, stripping dashboard-only fields and scenario hints. Legacy named-scenario backend paths may independently evaluate the doctor automatically; they were not changed. Unrequested legacy diagnoses are not displayed as button-requested consultations, and hiding them is not represented as server-side execution gating.
 
-Created:
-- `js/app.js`: application, source switching and clinical stream coordination.
-- `js/telemetry.js`: packet validation, missing-value handling, activity-aware statuses, formatting and rolling 60-sample history/HR trace.
-- `js/websocket.js`: validated WebSocket frames, duplicate/out-of-order suppression, stale detection, bounded 1-30s reconnect plus jitter, existing HTTP telemetry fallback.
-- `js/scenarios.js`: actual backend API contracts and scenario aliases.
-- `js/medical_panel.js`: Mode A/B/nominal rendering, source/citation handling, timestamped interactive checklist and explicit simulated recovery.
-- `js/mock_data.js`: four offline scenarios, varying telemetry and local recovery.
-- `data/baselines.json`: unchanged repository threshold snapshot; refresh when the source changes.
-- `data/demo_cases.json`: repository sample packets and deterministic-engine response snapshots, always labeled as unverified demonstration assessments.
-- `vendor/`: pinned Three.js r170, required addons, original Manrope/DM Mono fonts and licenses; no external runtime dependencies.
-- `tests/frontend.test.mjs`, `tests/integration.mjs`: focused tests without npm. Node is only a developer test tool.
+Consultation provenance displays request/receipt times in Mauritius time, the source telemetry timestamp, measured request-to-result latency, and a clear notice when newer telemetry has arrived. For streamed consultation, source time is taken from the first frame carrying its result and retained during recovery updates. A connection failure retains readings with disconnected/stale labels and pauses physiological motion; it never produces mock readings or assessments.
 
-The Blender source is `models/ares_upper_body_hologram.blend`; matching GLB copies contain the original five meshes plus only two eyes and two optic nerves.
+Checklist items remain timestamped session acknowledgements, not administration records. When returned, a backend-modeled physical action is submitted separately through `POST /api/treatments/apply` with its incident_id/action_id. Some Mode B incidents have no such action. Streaming incidents do not universally auto-recover: Reset Simulation explicitly uses the existing nominal scenario endpoint and waits for a real nominal snapshot, allowing another test without inventing a cure.
 
-## Confirmed endpoints
+## Viewer and appearance
 
-| Endpoint | Use |
-| --- | --- |
-| `WS /ws/telemetry` | 1 Hz agent frames, edge assessment and available rag_diagnosis |
-| `GET /api/telemetry/current` | HTTP fallback and fresh post-trigger snapshot |
-| `POST /api/scenarios/trigger` | scenario: nominal, hypercapnia, solar_flare, zero_day |
-| `POST /api/scenarios/simulate-crisis` | Starts a blind streaming crisis; returns an incident ID without diagnosis |
-| `POST /api/scenarios/analyze-crisis` | Explicitly asks the doctor to analyze the current incident ID |
-| `POST /api/diagnose` | Strict TelemetryPacket fields; excludes broadcast-only fields and scenario/force-mode hints |
-| `POST /api/treatments/apply` | treatment: li_oh_swap_and_o2 for hypercapnia; standard countermeasure protocol otherwise |
-| `GET /api/simulation/state`, `GET /health` | Integration validation and original-scenario restoration |
+The GLB anatomy remains unchanged: BODY_SURFACE, BRAIN, HEART, LUNG_LEFT, LUNG_RIGHT, EYE_LEFT, EYE_RIGHT, OPTIC_NERVE_LEFT, OPTIC_NERVE_RIGHT. No skeleton or other anatomy was added.
 
-The **Simulate crisis** button starts a blinded random incident and streams changing telemetry only. Once the edge monitor has observed anomalous vitals, **Analyze & Treat** becomes available. Pressing it explicitly requests the clinical assessment from the current stream; only then does the doctor diagnosis and recommended-action checklist appear. Critical checklist items must be acknowledged before the existing **Start simulated recovery** action is enabled. Acknowledgements are not medical administration. The local demo remains labeled as a repository example. Dropdown changes alone do not inject backend scenarios. UI solar maps to solar_flare; zero-day maps to zero_day.
+The image reference informs navy surfaces, cyan/electric-blue wire detail and restrained lavender internal-organ accents. Amber/red retain monitoring severity meanings. Equal-color, equal-intensity left/right lights replace the previous unequal cyan/blue keys. Shared holographic materials deliberately suppress the eyes' realistic white/pupil vertex-color contrast; faint eyes and optic nerves retain their original position, dimensions and connections.
 
-## Anatomy
+Brain and eye/optic-nerve layers have independent visibility and focus controls while sharing SANS-01 status. Heart, paired lungs and core have distinct targets. Selecting an organ smoothly interpolates camera position and OrbitControls target to its bounds, dims non-selected anatomy, preserves alert colors and pauses idle orbit. New selections replace pending transitions; manual orbit cancels them. Reset restores overview, both neuro-ocular layers, material presentation and idle-orbit preference. Ordinary pan/zoom limits and aspect-aware fitting remain controlled.
 
-Actual GLB nodes: BODY_SURFACE, BRAIN, HEART, LUNG_LEFT, LUNG_RIGHT, EYE_LEFT, EYE_RIGHT, OPTIC_NERVE_LEFT, OPTIC_NERVE_RIGHT. The eyes and optic nerves reuse the hidden source anatomy from the Blender file, and map to SANS-01. Mesh resources have corresponding _Mesh names. No skeleton exists or is required. Export is already +Y up, +Z forward.
+The overview camera is slightly elevated so the very faint horizontal elliptical scanner has a visible gridded interior. Its shader clips the grid to an ellipse; it stays attached to the anatomical root and cannot intercept selection. It hides during organ inspection and reduced-motion operation.
 
-Viewer includes translucent skin, depth-safe visible internals, restrained edge/scanning effects, heartbeat/critical pulses, drag rotation, bounded zoom, idle orbit, reset, resize and disposal. Internal organs are raycast first, skin only as fallback. Labels also support keyboard selection. The window event `ares:organ-selected` supplies regionId/region_id, meshName/selected_mesh_name and available telemetry. Selecting an organ creates no diagnosis.
+Idle rotation is 1.8 times its prior speed. Heartbeat and respiratory phases accumulate elapsed time at the latest valid observed rates: one cycle per 60/BPM and 60/respiration_rate seconds. Rates may change without resetting phase. The heart and lungs animate around their own centers, preserving placement; breathing expansion is restrained (maximum 1.8% lateral, 1.2% vertical, 2.3% depth). Missing/nonpositive rates, stale data after five seconds and reduced-motion preferences stop physiological motion instead of substituting a rate.
 
-Backend edge statuses are authoritative. Local physiological presentation uses repository activity bands. Cumulative radiation exposure limits are not converted into invented instantaneous thresholds; missing assessment data stays unknown.
+The original dashboard panel hierarchy is retained, with larger ordinary text (14px), larger vital values, stronger contrast, independent panel scrolling, tablet/mobile stacking and no fixed tiny-text scaling. Short desktop windows can scroll the page to preserve useful anatomy height. The model's lower cut edge is framed just above its bottom control panel.
 
-## Source and clinical behavior
+## Changed files
 
-Both the backend astronaut agent and local demo are synthetic. Footer labels SIMULATED TELEMETRY and distinguishes the sources. API connection/stale state is separate. After 5.5 seconds without initial backend packets, local demo starts while connection retries continue. Explicit local demo stops backend connections; Connect to backend resumes them.
+- index.html: removed rehearsal/demo controls; explicit consultation, layer/focus controls, monitoring alert, assessment provenance, simulation reset.
+- style.css: coordinated navy/cyan/lavender palette, readable typography, organ controls, responsive layouts and short-window scrolling.
+- js/app.js: backend-only lifecycle, separate simulation/consultation, live alerts, freshness/provenance and incident guards.
+- js/body_hud.js: holographic rendering, balanced lights, camera transitions, independent layers, elliptical scanner and telemetry animation.
+- js/body_dynamics.js (new): testable phases, target grouping, material presentation and fitting calculations.
+- js/medical_panel.js: clears stale citation tooltips when resetting a consultation.
+- tests/frontend.test.mjs, tests/body_dynamics.test.mjs (new), tests/integration.mjs: relevant regression and real-server checks.
 
-Offline assessments are labeled repository example snapshots and remove NASA citations. Mode B abstains from naming a disease. Citation display requires a backend-supplied primary-source quote and HTTPS NASA link; otherwise unavailable. Returned source/verification, CHeCS, contraindication, stabilization, diagnostic-order and uplink fields retain their provenance. Project treatment content is labeled unverified; uplink metadata does not establish delivery.
+Backend and Blender/GLB files were not edited in this revision. No commit or push was made.
 
-Checkboxes record session acknowledgement with Mauritius timestamps, not administration. A separate recovery button enables after critical steps (or all steps when none is critical). It calls the existing simulator endpoint, blocks duplicate/concurrent submission, permits retry after failure, and requires fresh backend telemetry. Repeated copies of an action plan preserve acknowledgements; plan/scenario changes reset them. Audit is bounded and in memory only.
+## Verification
 
-## Validation
+22 automated frontend checks pass (17 console/loader/controller checks and five dynamics checks). These exercise strict payloads, missing data, source status, independent brain/eye visibility, actual GLB loader/picking/materials, camera centering and interrupted/reset transitions, organ-centered motion, phase/rate timing, stale/reduced-motion behavior, live pre-consultation alerts, duplicate requests, and obsolete incident results.
 
-All seven modules passed syntax checks. All 14 frontend tests passed, covering validation, strict payloads, activity baselines, edge authority, four demos, API errors, checklist retention/submission guards, Mode B/citation states, obsolete responses, reconnect/stale/polling, and actual GLB loading, hierarchy, upright bounds, materials, fitting and through-skin picking.
+Real-server integration on an isolated instance passed local HTTP asset delivery, CORS, 1 Hz WebSocket/reconnect, named API compatibility, diagnosis fixtures, randomly selected streaming incidents, absence of a doctor result before consultation, Mode A/B after consultation, modeled recovery and stale/duplicate action rejection. The test resets its simulator to the original nominal state. Its previous assumption of automatic recovery for streaming Mode B was removed to match the actual backend contract.
 
-The earlier validation covered HTTP asset delivery, CORS for port 5500, 1 Hz WebSocket/reconnect, scenario triggers, strict diagnosis requests, changing agent CO2, simulated recovery, and Mode A/B sample responses. The staged crisis-to-doctor flow is a newer change and has not yet been validated against the live server.
+Desktop Chrome screenshots were inspected at normal zoom. The actual hologram, scanner, layer/focus controls, selected-heart enlargement, surrounding-organ dimming and paused idle orbit were observed. A final layout/lighting refinement followed that inspection. Browser automation then stopped during refresh because it could not verify the current URL; mobile visual QA and final browser-console inspection remain unverified. Automated checks do not substitute for those visual checks.
 
-With Node 24+ (no packages required):
+Run with recent Node.js (24+), without npm:
 
 ```powershell
-node --test frontend/tests/frontend.test.mjs
-# Both existing servers must run; briefly changes simulator scenarios:
+node frontend/tests/frontend.test.mjs
+node frontend/tests/body_dynamics.test.mjs
+# Existing backend/frontend running; this changes test simulator state:
 node frontend/tests/integration.mjs
+# For a separate test backend, optionally set:
+$env:ARES_TEST_API = "http://localhost:8001"
 ```
 
-## Limitations
+Use the existing backend's declared dependencies. The default port-8000 process returned a health error during this session, so live checks used an isolated port-8001 instance; the pre-existing port-8000 process was left untouched. Restart the existing backend in its intended environment if its API returns errors.
 
-Actual browser screenshots, WebGL rendering, pointer controls and responsive visual QA were not completed. Browser extension access was unavailable; native computer use stopped because it could not verify Chrome's current URL. Loader/material/raycast tests do not prove visual correctness or absence of browser-only errors.
-
-The existing dependency-free backend fallback fails at TelemetryPacket.model_dump(). The FastAPI/Pydantic environment works with declared requirements. The latest staged crisis-to-doctor flow has not yet been tested.
-
-Explicit diagnosis of the backend nominal agent's full resting symptom sentence can return Mode B despite nominal edge telemetry. The frontend preserves that response. The offline nominal fixture uses the engine's accepted No symptoms phrase and returns nominal normally.
-
-This prototype does not establish medical validation, treatment administration, Earth delivery, or a persistent clinical audit.
+Source/verification labels and verified-citation availability remain explicit. This simulation does not establish medical validation, treatment administration, Earth-message delivery or a persistent clinical audit.

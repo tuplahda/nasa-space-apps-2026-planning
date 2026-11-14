@@ -1,200 +1,171 @@
-import { TelemetryView, normalizeStatus, setText } from './telemetry.js';
+import { TelemetryView, setText } from './telemetry.js';
 import { TelemetryConnection } from './websocket.js';
 import { Backend } from './scenarios.js';
 import { MedicalPanel } from './medical_panel.js';
-import { MockAdapter } from './mock_data.js';
 
 const query=new URLSearchParams(location.search);
 const api=new Backend(query.get('api') || `${location.protocol==='https:'?'https:':'http:'}//localhost:8000`);
-const requestedSeed = query.get('seed');
-const blindSeed = requestedSeed !== null && /^-?\d+$/.test(requestedSeed)
-  && Number.isSafeInteger(Number(requestedSeed)) ? Number(requestedSeed) : undefined;
-let view,body,mock,connection,packet,mode='waiting',transport='',activeKey='nominal',busy=false,generation=0,lastScenario;
-let rehearsal = query.get('mode') === 'rehearsal';
-let expectedIncident = null, lastIncident = null, revealedIncident = null;
-let startingBlind = false, analysisPending = false;
-const button=document.getElementById('run-assessment'), analyzeButton=document.getElementById('analyze-crisis'), modeButton=document.getElementById('data-mode');
-const rehearsalToggle = document.getElementById('rehearsal-toggle');
-const casePicker = document.getElementById('rehearsal-cases');
-const incidentStatus = document.getElementById('blind-status');
-const revealButton = document.getElementById('reveal-incident');
+let view,body,connection,packet,mode='waiting',transport='',generation=0;
+let starting=false,expectedIncident=null,lastIncident=null,consultation=null,revealedIncident=null;
+const simulateButton=document.getElementById('run-assessment');
+const consultButton=document.getElementById('analyze-crisis');
+const revealButton=document.getElementById('reveal-incident');
+const resetSimulation=document.getElementById('reset-simulation');
+const formatTime=timestamp=>new Date(timestamp).toLocaleTimeString('en-GB',{timeZone:'Indian/Mauritius'});
+const fresh=()=>mode==='backend' && packet && connection?.lastAt && Date.now()-connection.lastAt<=5000;
 const panel=new MedicalPanel(async()=> {
-  if(mode==='demo') return mock.recover();
-  if(mode!=='backend' || !connection?.lastAt || Date.now()-connection.lastAt>5000) throw new Error('Fresh backend telemetry is required.');
-  const incident = panel.assessment?.blindIncident;
-  if (incident) return api.applyBlindAction(incident.id, incident.actions[0].id);
-  return api.recover(activeKey);
+  if(!fresh())throw new Error('Fresh backend telemetry is required.');
+  const incident=packet.blind_incident;
+  if(incident) {
+    if(incident.phase!=='assessed' || incident.id!==consultation?.incidentId)throw new Error('There is no matching current consultation action.');
+    const action=incident.actions?.[0];if(!action)throw new Error('No modeled recovery action was returned.');
+    return api.applyBlindAction(incident.id,action.id);
+  }
+  return api.recover(packet.active_scenario_id);
 });
+function controlError(message='') {
+  const node=document.getElementById('control-error');node.hidden=!message;node.textContent=message;
+}
 function updateControls() {
-  const incident = packet?.blind_incident;
-  const active = incident && incident.phase !== 'complete';
-  const named = mode === 'demo' || rehearsal;
-  casePicker.hidden = !named;
-  rehearsalToggle.hidden = mode === 'demo';
-  rehearsalToggle.disabled = busy || !!active || expectedIncident !== null;
-  rehearsalToggle.setAttribute('aria-pressed', String(rehearsal));
-  setText('rehearsal-toggle', rehearsal ? 'Exit rehearsal' : 'Rehearsal mode');
-  setText('run-label', named ? 'Run selected case' : 'Simulate crisis');
-  const doctorPending = analysisPending || incident?.phase === 'analyzing';
-  analyzeButton.hidden = mode !== 'backend' || !incident
-    || (!['awaiting_doctor', 'analyzing'].includes(incident.phase) && !analysisPending);
-  analyzeButton.disabled = busy || doctorPending || incident?.phase !== 'awaiting_doctor';
-  analyzeButton.textContent = doctorPending ? 'Doctor Analyzing…' : 'Analyze & Treat';
-  button.disabled = busy || mode === 'waiting' || !!active || expectedIncident !== null
-    || (!named && !!packet?.active_scenario_id && packet.active_scenario_id !== 'nominal');
+  const incident=packet?.blind_incident,active=incident && incident.phase!=='complete';
+  simulateButton.disabled=!fresh() || starting || !!active || expectedIncident!==null
+    || (!!packet?.active_scenario_id && packet.active_scenario_id!=='nominal');
+  const pending=consultation?.status==='pending';
+  resetSimulation.hidden=!incident || incident.phase==='complete';
+  resetSimulation.disabled=!fresh() || starting || pending;
+  consultButton.disabled=!fresh() || starting || pending || !!incident && incident.phase!=='awaiting_doctor';
+  consultButton.textContent=pending?'Consulting…':'Consult Doctor';
+  consultButton.setAttribute('aria-busy',String(pending));
+  consultButton.title=!fresh()?'Waiting for fresh backend telemetry':incident && incident.phase==='observing'?'The backend requires anomalous telemetry before consultation':incident && incident.phase!=='awaiting_doctor'?'The current incident has already been assessed or is recovering':'Request a doctor assessment of the latest observed telemetry';
 }
 function showIncident(incident) {
-  incidentStatus.hidden = !incident;
-  revealButton.hidden = !incident?.reveal || revealedIncident === incident.id;
-  if (!incident) return;
-  const recovery = incident.recovery_cause === 'operator' ? 'Operator-triggered recovery' : 'Automatic recovery';
-  incidentStatus.textContent = {
-    observing: 'Crisis telemetry is developing.',
-    awaiting_doctor: 'Anomalous vitals detected. Awaiting doctor analysis.',
-    analyzing: 'Doctor is analyzing the current telemetry.',
-    assessed: 'Doctor assessment based on streamed telemetry.',
-    recovering: recovery + ' in progress.',
-    complete: recovery + ' complete.',
-  }[incident.phase] || 'Monitoring the current incident.';
-  if (revealedIncident === incident.id && incident.reveal) {
-    incidentStatus.textContent += ` Simulated incident: ${incident.reveal}.`;
+  const node=document.getElementById('blind-status');node.hidden=!incident;
+  revealButton.hidden=!incident?.reveal || revealedIncident===incident.id;
+  if(!incident)return;
+  const recovery=incident.recovery_cause==='operator'?'Operator-triggered recovery':'Automatic recovery';
+  node.textContent=({observing:'Crisis telemetry is developing. Doctor idle.',awaiting_doctor:'Abnormal telemetry detected. Consult Doctor when ready.',analyzing:'The backend doctor is assessing the current telemetry.',assessed:'Consultation available for this incident.',recovering:`${recovery} in progress.`,complete:`${recovery} complete.`})[incident.phase] || 'Monitoring the current incident.';
+  if(incident.phase==='assessed' && !incident.actions?.length)node.textContent+=' No physical recovery action is modeled for this incident; reset the simulation to start another test.';
+  if(revealedIncident===incident.id && incident.reveal)node.textContent+=` Simulated incident: ${incident.reveal}.`;
+}
+function updateProvenance() {
+  if(!consultation) {
+    setText('assessment-time','No consultation requested');
+    setText('assessment-freshness','Live telemetry alerts are monitoring observations, not a diagnosis.');return;
   }
+  if(consultation.status==='pending') {
+    setText('assessment-time',`Requested ${formatTime(consultation.requestedAt)} MUT`);
+    setText('assessment-freshness','Awaiting the backend doctor. Live telemetry continues updating.');return;
+  }
+  if(consultation.status==='failed')return;
+  setText('assessment-time',`Received ${formatTime(consultation.receivedAt)} MUT · telemetry ${formatTime(consultation.sourceTimestamp)} MUT`);
+  const newer=Date.parse(packet?.timestamp)>Date.parse(consultation.sourceTimestamp);
+  setText('assessment-freshness',!fresh()?'Backend disconnected or stale. This is a retained consultation.':newer?'Last consultation · newer telemetry has arrived; this result is not a new assessment of every tick.':'Last consultation · source telemetry shown above.');
 }
-function status(state,label) {
-  const node=document.getElementById('api-state');node.dataset.state=state;
-  setText('api-state-label',label);
-}
-function sourceLabel() {
-  const demo=mode==='demo';
-  setText('packet-source',demo?'SIMULATED TELEMETRY · LOCAL DEMO':mode==='backend'?`SIMULATED TELEMETRY · ASTRONAUT AGENT · ${transport}`:'NO TELEMETRY');
-  setText('data-badge',demo?'SIMULATED · DEMO':mode==='backend'?'SIMULATED · AGENT':'WAITING');
+function updateAlerts(states) {
+  const critical=Object.keys(states).filter(key=>states[key]==='red'),warning=Object.keys(states).filter(key=>states[key]==='amber');
+  const level=critical.length?'critical':warning.length?'warning':Object.values(states).every(x=>x==='unknown')?'unknown':'nominal';
+  document.querySelector('.dashboard-grid').dataset.alert=level;
+  const node=document.getElementById('telemetry-alert');node.dataset.status=level;
+  node.textContent=level==='critical'?`Critical telemetry · ${critical.join(', ')}`:level==='warning'?`Telemetry warning · ${warning.join(', ')}`:level==='unknown'?'Telemetry status unavailable':'Telemetry within current monitoring bands';
 }
 function ingest(p,source) {
-  if(mode==='demo' && source!=='demo') return;
-  const incident = mode === 'backend' ? p.blind_incident : null;
-  if (startingBlind || (expectedIncident !== null && p.simulation_incident < expectedIncident)
-      || (lastIncident !== null && p.simulation_incident < lastIncident)) return;
-  if (expectedIncident !== null && p.simulation_incident >= expectedIncident) expectedIncident = null;
-  if (Number.isInteger(p.simulation_incident) && lastIncident !== p.simulation_incident) {
-    lastIncident = p.simulation_incident;
-    analysisPending = false;
-    panel.reset('Waiting for the astronaut agent assessment.');
+  if(starting || (expectedIncident!==null && (!Number.isInteger(p.simulation_incident) || p.simulation_incident<expectedIncident))
+    || (lastIncident!==null && Number.isInteger(p.simulation_incident) && p.simulation_incident<lastIncident))return;
+  if(expectedIncident!==null && p.simulation_incident>=expectedIncident)expectedIncident=null;
+  if(lastIncident!==p.simulation_incident) {
+    lastIncident=p.simulation_incident;generation++;consultation=null;
+    panel.reset('Telemetry monitoring is active. Press Consult Doctor to request an assessment.');
   }
-  packet=p;transport=source;const scenario=p.active_scenario_id;
-  if(mode==='backend' && !incident) {
-    activeKey=({nominal:'nominal',hypercapnia:'hypercapnia',solar_flare:'solar','zero_day':'zero-day'})[scenario] || scenario;
-    if(lastScenario!==undefined && scenario!==lastScenario) panel.reset('Scenario changed. Waiting for the astronaut agent clinical result.');
-    lastScenario=scenario;
-  }
-  const states=view.update(p,source);body?.update(p,states);sourceLabel();
-  if (incident) {
-    if (['assessed', 'recovering', 'complete'].includes(incident.phase)) analysisPending = false;
-    showIncident(incident);
-    if (p.rag_diagnosis) panel.render({...p.rag_diagnosis, blindIncident: incident});
-    else if (panel.assessment) panel.reset('Waiting for the doctor to analyze the current telemetry.');
-    setText('assessment-latency', p.rag_diagnosis ? 'DOCTOR ASSESSMENT' : incident.phase === 'awaiting_doctor' ? 'READY FOR DOCTOR ANALYSIS' : incident.phase === 'analyzing' ? 'DOCTOR ANALYZING…' : 'COLLECTING TELEMETRY');
-    updateControls();
-    return;
-  }
-  showIncident(null);
-  if(mode==='backend' && p.rag_diagnosis && !busy) panel.render(p.rag_diagnosis);
-  // Remove obsolete emergency instructions once the edge reports recovery.
-  if(mode==='backend' && !p.rag_diagnosis && p.anomaly_assessment?.alert_level==='NOMINAL' && panel.assessment && panel.assessment.mode!=='NOMINAL_TELEMETRY') panel.reset('Latest edge assessment is nominal. Monitoring for a new clinical result.');
-  if(mode==='demo' && mock.key!==activeKey) {activeKey=mock.key;panel.render(mock.assessment());}
-  updateControls();
-}
-function demo(automatic=false) {
-  generation++; busy=false;button.disabled=false;button.classList.remove('is-loading');button.setAttribute('aria-busy','false');
-  mode='demo';view.reset();packet=null;lastScenario=undefined;activeKey=document.getElementById('case-select').value;
-  expectedIncident=lastIncident=null;startingBlind=false;analysisPending=false;showIncident(null);updateControls();
-  if(!automatic) connection?.stop();
-  mock.select(activeKey);panel.reset();mock.start(p=>ingest(p,'demo'));panel.render(mock.assessment());
-  status('simulated','SIMULATED · LOCAL DEMO');modeButton.textContent='Connect to backend';sourceLabel();
-}
-function followBackend() {
-  generation++;mode='waiting';packet=null;lastScenario=undefined;mock.stop();connection?.stop();view.reset();panel.reset();status('connecting','CONNECTING API');sourceLabel();
-  expectedIncident=lastIncident=null;startingBlind=false;analysisPending=false;showIncident(null);updateControls();
-  modeButton.textContent='Use local demo';
-  connection=new TelemetryConnection(api.base,(p,t)=> {
-    if(mode!=='backend') {generation++;mode='backend';mock.stop();view.reset();panel.reset();modeButton.textContent='Use local demo';status('connected',`API CONNECTED · ${t==='WebSocket'?'WS':'HTTP'}`);}
-    ingest(p,t);
-  },(state,label)=> {
-    if(mode==='demo') return;
-    if(state==='connected') status('connected',`API CONNECTED · ${label==='WebSocket'?'WS':'HTTP'}`);
-    else {status(state,state==='stale'?'STALE TELEMETRY':state==='invalid'?'INVALID PACKET':state==='connecting'?'RECONNECTING API':'API DISCONNECTED');if(state==='stale') {setText('packet-source','STALE TELEMETRY · values retained');body?.update(packet,Object.fromEntries(['SANS-01','CV-02','ECLSS-03','RAD-04'].map(k=>[k,'unknown'])));}}
-  });
-  connection.start();
-  const expected=generation;clearTimeout(window.aresFallback);
-  window.aresFallback=setTimeout(()=>{if(mode==='waiting' && expected===generation)demo(true);},5500);
-}
-button.addEventListener('click',async()=> {
-  if(button.disabled || busy || !mock) return;
-  const key=document.getElementById('case-select').value;busy=true;analysisPending=false;button.disabled=true;button.classList.add('is-loading');button.setAttribute('aria-busy','true');setText('assessment-latency','SIMULATING…');panel.error('');
-  const started=performance.now(),version=generation;
-  try {
-    if(mode==='demo') {mock.select(key);activeKey=key;panel.reset();ingest(mock.packet(),'demo');panel.render(mock.assessment());}
-    else if (mode === 'backend' && !rehearsal) {
-      startingBlind = true;
-      const result = await api.startBlindCrisis(blindSeed);
-      if (version !== generation) return;
-      if (!Number.isInteger(result.incident_id)) throw new Error('The backend did not acknowledge a blind incident.');
-      expectedIncident = result.incident_id;
-      panel.reset('Waiting for evidence from the current incident.');
-      showIncident(null);
-      setText('assessment-latency', 'COLLECTING TELEMETRY');
-      return;
+  packet=p;transport=source;mode='backend';
+  const states=view.update(p,source);body?.update(p,states);updateAlerts(states);
+  setText('packet-source',`SIMULATED TELEMETRY · ASTRONAUT AGENT · ${transport}`);
+  setText('data-badge','AGENT · 1 Hz');
+  showIncident(p.blind_incident);
+  // The blind streaming contract truly gates Layer 3 on the server. Unsolicited
+  // diagnoses from legacy/non-blind streams are not displayed as consultations.
+  if(consultation && consultation.incidentId===p.simulation_incident && p.rag_diagnosis
+    && ['assessed','recovering','complete'].includes(p.blind_incident?.phase)) {
+    if(consultation.status==='pending' || consultation.status==='failed') {
+      consultation.status='complete';consultation.receivedAt=new Date().toISOString();consultation.sourceTimestamp=p.timestamp;
+      setText('assessment-latency',`CONSULTATION ${(performance.now()-consultation.start).toFixed(0)} ms`);
     }
-    else {
-      if(mode!=='backend') throw new Error('API unavailable. Select local demo or wait for connection.');
-      await api.trigger(key);if(version!==generation)return;
-      panel.reset('Scenario injected. The astronaut agent changes vitals dynamically; assessments follow observed telemetry.');
-      const current=await api.snapshot(key);if(version!==generation)return;
-      ingest(current,transport);const result=await api.diagnose(current);
-      if(version!==generation || current.simulation_incident !== packet?.simulation_incident)return;
-      panel.render(result);
-      if(result.organ_hud_status) body?.update(current,Object.fromEntries(Object.entries(result.organ_hud_status).map(([id,s])=>[id,normalizeStatus(s)])));
-    }
-    setText('assessment-latency',`${mode==='demo'?'DEMO RENDER':'ASSESSMENT'} ${(performance.now()-started).toFixed(0)} ms`);
-  } catch(e) {if(version===generation){panel.error(e.message);setText('assessment-latency','ASSESSMENT FAILED');}}
-  finally {if(version===generation){startingBlind=false;busy=false;button.classList.remove('is-loading');button.setAttribute('aria-busy','false');updateControls();}}
-});
-analyzeButton.addEventListener('click', async()=> {
-  const incident = packet?.blind_incident;
-  if(analyzeButton.disabled || busy || mode !== 'backend' || incident?.phase !== 'awaiting_doctor') return;
+    if(consultation.status==='complete')panel.render({...p.rag_diagnosis,blindIncident:p.blind_incident});
+  }
+  updateProvenance();updateControls();
+}
+simulateButton.addEventListener('click',async()=> {
+  if(simulateButton.disabled || starting)return;
+  starting=true;controlError();simulateButton.classList.add('is-loading');simulateButton.setAttribute('aria-busy','true');updateControls();
   const version=generation;
-  busy=true;analysisPending=true;analyzeButton.disabled=true;analyzeButton.textContent='Doctor Analyzing…';
-  setText('assessment-latency','DOCTOR ANALYZING…');panel.error('');
   try {
-    await api.analyzeBlindCrisis(incident.id);
-    if(version !== generation) return;
-    showIncident({...incident, phase:'analyzing'});
-  } catch(e) {
-    if(version === generation) {analysisPending=false;panel.error(e.message);setText('assessment-latency','ASSESSMENT REQUEST FAILED');}
-  } finally {
-    if(version === generation) {busy=false;updateControls();}
-  }
+    const result=await api.startBlindCrisis();
+    if(version!==generation)return;
+    if(!Number.isInteger(result.incident_id))throw new Error('The backend did not acknowledge a random streaming incident.');
+    expectedIncident=result.incident_id;consultation=null;
+    panel.reset('Random crisis started. Monitoring changing vitals; doctor remains idle until consultation.');
+    showIncident(null);setText('assessment-latency','MONITORING TELEMETRY');updateProvenance();
+  } catch(error) {controlError(`${error.message} Random streaming simulation requires the existing simulate-crisis endpoint; no local fallback is used.`);}
+  finally {starting=false;simulateButton.classList.remove('is-loading');simulateButton.setAttribute('aria-busy','false');updateControls();}
 });
-rehearsalToggle.addEventListener('click', () => { rehearsal = !rehearsal; updateControls(); });
-revealButton.addEventListener('click', () => {
-  const incident = packet?.blind_incident;
-  if (incident?.phase === 'complete') {
-    revealedIncident = incident.id;
-    showIncident(incident);
-  }
+consultButton.addEventListener('click',async()=> {
+  if(consultButton.disabled || !fresh())return;
+  const observed=structuredClone(packet),incident=observed.blind_incident,version=generation;
+  consultation={incidentId:observed.simulation_incident,status:'pending',requestedAt:new Date().toISOString(),sourceTimestamp:observed.timestamp,start:performance.now()};
+  panel.error('');controlError();setText('assessment-latency','CONSULTING DOCTOR…');updateProvenance();updateControls();
+  try {
+    if(incident) {
+      // This endpoint evaluates the server's latest live packet for this incident;
+      // it accepts the incident ID, not a fabricated frontend assessment payload.
+      await api.analyzeBlindCrisis(incident.id);
+    } else {
+      const result=await api.diagnose(observed);
+      if(version!==generation || consultation?.incidentId!==observed.simulation_incident)return;
+      panel.render(result);consultation.status='complete';consultation.receivedAt=new Date().toISOString();
+      setText('assessment-latency',`CONSULTATION ${(performance.now()-consultation.start).toFixed(0)} ms`);
+    }
+  } catch(error) {
+    if(version===generation && consultation) {
+      consultation.status='failed';panel.error(error.message);setText('assessment-latency','CONSULTATION FAILED');
+      setText('assessment-freshness','Consultation failed. No new assessment is available; retry when permitted by the backend.');
+    }
+  } finally {updateProvenance();updateControls();}
 });
-modeButton.addEventListener('click',()=>{if(mode==='demo') followBackend();else demo();});
+resetSimulation.addEventListener('click',async()=> {
+  if(resetSimulation.disabled || !fresh())return;
+  starting=true;controlError();updateControls();
+  try {
+    await api.trigger('nominal');
+    const observed=await api.snapshot('nominal');
+    starting=false;expectedIncident=null;ingest(observed,transport);
+  } catch(error) {controlError(`Simulation reset failed: ${error.message}`);}
+  finally {starting=false;updateControls();}
+});
+revealButton.addEventListener('click',()=> {
+  const incident=packet?.blind_incident;if(incident?.phase==='complete'){revealedIncident=incident.id;showIncident(incident);}
+});
 async function init() {
-  panel.reset();
+  panel.reset('Connect the astronaut agent, then simulate a crisis. Consult Doctor requests the clinical assessment separately.');
+  updateProvenance();updateControls();
   try {
-    const [baselineResponse,demoResponse]=await Promise.all([fetch('data/baselines.json'),fetch('data/demo_cases.json')]);
-    if(!baselineResponse.ok || !demoResponse.ok) throw new Error('Local telemetry reference files could not load.');
-    view=new TelemetryView(await baselineResponse.json());mock=new MockAdapter(await demoResponse.json());
-    // A WebGL problem must not stop the telemetry and clinical console.
+    const response=await fetch('data/baselines.json');if(!response.ok)throw new Error('Local monitoring baselines failed to load.');
+    view=new TelemetryView(await response.json());
     try {const {AresBodyHUD}=await import('./body_hud.js');body=new AresBodyHUD(document.getElementById('body-canvas'));}
-    catch(e) {setText('model-status',`3D unavailable: ${e.message}`);}
-    if(query.get('mode')==='demo')demo();else followBackend();
-  } catch(e) {status('disconnected','FRONTEND ERROR');panel.error(`${e.message} Serve frontend through HTTP, not file://.`);button.disabled=true;}
+    catch(error){setText('model-status',`3D unavailable: ${error.message}`);}
+    connection=new TelemetryConnection(api.base,ingest,(state,label)=> {
+      const node=document.getElementById('api-state');node.dataset.state=state;
+      if(state==='connected') {mode='backend';setText('api-state-label',`API CONNECTED · ${label==='WebSocket'?'WS':'HTTP'}`);}
+      else {
+        setText('api-state-label',state==='stale'?'STALE TELEMETRY':state==='connecting'?'CONNECTING API':state==='invalid'?'INVALID PACKET':'API DISCONNECTED');
+        if(state==='stale' || state==='disconnected') {
+          mode='disconnected';body?.markStale();setText('telemetry-alert','Backend unavailable · readings and organ status are retained, not fresh observations.');document.getElementById('telemetry-alert').dataset.status='unknown';setText('data-badge',state==='stale'?'STALE':'DISCONNECTED');
+          setText('packet-source',packet?'BACKEND UNAVAILABLE · retained readings':'NO BACKEND TELEMETRY · reconnecting');
+        }
+      }
+      updateProvenance();updateControls();
+    });
+    connection.start();
+  } catch(error) {setText('api-state-label','FRONTEND ERROR');controlError(`${error.message} Serve the frontend through HTTP.`);}
 }
-window.addEventListener('pagehide',()=>{connection?.stop();mock?.stop();body?.dispose();clearTimeout(window.aresFallback);});
-window.addEventListener('pageshow',e=>{if(e.persisted)location.reload();});
+window.addEventListener('pagehide',()=>{connection?.stop();body?.dispose();});
+window.addEventListener('pageshow',event=>{if(event.persisted)location.reload();});
 init();

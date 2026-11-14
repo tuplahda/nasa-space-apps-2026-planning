@@ -12,7 +12,7 @@ const fixture=JSON.parse(await readFile(new URL('../data/demo_cases.json',import
 const health=await api.request('/health');assert.equal(health.status,'NOMINAL');
 let connection;
 try {
-  for(const path of ['/','/style.css','/js/app.js','/js/body_hud.js','/js/websocket.js','/js/telemetry.js','/js/scenarios.js','/js/mock_data.js','/js/medical_panel.js','/vendor/three/three.module.js','/vendor/three/addons/loaders/GLTFLoader.js','/vendor/three/addons/controls/OrbitControls.js','/vendor/three/addons/utils/BufferGeometryUtils.js','/assets/models/ares_upper_body_hologram.glb','/data/baselines.json','/data/demo_cases.json']) {
+  for(const path of ['/','/style.css','/js/app.js','/js/body_dynamics.js','/js/body_hud.js','/js/websocket.js','/js/telemetry.js','/js/scenarios.js','/js/mock_data.js','/js/medical_panel.js','/vendor/three/three.module.js','/vendor/three/addons/loaders/GLTFLoader.js','/vendor/three/addons/controls/OrbitControls.js','/vendor/three/addons/utils/BufferGeometryUtils.js','/assets/models/ares_upper_body_hologram.glb','/data/baselines.json','/data/demo_cases.json']) {
     const response=await fetch(frontend+path);assert.equal(response.status,200,path);await response.arrayBuffer();
   }
   console.log('PASS: all HTML, CSS, modules, GLB and local dependencies served via HTTP');
@@ -56,6 +56,9 @@ try {
   assert.equal(initial.rag_diagnosis,undefined);
   assert.equal(initial.active_scenario_id,undefined);
   assert.equal(initial.blind_incident.reveal,undefined);
+  const waiting=await waitForFrame(known.incident_id,p=>p.blind_incident.phase==='awaiting_doctor');
+  assert.equal(waiting.rag_diagnosis,undefined);
+  await api.analyzeBlindCrisis(known.incident_id);
   const knownFrame=await waitForFrame(known.incident_id,p=>p.blind_incident.phase==='assessed');
   assert.equal(knownFrame.rag_diagnosis.mode,'MODE_A_KNOWN_CONDITION');
   assert.ok(knownFrame.environment.cabin_co2_mmhg>initial.environment.cabin_co2_mmhg);
@@ -67,11 +70,13 @@ try {
   const complete=await waitForFrame(known.incident_id,p=>p.blind_incident.phase==='complete');
   assert.equal(complete.blind_incident.reveal,'hypercapnia');
   const unknown=await api.request('/api/scenarios/simulate-crisis',{streaming:true,seed:0,duration_ticks:10});
+  const unknownWaiting=await waitForFrame(unknown.incident_id,p=>p.blind_incident.phase==='awaiting_doctor');
+  assert.equal(unknownWaiting.rag_diagnosis,undefined);
+  await api.analyzeBlindCrisis(unknown.incident_id);
   const abstained=await waitForFrame(unknown.incident_id,p=>p.blind_incident.phase==='assessed');
   assert.equal(abstained.rag_diagnosis.mode,'MODE_B_NOVEL_ANOMALY');
   assert.deepEqual(abstained.blind_incident.actions,[]);
-  await waitForFrame(unknown.incident_id,p=>p.blind_incident.phase==='recovering' && p.blind_incident.recovery_cause==='automatic');
-  console.log('PASS: blind WebSocket onset, known match, abstention, stale and duplicate action rejection, and both recovery causes');
+  console.log('PASS: random streaming onset; no diagnosis before consultation; known match and modeled recovery; Mode B abstention; stale/duplicate action rejection');
   console.log('ALL INTEGRATION CHECKS PASSED');
 } finally {
   connection?.stop();
