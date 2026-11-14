@@ -182,6 +182,7 @@ def execute_diagnosis_pipeline(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
     start_ns = time.perf_counter_ns()
     packet = TelemetryPacket.model_validate(payload)
+    packet.active_scenario_id = None
     assessment: AnomalyAssessment = anomaly_detector.evaluate_packet(packet)
     rag_result = rag_engine.diagnose(packet, assessment)
 
@@ -203,6 +204,7 @@ if FASTAPI_AVAILABLE and router is not None:
         """
         start_ns = time.perf_counter_ns()
         try:
+            packet.active_scenario_id = None
             assessment = anomaly_detector.evaluate_packet(packet)
             result = rag_engine.diagnose(packet, assessment)
             total_ms = round((time.perf_counter_ns() - start_ns) / 1_000_000.0, 3)
@@ -228,6 +230,7 @@ if FASTAPI_AVAILABLE and router is not None:
         """
         Stateful 1Hz tick evaluation endpoint (enforces 3-tick SEU persistence debounce).
         """
+        packet.active_scenario_id = None
         packet.stateless_evaluation = False
         assessment = anomaly_detector.evaluate_packet(packet)
         rag_consultation = None

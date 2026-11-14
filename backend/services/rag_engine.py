@@ -127,6 +127,10 @@ CLINICAL_SYNONYM_MAP: Dict[str, str] = {
     "stuffy nose": "sas rhinosinusitis stuffies nasal",
     "motion sick": "sas adaptation nausea",
     "tearing": "lacrimation ocular tearing",
+    "grit": "particulate foreign body",
+    "scratched": "abrasion scratch",
+    "eyeball": "eye ocular",
+    "light sensitivity": "photophobia",
     "burning eyes": "ocular burning",
     "convulsion": "seizures seizure convulsion",
     "altered awareness": "seizures post-ictal",
@@ -1711,6 +1715,8 @@ class LocalMedicalRAGEngine:
 
         # --- Corneal Abrasion / Foreign Body Eye (CPG-22) ---
         if sid == "CPG-22":
+            if not re.search(r"\b(?:eyes?|eyeball|ocular|cornea\w*|photophobia|fluorescein|light sensitivity)\b", packet.symptom_log, re.IGNORECASE):
+                return 0.0
             if any(k in sym for k in ("ammonia", "cough", "dyspnea", "wheeze")):
                 return -0.10
             if "photophobia" in sym and "tearing" in sym and any(
@@ -2369,6 +2375,37 @@ class LocalMedicalRAGEngine:
                 safe_entries.append(item)
             filtered.append(safe_entries)
         return filtered[0], filtered[1], list(dict.fromkeys(contraindications + warnings))
+
+    def get_treatment_options(
+        self, scenario_id: str, packet: TelemetryPacket, assessment: AnomalyAssessment
+    ) -> List[str]:
+        """Return exact active-condition medication names after current safety filtering."""
+        family = (scenario_id,)
+        if scenario_id in ("CPG-06", "SCENARIO_2_SANS"):
+            family = ("CPG-06", "SCENARIO_2_SANS")
+        options = set()
+        for protocol_id in family:
+            proto = self.protocol_by_id.get(protocol_id, {})
+            medications = self._normalize_contract_checs_medications(proto.get("checs_medications", []))
+            source = STRUCTURED_CHECS_PRESCRIPTIONS.get(protocol_id, medications)
+            prescriptions = [self._parse_and_validate_medication(item) for item in source]
+            safe, _, _ = self._apply_deterministic_safety_filter(prescriptions, medications, [], packet, assessment)
+            for medication in safe:
+                if not medication.get("formulary_verified"):
+                    continue
+                name = str(medication.get("medication", ""))
+                options.add(name)
+                # Separate a source medication name from its stated dose or route.
+                prefix = re.split(
+                    r"\s+\d+(?:[.,]\d+)?(?:-\d+(?:[.,]\d+)?)?\s*(?:mg|mcg|g|mL|L)\b|\s+(?:PO|IV|IM|SC|ODT)\b",
+                    name, maxsplit=1, flags=re.IGNORECASE,
+                )[0].strip()
+                if prefix:
+                    options.add(prefix)
+                for canonical in self.formulary_by_name:
+                    if re.search(r"(?<!\w)" + re.escape(canonical) + r"(?!\w)", name, re.IGNORECASE):
+                        options.add(canonical)
+        return sorted(options)
 
     def _is_nominal_asymptomatic(
         self,

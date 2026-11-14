@@ -175,6 +175,11 @@ class AstronautSimulationEngine:
         self.active_treatment: Optional[str] = None
         self.recovery_tick: int = 0
         self.recovery_start: float = 0.0
+        self.incident_id: int = 0
+        self._treatment_options: set[str] = set()
+        self._latest_packet: Optional[TelemetryPacket] = None
+        self._readiness_score: Optional[int] = None
+        self._readiness_tick: int = -1
 
         # Mission Elapsed Time base (Day 84, 10:15:00)
         self.met_seconds: int = (84 * 86400) + (10 * 3600) + (15 * 60)
@@ -264,6 +269,8 @@ class AstronautSimulationEngine:
             {"id": "orthostatic_intolerance", "name": "Microgravity Orthostatic Intolerance", "category": "Quantitative Trajectory"},
             {"id": "decompression", "name": "Cabin / Suit Decompression & Acute Hypoxia", "category": "Quantitative Trajectory"},
             {"id": "sans", "name": "Spaceflight-Associated Neuro-Ocular Syndrome", "category": "Quantitative Trajectory"},
+            {"id": "zero_day", "name": "Unclassified Multi-System Anomaly", "category": "Simulation Demo"},
+            {"id": "dehydration", "name": "Dehydration / Volume Depletion", "category": "Simulation Demo"},
         ]
         # Append 24 seeds
         seen = set()
@@ -278,8 +285,20 @@ class AstronautSimulationEngine:
                 })
         return catalog
 
-    def get_routine_schedule(self) -> Dict[str, Any]:
-        """Return daily prevention schedule and active timeline block."""
+    def get_routine_schedule(self, readiness_score: Optional[int] = None) -> Dict[str, Any]:
+        """Return the schedule with readiness from the current physiological assessment."""
+        if readiness_score is not None:
+            self._readiness_score = max(0, min(100, int(readiness_score)))
+            self._readiness_tick = self.tick_count
+        elif self._latest_packet is not None and self._readiness_tick != self.tick_count:
+            from backend.services.anomaly_detector import EdgeAnomalyDetector
+
+            observation = TelemetryPacket.model_validate(self._latest_packet.model_dump())
+            observation.active_scenario_id = None
+            observation.stateless_evaluation = True
+            assessment = EdgeAnomalyDetector().evaluate_packet(observation)
+            self._readiness_score = assessment.readiness_score_0_100
+            self._readiness_tick = self.tick_count
         # Determine time of day from mission elapsed time
         rem = self.met_seconds % 86400
         hour = rem // 3600
@@ -306,7 +325,7 @@ class AstronautSimulationEngine:
             "met_time": current_time_str,
             "active_block": active_item["activity"],
             "schedule": schedule_status,
-            "crew_readiness_score": 94,
+            "crew_readiness_score": self._readiness_score,
         }
 
     def set_activity_state(self, new_state: str) -> Dict[str, Any]:
@@ -327,6 +346,8 @@ class AstronautSimulationEngine:
         normalized = name.replace(" ", "_")
         normalized = SCENARIO_ALIASES.get(normalized, normalized)
         if normalized in ("nominal", "normal", "healthy", "baseline"):
+            self.incident_id += 1
+            self._treatment_options.clear()
             self.active_scenario = "nominal"
             self.target_progression = 0.0
             self.scenario_progression = 0.0
@@ -343,6 +364,8 @@ class AstronautSimulationEngine:
             normalized = seed["seed_id"].lower()
         elif normalized not in TRAJECTORY_SCENARIOS.values() and normalized not in ("dehydration", "zero_day"):
             return {"status": "error", "message": "Unknown simulation scenario."}
+        self.incident_id += 1
+        self._treatment_options.clear()
         if self.active_scenario != normalized:
             self.scenario_progression = 0.0
         self.active_scenario = normalized
@@ -355,13 +378,17 @@ class AstronautSimulationEngine:
             "message": f"Injected scenario: {normalized}. Vitals trending into crisis.",
         }
 
+    def set_treatment_options(self, treatments: List[str]) -> None:
+        """Register exact countermeasure names from the current filtered RAG decision."""
+        self._treatment_options = {" ".join(value.lower().split()) for value in treatments if value.strip()}
+
     def apply_treatment(self, treatment_name: str) -> Dict[str, Any]:
         """
         Administer countermeasure to initiate closed-loop biological recovery.
         Vitals will decay back to baseline over 5-10 seconds.
         """
-        treatment_id = treatment_name.strip().lower() if isinstance(treatment_name, str) else ""
-        if treatment_id not in GENERIC_TREATMENTS | HYPERCAPNIA_TREATMENTS:
+        treatment_id = " ".join(treatment_name.lower().split()) if isinstance(treatment_name, str) else ""
+        if treatment_id not in GENERIC_TREATMENTS | HYPERCAPNIA_TREATMENTS | self._treatment_options:
             return {"status": "error", "message": "Unknown simulation treatment."}
         if treatment_id in HYPERCAPNIA_TREATMENTS and self.active_scenario not in ("nominal", "hypercapnia"):
             return {"status": "error", "message": "This treatment is for the hypercapnia scenario."}
@@ -413,6 +440,7 @@ class AstronautSimulationEngine:
                 self.is_recovering = False
                 self.active_scenario = "nominal"
                 self.active_treatment = None
+                self._treatment_options.clear()
         else:
             if self.scenario_progression < self.target_progression:
                 self.scenario_progression = min(
@@ -628,7 +656,7 @@ class AstronautSimulationEngine:
 
         now_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
-        return TelemetryPacket(
+        packet = TelemetryPacket(
             timestamp=now_iso,
             met=self._format_met(),
             mission_day=self.mission_day,
@@ -647,6 +675,8 @@ class AstronautSimulationEngine:
             symptom_log=symptom_log,
             quality_flags=quality_flags or None,
         )
+        self._latest_packet = packet
+        return packet
 
 
 # Global singleton instance

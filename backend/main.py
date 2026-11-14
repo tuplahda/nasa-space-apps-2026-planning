@@ -12,6 +12,7 @@ Complies strictly with JPL Power-of-Ten safety rules and contains zero emojis.
 """
 
 import asyncio
+from copy import deepcopy
 from contextlib import asynccontextmanager
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
@@ -24,7 +25,7 @@ from urllib.parse import parse_qs, urlparse
 
 os.environ.setdefault("SystemRoot", r"C:\Windows")
 
-from backend.models.telemetry import DEMO_ASTRONAUT_ID, TelemetryPacket
+from backend.models.telemetry import AnomalyAssessment, DEMO_ASTRONAUT_ID, TelemetryPacket
 from backend.routes.diagnose import (
     FASTAPI_AVAILABLE,
     SWAGGER_DIAGNOSE_EXAMPLES,
@@ -90,11 +91,11 @@ offline_simulation_lock = Lock()
 def run_simulation_command(action: Any, payload: Dict[str, Any]) -> Dict[str, Any]:
     """Validate controls consistently across REST, WebSocket, and offline HTTP."""
     if action == "trigger_scenario":
-        return astronaut_sim.trigger_scenario(payload.get("scenario", payload.get("scenario_id")))
+        return astronaut_sim.trigger_scenario(payload.get("scenario") or payload.get("scenario_id"))
     if action == "apply_treatment":
-        return astronaut_sim.apply_treatment(payload.get("treatment", payload.get("action")))
+        return astronaut_sim.apply_treatment(payload.get("treatment") or payload.get("action"))
     if action == "set_activity":
-        return astronaut_sim.set_activity_state(payload.get("activity_state", payload.get("activity")))
+        return astronaut_sim.set_activity_state(payload.get("activity_state") or payload.get("activity"))
     return {"status": "error", "message": "Unknown simulation command."}
 
 
@@ -102,11 +103,52 @@ def command_status(result: Dict[str, Any]) -> int:
     return 400 if result["status"] == "error" else 200
 
 
+def recovery_diagnosis(
+    recorded: Dict[str, Any], packet: TelemetryPacket, assessment: AnomalyAssessment, status: str
+) -> Dict[str, Any]:
+    """Carry recorded context through recovery while applying current safety lockouts."""
+    context = deepcopy(recorded)
+    prescriptions, medications, contraindications = rag_engine._apply_deterministic_safety_filter(
+        context.get("prescriptions", []), context.get("checs_medications", []),
+        context.get("contraindications_locked", []), packet, assessment,
+    )
+    blocked, _ = rag_engine._medication_safety_policy(packet)
+    checklist = [step for step in context.get("action_checklist", [])
+                 if not any(name in step["action"].lower() for name in blocked)]
+    context.update({
+        "recovery_status": status,
+        "source_mode": "RECORDED_DIAGNOSIS_RECOVERY_CONTEXT",
+        "execution_time_ms": 0.0,
+        "triggering_vitals": assessment.triggering_vitals_summary,
+        "organ_hud_status": assessment.organ_hud_status,
+        "risk_score_0_100": assessment.risk_score_0_100,
+        "readiness_score_0_100": assessment.readiness_score_0_100,
+        "severity": assessment.nasa_priority_class,
+        "clinical_reasoning": "Monitoring recovery from the recorded diagnosis using the current physiological assessment.",
+        "prescriptions": prescriptions,
+        "checs_medications": medications,
+        "contraindications_locked": contraindications,
+        "action_checklist": checklist,
+        "action_plan": checklist,
+        "autonomous_checklist": checklist,
+        "hardware_and_diagnostics": [step for step in context.get("hardware_and_diagnostics", [])
+                                     if not any(name in step.lower() for name in blocked)],
+        "checs_subpack": " / ".join(sorted({item["checs_pack"] for item in prescriptions})) or "NONE",
+    })
+    context["rag_metrics"]["retrieval_latency_ms"] = 0.0
+    return context
+
+
 def advance_telemetry() -> Dict[str, Any]:
     """Advance the shared simulation and publish one snapshot for all readers."""
     global latest_telemetry
+    was_recovering = astronaut_sim.is_recovering
     packet = astronaut_sim.step()
     payload = packet.model_dump()
+    payload["simulation_incident"] = astronaut_sim.incident_id
+    previous = latest_telemetry or {}
+    same_incident = (previous.get("simulation_incident") == astronaut_sim.incident_id
+                     and previous.get("astronaut_id") == packet.astronaut_id)
 
     # Keep the scenario label for the dashboard. The evaluator receives observations.
     packet.active_scenario_id = None
@@ -117,13 +159,31 @@ def advance_telemetry() -> Dict[str, Any]:
     has_symptoms = bool(packet.symptom_log.strip()) and packet.symptom_log != NOMINAL_SYMPTOM_LOG
     if has_symptoms and not astronaut_sim.is_recovering:
         assessment.trigger_rag_consultation = True
+    recovery_monitoring = was_recovering or astronaut_sim.is_recovering
+    status = "NONE"
+    if recovery_monitoring:
+        assessment.trigger_rag_consultation = False
+        status = "ACTIVE" if astronaut_sim.is_recovering else "COMPLETE"
+        if same_incident and previous.get("rag_diagnosis"):
+            payload["rag_diagnosis"] = recovery_diagnosis(previous["rag_diagnosis"], packet, assessment, status)
+            if astronaut_sim.is_recovering:
+                options = rag_engine.get_treatment_options(payload["rag_diagnosis"]["scenario_id"], packet, assessment)
+                options.extend(str(step["action"]) for step in payload["rag_diagnosis"].get("action_checklist", []))
+                astronaut_sim.set_treatment_options(options)
+    payload["recovery_status"] = status
     payload["anomaly_assessment"] = assessment.model_dump()
-    payload["routine_schedule"] = astronaut_sim.get_routine_schedule()
+    payload["routine_schedule"] = astronaut_sim.get_routine_schedule(assessment.readiness_score_0_100)
     payload["mission_readiness_pct"] = assessment.readiness_score_0_100
 
     if assessment.trigger_rag_consultation:
         try:
-            payload["rag_diagnosis"] = rag_engine.diagnose(packet, assessment)
+            decision = rag_engine.diagnose(packet, assessment)
+            payload["rag_diagnosis"] = decision
+            options = []
+            if decision.get("mode") == "MODE_A_KNOWN_CONDITION":
+                options.extend(rag_engine.get_treatment_options(decision["scenario_id"], packet, assessment))
+                options.extend(str(step["action"]) for step in decision.get("action_checklist", []))
+            astronaut_sim.set_treatment_options(options)
         except Exception:
             logger.exception("Diagnosis failed for a simulation tick")
 
@@ -241,6 +301,8 @@ if FASTAPI_AVAILABLE:
         """
         WebSocket stream emitting 1Hz TelemetryPackets to Tivesh's Mission Control HUD.
         Also accepts JSON commands to trigger scenarios or apply treatments.
+        Commands support flat fields, a nested payload, or a separate command key.
+        Every acknowledgement includes result. Activity replies retain the activity alias.
         """
         await manager.connect(websocket)
         try:
@@ -257,13 +319,15 @@ if FASTAPI_AVAILABLE:
                     await websocket.send_text(json.dumps({"type": "ERROR", "message": str(error)}))
                     continue
 
-                action = cmd.get("action")
-                payload = {"treatment": cmd.get("treatment")} if action == "apply_treatment" else cmd
-                result = run_simulation_command(action, payload)
-                if action == "set_activity" and result["status"] == "ok":
-                    reply = {"type": "COMMAND_ACK", "activity": result["activity_state"]}
+                action = cmd.get("command", cmd.get("action"))
+                payload = cmd.get("payload", cmd)
+                if not isinstance(payload, dict):
+                    result = {"status": "error", "message": "Expected a JSON object payload."}
                 else:
-                    reply = {"type": "COMMAND_ACK", "result": result}
+                    result = run_simulation_command(action, payload)
+                reply = {"type": "COMMAND_ACK", "action": action, "result": result}
+                if action == "set_activity" and result["status"] == "ok":
+                    reply["activity"] = result["activity_state"]
                 await websocket.send_text(json.dumps(reply))
         except WebSocketDisconnect:
             pass
@@ -376,17 +440,19 @@ OFFLINE_API_DOCS = """<!DOCTYPE html>
     <div class="endpoint">
       <div><span class="method-post">POST</span><span class="path">/api/scenarios/trigger</span> — Inject Crisis Scenario</div>
       <p style="font-size:13px;color:#94a3b8;">Use these demo shortcuts or get the full scenario list.</p>
-      <button onclick="sendPost('/api/scenarios/trigger', JSON.stringify({scenario: 'hypercapnia'}))">Trigger Hypercapnia</button>
-      <button onclick="sendPost('/api/scenarios/trigger', JSON.stringify({scenario: 'solar_flare'}))">Trigger Solar Flare</button>
-      <button onclick="sendPost('/api/scenarios/trigger', JSON.stringify({scenario: 'zero_day'}))">Trigger Mode B Demo</button>
-      <button onclick="sendPost('/api/scenarios/trigger', JSON.stringify({scenario: 'nominal'}))">Reset to Nominal</button>
-      <button onclick="sendGet('/api/scenarios/list')">List Scenarios</button>
+      <button onclick="sendPost('/api/scenarios/trigger', JSON.stringify({scenario: 'hypercapnia'}), 'scenarioResp')">Trigger Hypercapnia</button>
+      <button onclick="sendPost('/api/scenarios/trigger', JSON.stringify({scenario: 'solar_flare'}), 'scenarioResp')">Trigger Solar Flare</button>
+      <button onclick="sendPost('/api/scenarios/trigger', JSON.stringify({scenario: 'zero_day'}), 'scenarioResp')">Trigger Mode B Demo</button>
+      <button onclick="sendPost('/api/scenarios/trigger', JSON.stringify({scenario: 'nominal'}), 'scenarioResp')">Reset to Nominal</button>
+      <button onclick="sendGet('/api/scenarios/list', 'scenarioResp')">List Scenarios</button>
+      <pre id="scenarioResp">// Scenario response will appear here...</pre>
     </div>
 
     <div class="endpoint">
       <div><span class="method-post">POST</span><span class="path">/api/scenarios/cure</span> - Start Simulated Recovery</div>
       <p style="font-size:13px;color:#94a3b8;">Initiate closed-loop biological recovery curve.</p>
-      <button onclick="sendPost('/api/scenarios/cure', '{}')">Start Simulated Recovery</button>
+      <button onclick="sendPost('/api/scenarios/cure', '{}', 'recoveryResp')">Start Simulated Recovery</button>
+      <pre id="recoveryResp">// Recovery response will appear here...</pre>
     </div>
 
     <div class="endpoint">
@@ -421,26 +487,34 @@ OFFLINE_API_DOCS = """<!DOCTYPE html>
     }
     loadExample(exampleSelect.value);
 
-    async function sendPost(url, bodyStr) {
-      const out = document.getElementById('postResp');
+    async function sendRequest(url, options, targetId) {
+      const out = document.getElementById(targetId);
       out.textContent = 'Executing...';
-      const t0 = performance.now();
-      const res = await fetch(url, {
+      out.dataset.status = 'pending';
+      try {
+        const response = await fetch(url, options);
+        const text = await response.text();
+        let displayed = text;
+        try { displayed = JSON.stringify(JSON.parse(text), null, 2); } catch {}
+        out.dataset.status = response.ok ? 'success' : 'error';
+        const failure = response.ok ? '' : 'Request failed. ';
+        out.textContent = `${failure}HTTP ${response.status} ${response.statusText}\n${displayed}`;
+      } catch (error) {
+        out.dataset.status = 'error';
+        out.textContent = `Request failed: ${error.message}`;
+      }
+    }
+
+    async function sendPost(url, bodyStr, targetId = 'postResp') {
+      return sendRequest(url, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: bodyStr || document.getElementById('reqBody').value
-      });
-      const data = await res.json();
-      const dt = (performance.now() - t0).toFixed(2);
-      out.textContent = `// HTTP ${res.status} (${dt} ms round-trip)\\n` + JSON.stringify(data, null, 2);
+      }, targetId);
     }
 
-    async function sendGet(url) {
-      const out = document.getElementById('getResp');
-      out.textContent = 'Fetching...';
-      const res = await fetch(url);
-      const data = await res.json();
-      out.textContent = `// HTTP ${res.status} (${url})\\n` + JSON.stringify(data, null, 2);
+    async function sendGet(url, targetId = 'getResp') {
+      return sendRequest(url, {method: 'GET'}, targetId);
     }
   </script>
 </body>
@@ -591,6 +665,9 @@ class AresMedStdlibRequestHandler(BaseHTTPRequestHandler):
             try:
                 result = execute_diagnosis_pipeline(data)
                 self._send_json(200, result)
+            except (ValueError, TypeError):
+                self._send_json(422, {"detail": [{"loc": ["body"], "type": "value_error",
+                                                "msg": "Invalid telemetry payload."}]})
             except Exception as exc:
                 self._send_json(
                     500,
@@ -604,15 +681,22 @@ class AresMedStdlibRequestHandler(BaseHTTPRequestHandler):
             return
 
         if parsed.path == "/api/diagnose/evaluate-tick":
-            packet = TelemetryPacket.model_validate(data)
-            packet.stateless_evaluation = False
-            assessment = anomaly_detector.evaluate_packet(packet)
-            rag_out = (
-                rag_engine.diagnose(packet, assessment)
-                if assessment.trigger_rag_consultation
-                else None
-            )
-            self._send_json(200, build_contract_b_response(assessment, packet, rag_out))
+            try:
+                packet = TelemetryPacket.model_validate(data)
+            except (ValueError, TypeError):
+                self._send_json(422, {"detail": [{"loc": ["body"], "type": "value_error",
+                                                "msg": "Invalid telemetry payload."}]})
+                return
+            try:
+                packet.active_scenario_id = None
+                packet.stateless_evaluation = False
+                assessment = anomaly_detector.evaluate_packet(packet)
+                rag_out = rag_engine.diagnose(packet, assessment) if assessment.trigger_rag_consultation else None
+                self._send_json(200, build_contract_b_response(assessment, packet, rag_out))
+            except Exception as error:
+                logger.exception("Tick evaluation failed")
+                self._send_json(500, {"title": "Tick evaluation failed", "status": 500,
+                                      "error_class": error.__class__.__name__})
             return
 
         self._send_json(404, {"title": "Not Found", "status": 404})
