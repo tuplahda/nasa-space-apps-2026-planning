@@ -46,7 +46,7 @@ def print_frame(packet, assessment=None, prefix: str = "TICK") -> None:
 def run_golden_loop() -> None:
     print_separator("=")
     print(" A.R.E.S. MED — 60-SECOND AUTONOMOUS SPACE MEDICINE DEMONSTRATION")
-    print(" Target: Cmdr. Maya Lin (ASTRO-01) | 20-Minute Mars Comms Delay Active")
+    print(f" Target: {astronaut_sim.name} ({astronaut_sim.astronaut_id}) | 20-Minute Mars Comms Delay Active")
     print("=" * 85)
     time.sleep(1.0)
 

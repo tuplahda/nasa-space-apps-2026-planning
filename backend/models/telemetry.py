@@ -11,6 +11,10 @@ in an air-gapped environment.
 
 from typing import Any, Dict, List, Optional, Tuple
 
+
+DEMO_ASTRONAUT_ID = "ASTRO-01"
+DEMO_ASTRONAUT_NAME = "Cmdr. Alex Vance"
+
 try:
     from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -218,8 +222,8 @@ def _unpack_packet_dict(data: Dict[str, Any]) -> Dict[str, Any]:
             {"id", "name", "activity_state", "active_scenario_id", "vitals", "specialized_diagnostics", "symptom_log"},
             "astronaut",
         )
-        payload.setdefault("astronaut_id", astro.get("id", "ASTRO-01"))
-        payload.setdefault("name", astro.get("name", "Cmdr. Maya Lin"))
+        payload.setdefault("astronaut_id", astro.get("id", DEMO_ASTRONAUT_ID))
+        payload.setdefault("name", astro.get("name", DEMO_ASTRONAUT_NAME))
         payload.setdefault("activity_state", astro.get("activity_state", "IVA_REST"))
         payload.setdefault("active_scenario_id", astro.get("active_scenario_id"))
         payload.setdefault("vitals", astro.get("vitals", {}))
@@ -349,8 +353,8 @@ if PYDANTIC_AVAILABLE:
         met: str = Field(default="042:14:30:12")
         elapsed_s: Optional[float] = Field(default=None, ge=0.0)
         mission_day: int = Field(default=84, ge=1, le=1200)
-        astronaut_id: str = Field(default="ASTRO-01")
-        name: str = Field(default="Cmdr. Maya Lin")
+        astronaut_id: str = Field(default=DEMO_ASTRONAUT_ID)
+        name: str = Field(default=DEMO_ASTRONAUT_NAME)
         activity_state: str = Field(default="IVA_REST")
         active_scenario_id: Optional[str] = Field(default=None)
         comms_status: Optional[CommsStatus] = Field(default=None)
@@ -512,8 +516,8 @@ else:
             self.met = str(unpacked.get("met", "042:14:30:12"))
             self.elapsed_s = unpacked.get("elapsed_s")
             self.mission_day = int(unpacked.get("mission_day", 84))
-            self.astronaut_id = str(unpacked.get("astronaut_id", "ASTRO-01"))
-            self.name = str(unpacked.get("name", "Cmdr. Maya Lin"))
+            self.astronaut_id = str(unpacked.get("astronaut_id", DEMO_ASTRONAUT_ID))
+            self.name = str(unpacked.get("name", DEMO_ASTRONAUT_NAME))
             self.activity_state = str(unpacked.get("activity_state", "IVA_REST"))
             self.active_scenario_id = unpacked.get("active_scenario_id")
             comms = unpacked.get("comms_status")

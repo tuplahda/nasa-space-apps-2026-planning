@@ -21,7 +21,7 @@ def main() -> None:
     print("=" * 85)
     print(" A.R.E.S. MED - AUTONOMOUS ASTRONAUT AGENT ENGINE (DHEER)")
     print(" Live 1Hz Microgravity Biotelemetry Generator")
-    print(" Target: Cmdr. Maya Lin (ASTRO-01) | Mission Day 84 (Post-FD75 Adapted)")
+    print(f" Target: {astronaut_sim.name} ({astronaut_sim.astronaut_id}) | Mission Day {astronaut_sim.mission_day}")
     print("=" * 85)
     print("Trajectory Controls:")
     print("  [h] Trigger Hypercapnia (TRAJ-HYPERCAPNIA / CPG-07)")

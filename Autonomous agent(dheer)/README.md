@@ -9,7 +9,7 @@
 
 ## Purpose & Scope
 
-This directory contains the standalone and core modules for the **Autonomous Astronaut Agent (Cmdr. Maya Lin / ASTRO-01)**. 
+This directory contains the standalone and core modules for the **Autonomous Astronaut Agent (Cmdr. Alex Vance / ASTRO-01)**. 
 
 It serves as the heart of Layer 1 in the A.R.E.S. Med architecture:
 1. **1Hz Biological Telemetry Generator:** Continuous, non-hardcoded microgravity physiological telemetry (HR, BP, SpO2, HRV, Core Temp, Respiration Rate, VE).

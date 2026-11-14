@@ -1,7 +1,7 @@
 """
 Autonomous Astronaut Agent (Digital Twin) Simulation Engine.
 
-Simulates Cmdr. Maya Lin (ASTRO-01) on a continuous 1000ms tick:
+Simulates the demo astronaut on a continuous 1000ms tick:
 - Sinus respiratory arrhythmia (+/- 3 bpm modulated by breathing rate).
 - Microgravity baseline adaptations across SLEEP, IVA_REST, ARED_EXERCISE, EVA_SPACEWALK
   aligned with NASA-STD-3001 and ESA Space Fever findings (adapted post-FD75).
@@ -26,6 +26,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from backend.models.telemetry import (
     CommsStatus,
+    DEMO_ASTRONAUT_ID,
+    DEMO_ASTRONAUT_NAME,
     Environment,
     SpecializedDiagnostics,
     TelemetryPacket,
@@ -131,7 +133,7 @@ ACTIVITY_PROFILES: Dict[str, ActivityBaseline] = {
     ),
 }
 
-# Daily Flight Operational Schedule for Cmdr. Maya Lin (Day 84)
+# Daily flight operational schedule for the demo astronaut
 DAILY_SCHEDULE_TEMPLATE: List[Dict[str, str]] = [
     {"time": "06:00", "activity": "Sleep Phase Termination & Morning Biometrics", "category": "ROUTINE"},
     {"time": "07:00", "activity": "Breakfast & Metabolic Caloric Tracking", "category": "NUTRITION"},
@@ -152,8 +154,8 @@ class AstronautSimulationEngine:
 
     def __init__(
         self,
-        astronaut_id: str = "ASTRO-01",
-        name: str = "Cmdr. Maya Lin",
+        astronaut_id: str = DEMO_ASTRONAUT_ID,
+        name: str = DEMO_ASTRONAUT_NAME,
         mission_day: int = 84,
     ) -> None:
         self.astronaut_id = astronaut_id

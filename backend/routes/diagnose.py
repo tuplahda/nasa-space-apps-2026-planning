@@ -9,7 +9,12 @@ clinical JSON payloads in <50ms with a deterministic offline fallback.
 import time
 from typing import Any, Dict
 
-from backend.models.telemetry import AnomalyAssessment, TelemetryPacket
+from backend.models.telemetry import (
+    AnomalyAssessment,
+    DEMO_ASTRONAUT_ID,
+    DEMO_ASTRONAUT_NAME,
+    TelemetryPacket,
+)
 from backend.services.anomaly_detector import EdgeAnomalyDetector
 from backend.services.rag_engine import LocalMedicalRAGEngine
 
@@ -59,8 +64,8 @@ SWAGGER_DIAGNOSE_EXAMPLES: Dict[str, Dict[str, Any]] = {
             "timestamp": "2026-11-14T10:15:30Z",
             "met": "042:14:30:12",
             "mission_day": 84,
-            "astronaut_id": "ASTRO-01",
-            "name": "Cmdr. Maya Lin",
+            "astronaut_id": DEMO_ASTRONAUT_ID,
+            "name": DEMO_ASTRONAUT_NAME,
             "activity_state": "EVA_SPACEWALK",
             "vitals": {
                 "heart_rate": 118,
@@ -87,8 +92,8 @@ SWAGGER_DIAGNOSE_EXAMPLES: Dict[str, Dict[str, Any]] = {
             "timestamp": "2026-11-14T11:00:00Z",
             "met": "042:15:15:00",
             "mission_day": 84,
-            "astronaut_id": "ASTRO-01",
-            "name": "Cmdr. Maya Lin",
+            "astronaut_id": DEMO_ASTRONAUT_ID,
+            "name": DEMO_ASTRONAUT_NAME,
             "activity_state": "EVA_SPACEWALK",
             "vitals": {
                 "heart_rate": 98,
@@ -116,8 +121,8 @@ SWAGGER_DIAGNOSE_EXAMPLES: Dict[str, Dict[str, Any]] = {
             "timestamp": "2026-11-14T19:00:00Z",
             "met": "095:08:00:00",
             "mission_day": 95,
-            "astronaut_id": "ASTRO-01",
-            "name": "Cmdr. Maya Lin",
+            "astronaut_id": DEMO_ASTRONAUT_ID,
+            "name": DEMO_ASTRONAUT_NAME,
             "activity_state": "IVA_REST",
             "vitals": {
                 "heart_rate": 62,
@@ -147,8 +152,8 @@ SWAGGER_DIAGNOSE_EXAMPLES: Dict[str, Dict[str, Any]] = {
             "timestamp": "2026-11-14T14:20:00Z",
             "met": "042:18:35:00",
             "mission_day": 84,
-            "astronaut_id": "ASTRO-01",
-            "name": "Cmdr. Maya Lin",
+            "astronaut_id": DEMO_ASTRONAUT_ID,
+            "name": DEMO_ASTRONAUT_NAME,
             "activity_state": "IVA_REST",
             "vitals": {
                 "heart_rate": 114,
@@ -231,7 +236,7 @@ if FASTAPI_AVAILABLE and router is not None:
         return build_contract_b_response(assessment, packet, rag_consultation)
 
     @router.get("/diagnose/buffer-status")
-    async def get_buffer_status(astronaut_id: str = "ASTRO-01") -> Dict[str, Any]:
+    async def get_buffer_status(astronaut_id: str = DEMO_ASTRONAUT_ID) -> Dict[str, Any]:
         """Return 60-second ring buffer metrics and cosmic-ray SEU counters."""
         mgr = anomaly_detector.get_or_create_buffer(astronaut_id)
         return mgr.get_snapshot_summary()

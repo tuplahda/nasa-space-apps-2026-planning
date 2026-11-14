@@ -62,7 +62,7 @@ class TelemetryPacket(BaseModel):
     timestamp: str
     met: str
     astronaut_id: str = "ASTRO-01"
-    name: str = "Cmdr. Maya Lin"
+    name: str = "Cmdr. Alex Vance"
     activity_state: str  # SLEEP, RESTING, ARED_EXERCISE, EVA_SPACEWALK
     vitals: Vitals
     environment: Environment

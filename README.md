@@ -12,7 +12,7 @@ On deep-space missions to the Moon or Mars, radio communication suffers a **20-m
 
 **A.R.E.S. Med** (*Astronaut Rapid Evaluation Support & Medical System*) is a **Closed-Loop Multi-Agent Simulation & Clinical Decision Support System**:
 
-1. **Autonomous Astronaut Agent (Digital Twin) — *Dheer*:** Generates dynamic, non-hardcoded microgravity vitals (`HR`, `BP`, `SpO2`, `HRV`, `Core Temp`), activity states (`SLEEP`, `RESTING`, `EXERCISE`, `EVA`), and first-person symptom logs, modulated by live NASA space weather (`DONKI API`).
+1. **Autonomous Astronaut Agent (Digital Twin) — *Dheer*:** The live demo follows **Cmdr. Alex Vance (ASTRO-01)**. The simulator generates dynamic, non-hardcoded microgravity vitals (`HR`, `BP`, `SpO2`, `HRV`, `Core Temp`), activity states (`SLEEP`, `RESTING`, `EXERCISE`, `EVA`), and first-person symptom logs, modulated by live NASA space weather (`DONKI API`).
 2. **60-Second Sliding Ring Buffer & SEU Filter — *Yohan*:** Evaluates incoming telemetry against spaceflight-adapted baselines using JPL Power-of-Ten safety rules and a 3-tick persistence debounce to filter cosmic ray bit-flips.
 3. **NASA Level V RAG Medical Officer — *Yohan*:** An onboard AI doctor executing our strict **2-Mode Clinical Protocol**:
    - **Mode A (Known Condition $\ge 75\%$):** Matches project scenarios and displays a verified NASA requirement only when one is mapped. Clinical steps, medication entries and lockouts are unverified project simulation content.

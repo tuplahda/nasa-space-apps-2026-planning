@@ -23,6 +23,16 @@ class SimulationIntegrationTests(unittest.TestCase):
             mock.start()
             self.addCleanup(mock.stop)
 
+    def test_demo_identity_in_telemetry_and_diagnosis_examples(self) -> None:
+        expected = ("ASTRO-01", "Cmdr. Alex Vance")
+        frame = server.advance_telemetry()
+        self.assertEqual((frame["astronaut_id"], frame["name"]), expected)
+        for packet in (TelemetryPacket(), TelemetryPacket.model_validate({"astronaut": {}})):
+            self.assertEqual((packet.astronaut_id, packet.name), expected)
+        for example in server.SWAGGER_DIAGNOSE_EXAMPLES.values():
+            payload = example["value"]
+            self.assertEqual((payload["astronaut_id"], payload["name"]), expected)
+
     def test_live_scenarios_reach_the_rag_without_scenario_labels(self) -> None:
         cases = {
             "SEED-TRM-02": "CPG-22",

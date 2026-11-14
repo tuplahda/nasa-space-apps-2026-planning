@@ -24,7 +24,7 @@ from urllib.parse import parse_qs, urlparse
 
 os.environ.setdefault("SystemRoot", r"C:\Windows")
 
-from backend.models.telemetry import TelemetryPacket
+from backend.models.telemetry import DEMO_ASTRONAUT_ID, TelemetryPacket
 from backend.routes.diagnose import (
     FASTAPI_AVAILABLE,
     SWAGGER_DIAGNOSE_EXAMPLES,
@@ -538,7 +538,7 @@ class AresMedStdlibRequestHandler(BaseHTTPRequestHandler):
             return
         if parsed.path == "/api/diagnose/buffer-status":
             qs = parse_qs(parsed.query)
-            astro_id = qs.get("astronaut_id", ["ASTRO-01"])[0]
+            astro_id = qs.get("astronaut_id", [DEMO_ASTRONAUT_ID])[0]
             mgr = anomaly_detector.get_or_create_buffer(astro_id)
             self._send_json(200, mgr.get_snapshot_summary())
             return

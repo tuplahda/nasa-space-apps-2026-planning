@@ -25,11 +25,7 @@ class TestAstronautSimulationEngine(unittest.TestCase):
     """Unit and integration tests for Dheer's Astronaut Simulation Engine."""
 
     def setUp(self) -> None:
-        self.sim = AstronautSimulationEngine(
-            astronaut_id="ASTRO-01",
-            name="Cmdr. Maya Lin",
-            mission_day=84,
-        )
+        self.sim = AstronautSimulationEngine()
 
     def test_nominal_vitals_within_nasa_bounds(self) -> None:
         """Verify baseline values match NASA-STD-3001 microgravity constraints."""

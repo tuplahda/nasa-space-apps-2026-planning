@@ -33,7 +33,7 @@ Emitted by **Dheer's Backend** every 1000ms:
   "timestamp": "2026-11-14T10:15:30Z",
   "met": "042:14:30:12",
   "astronaut_id": "ASTRO-01",
-  "name": "Cmdr. Maya Lin",
+  "name": "Cmdr. Alex Vance",
   "activity_state": "EVA_SPACEWALK",
   "vitals": {
     "heart_rate": 118,
@@ -98,7 +98,7 @@ By agreeing on these exact element IDs in `index.html`, Tivesh and Roy can write
 | Element ID | Owner | Purpose |
 | :--- | :---: | :--- |
 | `met-timer` | Tivesh | Displays ticking Mission Elapsed Time |
-| `astronaut-name` | Tivesh | Displays "Cmdr. Maya Lin" |
+| `astronaut-name` | Tivesh | Displays the name from the telemetry packet |
 | `activity-badge` | Tivesh | Displays "EVA SPACEWALK" or "RESTING" |
 | `hr-val` | Tivesh | Current Heart Rate number |
 | `bp-val` | Tivesh | Current BP (e.g. "120/80") |
