@@ -308,19 +308,37 @@ def _seed_to_payload(seed: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _check_mode_a_validity(rag: LocalMedicalRAGEngine, result: Dict[str, Any]) -> bool:
-    """Verify Mode A response citations, rule linkage, medications, pack codes, and lockouts."""
-    if not result.get("nasa_citations"):
+    """Check response claims against the locally audited source and formulary records."""
+    proto = rag.protocol_by_id.get(str(result.get("scenario_id", "")))
+    if not proto or result.get("nasa_citations") != proto.get("nasa_citations"):
         return False
-    prescriptions = result.get("prescriptions") or []
-    if not prescriptions:
+    references = proto.get("source_audit", {}).get("references", [])
+    if not references or not all(str(ref.get("url", "")).startswith("https://") for ref in references):
         return False
-    for rx in prescriptions:
-        if not isinstance(rx, dict):
+    citation = result.get("nasa_citation")
+    if not isinstance(citation, dict):
+        return False
+    rule_id = citation.get("standard_id")
+    rule = rag.reference_rules.get(str(rule_id)) if rule_id else None
+    if rule is not None:
+        if rule_id not in proto.get("verified_rule_ids", []) or rule.get("verification_status") != "verified_primary_source":
             return False
-        if not (rx.get("medication") and rx.get("checs_pack") and rx.get("route") and rx.get("dosage")):
+        expected = {"document": rule.get("source_revision", ""),
+                    "section": rule.get("source_section", ""), "url": rule.get("source_url", "")}
+        if any(citation.get(key) != value for key, value in expected.items()):
+            return False
+        if result.get("source_document") != expected["document"]:
+            return False
+        if result.get("nasa_direct_quote", "") != rule.get("verbatim_rule", ""):
+            return False
+    elif (result.get("nasa_direct_quote") or citation.get("url") or citation.get("section")
+          or citation.get("document") != "No verified NASA requirement mapped"):
+        return False
+    for rx in result.get("prescriptions", []):
+        if not isinstance(rx, dict) or not all(rx.get(key) for key in ("medication", "checs_pack", "route", "dosage")):
             return False
         parsed = rag._parse_and_validate_medication(rx)
-        if not parsed.get("formulary_verified"):
+        if not parsed.get("formulary_verified") or parsed.get("checs_pack") != rx.get("checs_pack"):
             return False
     return True
 
@@ -381,6 +399,62 @@ def _run_case(
     }
 
 
+def evaluate_live_simulation(activity_state: str = "IVA_REST", mission_day: int = 84) -> Dict[str, Any]:
+    """Replay the server's actual tick path with deterministic noise and hidden labels."""
+    import random
+    from unittest.mock import patch
+
+    import backend.main as server
+    from backend.services.astronaut_sim import AstronautSimulationEngine
+    from backend.services.astronaut_sim import TRAJECTORY_SCENARIOS
+
+    dataset = json.loads(SEEDS_PATH.read_text(encoding="utf-8"))
+    seeds = {row["seed_id"].lower(): row for row in dataset["synthetic_scenario_seeds_24"]}
+    trajectories = {
+        TRAJECTORY_SCENARIOS[row["trajectory_id"].lower()]: row
+        for row in dataset["quantitative_crisis_trajectories_and_symptom_logs"]
+    }
+    generator_state = random.getstate()
+    results = []
+    random.seed(42)
+    try:
+        with patch.object(server, "rag_engine", LocalMedicalRAGEngine()), patch.object(
+            server, "latest_telemetry", None
+        ), patch.object(server.donki_service, "get_space_weather",
+                        side_effect=server.donki_service._get_cache_fallback):
+            for case_id in list(trajectories) + list(seeds):
+                row = seeds.get(case_id) or trajectories[case_id]
+                labels = [row[key] for key in ("linked_cpg_id", "linked_legacy_scenario") if row.get(key)]
+                expected_mode = row.get("expected_mode", "MODE_A_KNOWN_CONDITION")
+                sim = AstronautSimulationEngine(mission_day=mission_day)
+                sim.set_activity_state(activity_state)
+                server.rag_engine.diagnosis_cache.clear()
+                with patch.object(server, "astronaut_sim", sim), patch.object(
+                    server, "anomaly_detector", EdgeAnomalyDetector()
+                ):
+                    for _ in range(5):
+                        server.advance_telemetry()
+                    sim.trigger_scenario(case_id)
+                    for _ in range(20):
+                        frame = server.advance_telemetry()
+                result = frame.get("rag_diagnosis", {})
+                correct = result.get("mode") == expected_mode
+                if expected_mode == "MODE_A_KNOWN_CONDITION":
+                    correct = correct and result.get("scenario_id") in labels
+                results.append({"case": case_id, "correct": correct,
+                                "expected_mode": expected_mode, "expected_labels": labels,
+                                "predicted": result.get("scenario_id"), "mode": result.get("mode")})
+    finally:
+        random.setstate(generator_state)
+    known = [row for row in results if row["expected_mode"] == "MODE_A_KNOWN_CONDITION"]
+    unsupported = [row for row in results if row["expected_mode"] == "MODE_B_NOVEL_ANOMALY"]
+    return {"cases": len(results), "activity_state": activity_state, "mission_day": mission_day,
+            "correct_decisions": sum(row["correct"] for row in results),
+            "known_condition_cases": len(known), "known_condition_matches": sum(row["correct"] for row in known),
+            "unsupported_cases": len(unsupported), "correct_abstentions": sum(row["correct"] for row in unsupported),
+            "failures": [row for row in results if not row["correct"]]}
+
+
 def evaluate() -> Dict[str, Any]:
     """Run the full 54-case blind evaluation benchmark."""
     seeds_data = json.loads(SEEDS_PATH.read_text(encoding="utf-8"))
@@ -394,7 +468,7 @@ def evaluate() -> Dict[str, Any]:
 
     # 1. 24 synthetic seeds (every 3rd case held out)
     for idx, seed in enumerate(seeds):
-        expected_labels = [seed["linked_cpg_id"]]
+        expected_labels = [seed["linked_cpg_id"]] if seed.get("linked_cpg_id") else []
         if "linked_legacy_scenario" in seed:
             expected_labels.append(seed["linked_legacy_scenario"])
         results.append(
@@ -405,7 +479,7 @@ def evaluate() -> Dict[str, Any]:
                 case_group="synthetic_seed",
                 payload=_seed_to_payload(seed),
                 expected_labels=expected_labels,
-                expected_mode="MODE_A_KNOWN_CONDITION",
+                expected_mode=seed.get("expected_mode", "MODE_A_KNOWN_CONDITION"),
                 held_out=(idx % 3 == 2),
             )
         )
@@ -485,6 +559,10 @@ def evaluate() -> Dict[str, Any]:
 
     return {
         "cases": total,
+        "mapped_seed_cases": sum(bool(seed.get("linked_cpg_id")) for seed in seeds),
+        "unmapped_seed_cases": sum(seed.get("expected_mode") == "MODE_B_NOVEL_ANOMALY" for seed in seeds),
+        "decision_accuracy": round(sum(r["correct"] for r in results) / total, 3) if total else 0.0,
+        "evaluation_scope": "Development corpus with explicit unsupported-condition abstentions. An independent validation set is still required to establish generalization.",
         "positive_cases": len(positives),
         "negative_cases": len(negatives),
         "held_out_cases": len(held_out_cases),
@@ -495,12 +573,14 @@ def evaluate() -> Dict[str, Any]:
         "mode_a_cases": len(mode_a_preds),
         "mode_a_precision": round(mode_a_correct / len(mode_a_preds), 3) if mode_a_preds else 0.0,
         "mode_b_abstention_accuracy": round(mode_b_correct / len(negatives), 3) if negatives else 0.0,
-        "citation_and_formulary_validity_rate": round(valid_mode_a / len(mode_a_preds), 3) if mode_a_preds else 1.0,
+        "citation_and_formulary_validity_rate": round(valid_mode_a / len(mode_a_preds), 3) if mode_a_preds else None,
         "latency_metrics_ms": {
             "mean_ms": round(sum(latencies) / len(latencies), 3) if latencies else 0.0,
             "p95_ms": latencies[p95_idx] if latencies else 0.0,
             "max_ms": latencies[-1] if latencies else 0.0,
         },
+        "live_replay": evaluate_live_simulation(),
+        "citation_validation_note": "Checks integrity against local audited records. External source authenticity and clinical efficacy require separate review.",
         "score_calibration_note": (
             "Confidence scores are heuristic neuro-symbolic fusion scores thresholded at 0.75 "
             "for Mode A gating, not calibrated clinical probabilities."

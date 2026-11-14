@@ -27,7 +27,7 @@ class SimulationIntegrationTests(unittest.TestCase):
         cases = {
             "SEED-TRM-02": "CPG-22",
             "SEED-TRM-05": "CPG-23",
-            "SEED-TRM-06": "CPG-08",
+            "SEED-TRM-06": "MODE_B_ZERO_DAY",
             "SEED-NEU-02": "CPG-32",
             "SEED-MED-05": "CPG-19",
         }

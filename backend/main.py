@@ -66,11 +66,18 @@ class ConnectionManager:
             logger.info("Dashboard disconnected. Active: %d", len(self.active_connections))
 
     async def broadcast(self, message: str) -> None:
-        for connection in list(self.active_connections):
+        await asyncio.gather(*(self._send(connection, message)
+                               for connection in list(self.active_connections)))
+
+    async def _send(self, connection: Any, message: str) -> None:
+        try:
+            await asyncio.wait_for(connection.send_text(message), timeout=0.1)
+        except Exception:
+            self.disconnect(connection)
             try:
-                await connection.send_text(message)
+                await asyncio.wait_for(connection.close(code=1013), timeout=0.1)
             except Exception:
-                self.disconnect(connection)
+                pass
 
 
 manager = ConnectionManager()
@@ -124,6 +131,25 @@ def advance_telemetry() -> Dict[str, Any]:
     return payload
 
 
+async def refresh_weather_loop() -> None:
+    """Keep remote I/O in a worker so telemetry and HTTP reads use cached weather."""
+    while True:
+        try:
+            await asyncio.to_thread(donki_service.refresh)
+        except Exception:
+            logger.exception("Weather refresh failed")
+        await asyncio.sleep(1.0)
+
+
+def run_offline_weather(stop: Event) -> None:
+    while not stop.is_set():
+        try:
+            donki_service.refresh()
+        except Exception:
+            logger.exception("Weather refresh failed")
+        stop.wait(1.0)
+
+
 async def broadcast_telemetry_loop() -> None:
     """Broadcast one shared frame per second."""
     clock = asyncio.get_running_loop()
@@ -157,14 +183,13 @@ if FASTAPI_AVAILABLE:
     async def lifespan(app: FastAPI):
         # Start background 1Hz simulation loop
         sim_task = asyncio.create_task(broadcast_telemetry_loop())
+        weather_task = asyncio.create_task(refresh_weather_loop())
         try:
             yield
         finally:
             sim_task.cancel()
-            try:
-                await sim_task
-            except asyncio.CancelledError:
-                pass
+            weather_task.cancel()
+            await asyncio.gather(sim_task, weather_task, return_exceptions=True)
 
     app = FastAPI(
         title="A.R.E.S. Med — Astronaut Rapid Evaluation Support & Medical System API",
@@ -607,13 +632,16 @@ def run_server(host: str = "127.0.0.1", port: int = 8000) -> None:
     print(f"[A.R.E.S. Med] Offline Server & API Console listening on http://{host}:{port}/docs")
     stop = Event()
     telemetry_thread = Thread(target=run_offline_telemetry, args=(stop,), daemon=True)
+    weather_thread = Thread(target=run_offline_weather, args=(stop,), daemon=True)
     telemetry_thread.start()
+    weather_thread.start()
     try:
         with server:
             server.serve_forever()
     finally:
         stop.set()
         telemetry_thread.join()
+        weather_thread.join(timeout=2.0)
 
 
 if __name__ == "__main__":

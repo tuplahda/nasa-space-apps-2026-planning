@@ -13,6 +13,7 @@ import math
 import logging
 import os
 from pathlib import Path
+from threading import Lock
 import time
 from typing import Any, Dict, List, Optional
 from urllib.error import HTTPError, URLError
@@ -65,6 +66,7 @@ class DonkiSpaceWeatherService:
         self._last_live_check: float = 0.0
         self._last_failure_time: float = 0.0
         self._last_report: Optional[SpaceWeatherReport] = None
+        self._refresh_lock = Lock()
         self._load_local_cache()
 
     def _load_local_cache(self) -> None:
@@ -164,12 +166,21 @@ class DonkiSpaceWeatherService:
         return None
 
     def get_space_weather(self, force_active_flare: bool = False) -> SpaceWeatherReport:
-        """
-        Get space weather report with non-blocking memory cache and offline fallback.
-        """
+        """Read an available snapshot without performing network I/O."""
         if force_active_flare:
             return self._get_cache_fallback(force_active_flare=True)
+        return self._last_report or self._get_cache_fallback()
 
+    def refresh(self) -> SpaceWeatherReport:
+        """Refresh in a background worker, with one bounded request in flight."""
+        if not self._refresh_lock.acquire(blocking=False):
+            return self.get_space_weather()
+        try:
+            return self._refresh_report()
+        finally:
+            self._refresh_lock.release()
+
+    def _refresh_report(self) -> SpaceWeatherReport:
         now_mono = time.monotonic()
         # Return in-memory cached report if still fresh
         if self._last_report is not None and (now_mono - self._last_live_check) < LIVE_CACHE_TTL_SEC:

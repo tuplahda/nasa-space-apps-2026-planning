@@ -23,6 +23,7 @@ if _sim_file.exists():
         AstronautSimulationEngine = _mod.AstronautSimulationEngine
         ActivityBaseline = _mod.ActivityBaseline
         ACTIVITY_PROFILES = _mod.ACTIVITY_PROFILES
+        TRAJECTORY_SCENARIOS = _mod.TRAJECTORY_SCENARIOS
         NOMINAL_SYMPTOM_LOG = _mod.NOMINAL_SYMPTOM_LOG
         astronaut_sim = _mod.astronaut_sim
     else:
@@ -34,6 +35,7 @@ __all__ = [
     "AstronautSimulationEngine",
     "ActivityBaseline",
     "ACTIVITY_PROFILES",
+    "TRAJECTORY_SCENARIOS",
     "NOMINAL_SYMPTOM_LOG",
     "astronaut_sim",
 ]

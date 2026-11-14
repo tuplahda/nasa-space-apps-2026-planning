@@ -127,9 +127,9 @@ CLINICAL_SYNONYM_MAP: Dict[str, str] = {
     "stuffy nose": "sas rhinosinusitis stuffies nasal",
     "motion sick": "sas adaptation nausea",
     "tearing": "lacrimation ocular tearing",
-    "burning eyes": "ocular burning ammonia nh3",
-    "convulsion": "seizures seizure convulsion hydrazine",
-    "altered awareness": "seizures post-ictal hydrazine",
+    "burning eyes": "ocular burning",
+    "convulsion": "seizures seizure convulsion",
+    "altered awareness": "seizures post-ictal",
     "airway swelling": "angioedema stridor anaphylaxis",
     "circulatory collapse": "hypotension anaphylaxis shock",
     "wheeze": "wheezing bronchospasm",
@@ -1137,9 +1137,7 @@ class LocalMedicalRAGEngine:
             if len(missing) >= 3:
                 return False
             if len(unreliable) >= 2:
-                # Allow concurrent RR/RMSSD suppression specifically on seizure/postictal (CPG-11)
-                if not (sid == "CPG-11" and unreliable.issubset({"hrv_ms", "respiration_rate"})):
-                    return False
+                return False
 
             if sid in ("SCENARIO_1_HYPERCAPNIA", "CPG-07"):
                 suit_co2 = packet.environment.suit_pico2_mmhg
@@ -1148,10 +1146,7 @@ class LocalMedicalRAGEngine:
                 if "suit_pico2_mmhg" in unreliable and suit_co2:
                     return False
             if sid in ("SCENARIO_4_SOLAR_RADIATION_ARS", "CPG-09"):
-                bfo_val = packet.environment.bfo_dose_rate_mGy_hr
-                if "ambient_radiation_msv_h" in unreliable and (bfo_val is None or "bfo_dose_rate_mGy_hr" in unreliable):
-                    return False
-                if "bfo_dose_rate_mGy_hr" in unreliable and bfo_val is not None:
+                if "ambient_radiation_msv_h" in unreliable and not packet.environment.donki_spe_active:
                     return False
             if sid in ("SCENARIO_5_EVA_THERMAL_DCS", "CPG-08") and ("spo2" in missing or "spo2" in unreliable):
                 return False
@@ -1287,10 +1282,38 @@ class LocalMedicalRAGEngine:
                 signal_details,
             )
 
+        response["execution_time_ms"] = round((time.perf_counter_ns() - start_ns) / 1_000_000.0, 3)
+        response["rag_metrics"]["retrieval_latency_ms"] = elapsed_ms
         if len(self.diagnosis_cache) >= MAX_CACHE_ENTRIES:
             self.diagnosis_cache.clear()
         self.diagnosis_cache[cache_key] = dict(response)
         return response
+
+    def _has_unmapped_presentation(self, packet: TelemetryPacket, symptoms: str) -> bool:
+        """Abstain when observations describe a presentation absent from this corpus."""
+        text = symptoms.lower()
+        exposure = any(word in text for word in ("hydrazin", "n2h4", "propellant", "ammonia", "coolant", "chemical", "smoke", "soot"))
+        allergy = any(word in text for word in ("urticaria", "hives", "angioedema", "allergen", "airway swelling"))
+        seizure = any(word in text for word in ("convulsion", "seizure", "postictal", "altered awareness"))
+        bronchospasm = any(word in text for word in ("wheeze", "wheezing", "prolonged expiration", "bronchospasm"))
+        ear_injury = "vertigo" in text and any(word in text for word in ("ear/sinus pain", "hearing change", "tympanic pain"))
+        if (seizure or bronchospasm) and not (exposure or allergy):
+            return True
+        if "blistering" in text or "severe burn" in text or "pneumothorax" in text:
+            return True
+        if all(word in text for word in ("chest pain", "dyspnea", "rapidly worsening", "shock")):
+            return True
+        if ear_injury and packet.vitals.spo2 >= 93 and packet.environment.suit_pressure_psi >= 4.1:
+            return True
+        if re.search(r"\b(?:panic|fear)\b", text) and not (exposure or allergy):
+            return True
+        if "pleuritic" in text and not (packet.specialized_diagnostics and packet.specialized_diagnostics.ultrasound_ijv_thrombus):
+            return True
+        return (
+            packet.vitals.core_temp_c <= 35.8
+            and "core_temp_c" not in packet.unreliable_channels
+            and any(word in text for word in ("shivering", "hypothermia", "cold exposure"))
+        )
 
     def _retrieve_best_protocol(
         self,
@@ -1305,8 +1328,10 @@ class LocalMedicalRAGEngine:
         if packet.force_mode_b:
             return ("UNCLASSIFIED_ZERO_DAY", 0.42, {"forced_mode_b": 0.42}, {"reason": "explicit_force_mode_b"})
 
+        if self._has_unmapped_presentation(packet, clean_symptoms):
+            return ("UNCLASSIFIED_ZERO_DAY", 0.44, {}, {"reason": "no_matching_project_protocol"})
         expanded_symptoms = expand_clinical_synonyms(clean_symptoms)
-        active_hint = (packet.active_scenario_id or "").strip().upper()
+        active_hint = ""  # Simulator labels never supply diagnostic evidence.
 
         if any(
             tok in active_hint
@@ -1408,11 +1433,6 @@ class LocalMedicalRAGEngine:
 
         co2_reliable = ("cabin_co2_mmhg" not in unreliable) and ("suit_pico2_mmhg" not in unreliable)
         ambient_rad = e.ambient_radiation_msv_h if ("ambient_radiation_msv_h" not in unreliable) else 0.0
-        bfo_rad = (
-            float(e.bfo_dose_rate_mGy_hr)
-            if (e.bfo_dose_rate_mGy_hr is not None and "bfo_dose_rate_mGy_hr" not in unreliable)
-            else 0.0
-        )
         spo2_valid = ("spo2" not in unreliable) and ("spo2" not in missing)
         bp_valid = ("blood_pressure_sys" not in unreliable) and ("blood_pressure_sys" not in missing)
         hr_valid = ("heart_rate" not in unreliable) and ("heart_rate" not in missing)
@@ -1421,7 +1441,7 @@ class LocalMedicalRAGEngine:
         hrv_valid = ("hrv_ms" not in unreliable) and ("hrv_ms" not in missing)
 
         effective_co2 = max(e.cabin_co2_mmhg, e.suit_pico2_mmhg or 0.0) if co2_reliable else 0.0
-        rad_level = max(ambient_rad, bfo_rad)
+        rad_level = ambient_rad
 
         has_trauma_bleed = any(
             k in sym for k in ("hemorrhag", "blood loss", "lacerat", "bleed", "burn", "blister", "pneumothorax", "efast", "trauma", "crush")
@@ -1500,21 +1520,12 @@ class LocalMedicalRAGEngine:
             return 0.0
 
         if sid == "CPG-15":
-            if temp_valid and v.core_temp_c <= 35.8:
-                return 0.87
             if (temp_valid and v.core_temp_c >= 38.0) or any(k in sym for k in ("lcvg", "heat exhaustion", "heavy sweating", "thermal cooling", "cdo")):
                 if ((temp_valid and v.core_temp_c >= 37.6) or (hr_valid and v.heart_rate >= 88.0)) and rad_level < 0.25 and "sepsis" not in sym and "pneumonia" not in sym:
                     return 0.84 if act != "EVA_SPACEWALK" else 0.83
             return 0.0
 
         if sid == "CPG-08":
-            if "fullness" in sym and "vertigo" in sym and any(
-                k in sym for k in ("ear pain", "ear/sinus pain", "hearing change", "tympanic")
-            ):
-                return 0.85
-            if any(k in sym for k in ("barotrauma", "ear", "sinus", "tympanic", "hearing")) and ("fullness" in sym or "vertigo" in sym or "barotrauma" in sym):
-                if hr_valid and v.heart_rate >= 78.0:
-                    return 0.85
             if spo2_valid and v.spo2 <= 93.0 and effective_co2 < 2.8 and rad_level < 0.25 and not has_trauma_bleed and not has_anaphylaxis:
                 if not any(k in sym for k in ("sepsis", "pneumonia", "embol", "pleuritic", "wheeze", "bronchospasm", "smoke", "soot", "seizure", "convulsion", "hydrazine")):
                     if act != "EVA_SPACEWALK":
@@ -1545,7 +1556,7 @@ class LocalMedicalRAGEngine:
 
         if sid == "CPG-31":
             if (
-                any(k in sym for k in ("panic", "fear", "anxiet", "hyperventilat", "insomnia", "sleep schedule"))
+                any(k in sym for k in ("insomnia", "sleep schedule", "circadian"))
                 and hr_valid and v.heart_rate >= 94.0
                 and rr_valid and v.respiration_rate >= 22.0
                 and (not spo2_valid or v.spo2 >= 95.0)
@@ -1566,6 +1577,8 @@ class LocalMedicalRAGEngine:
             return 0.0
 
         if sid == "CPG-05":
+            if hr_valid and v.heart_rate >= 80.0 and "irregular pulse" in sym and "palpitation" in sym:
+                return 0.86
             if hr_valid and v.heart_rate >= 95.0 and any(k in sym for k in ("palpitation", "irregular pulse", "afib", "atrial fibrillation", "arrhythmia", "svt")):
                 return 0.86
             return 0.0
@@ -1583,7 +1596,8 @@ class LocalMedicalRAGEngine:
         if sid in ("SCENARIO_8_SAS_URINARY_RETENTION", "CPG-17"):
             if d and d.bladder_volume_mL and d.bladder_volume_mL > 500.0:
                 return 0.87 if sid == "SCENARIO_8_SAS_URINARY_RETENTION" else 0.83
-            if any(k in sym for k in ("inability to void", "suprapubic", "urinary retention", "cannot urinate", "urgency", "bladder", "distention")) and ((hr_valid and v.heart_rate >= 78.0) or (bp_valid and v.blood_pressure_sys >= 122.0)):
+            if (any(k in sym for k in ("inability to void", "urinary retention", "cannot urinate"))
+                    and any(k in sym for k in ("suprapubic", "distention", "urgency"))):
                 return 0.86 if sid == "CPG-17" else 0.81
             if packet.mission_day <= 7 and ((hr_valid and v.heart_rate <= 50.0) or (hrv_valid and v.hrv_ms < 20.0)):
                 return 0.78 if sid == "SCENARIO_8_SAS_URINARY_RETENTION" else 0.72
@@ -1642,7 +1656,7 @@ class LocalMedicalRAGEngine:
 
         # --- Renal Calculi / Colic (CPG-16) ---
         if sid == "CPG-16":
-            if any(k in sym for k in ("flank", "groin", "renal colic", "kidney stone", "calculi", "hematuria")) and ((hr_valid and v.heart_rate >= 84.0) or (bp_valid and v.blood_pressure_sys >= 122.0)):
+            if "flank" in sym and any(k in sym for k in ("groin", "hematuria", "renal colic", "kidney stone")):
                 return 0.86
             return 0.0
 
@@ -1773,7 +1787,7 @@ class LocalMedicalRAGEngine:
         v = packet.vitals
         e = packet.environment
         effective_co2 = max(e.cabin_co2_mmhg, e.suit_pico2_mmhg or 0.0)
-        effective_rad = max(e.ambient_radiation_msv_h, e.bfo_dose_rate_mGy_hr or 0.0)
+        effective_rad = e.ambient_radiation_msv_h if "ambient_radiation_msv_h" not in packet.unreliable_channels else 0.0
         known_shock_markers = (
             "bends", "pleuritic", "urticaria", "angioedema", "anaphylax", "hives",
             "hemorrhag", "blood loss", "lacerat", "efast", "pneumothorax", "sepsis",
@@ -1941,7 +1955,8 @@ class LocalMedicalRAGEngine:
             and self.reference_rules[str(rule_id)].get("verification_status") == "verified_primary_source"
         ]
         direct_quote = next((str(rule.get("verbatim_rule", "")) for rule in verified_rules if rule.get("verbatim_rule")), "")
-        source_rule = verified_rules[0] if verified_rules else {}
+        source_rule = next((rule for rule in verified_rules if rule.get("verbatim_rule") == direct_quote),
+                           verified_rules[0] if verified_rules else {})
         nasa_source_summary = (
             f"{source_rule.get('source_revision', '')}, {source_rule.get('source_section', '')} — "
             f"{source_rule.get('source_url', '')}" if source_rule else "No verified NASA rule is mapped to this project protocol."
@@ -1970,7 +1985,13 @@ class LocalMedicalRAGEngine:
             assessment,
         )
         contract_checs_meds = self._normalize_contract_checs_medications(checs_meds)
-        hardware_and_diagnostics = self._build_hardware_and_diagnostics(proto)
+        blocked_medications, _ = self._medication_safety_policy(packet)
+        safe_steps = [step for step in raw_steps if not any(
+            marker in str(step).lower() for marker in blocked_medications
+        )]
+        safe_proto = dict(proto, autonomous_checklist=safe_steps)
+        hardware_and_diagnostics = [step for step in self._build_hardware_and_diagnostics(safe_proto)
+                                    if not any(marker in step.lower() for marker in blocked_medications)]
         checklist = [
             {
                 "step": idx + 1,
@@ -1978,11 +1999,11 @@ class LocalMedicalRAGEngine:
                 "critical": idx < 3,
                 "completed": False,
             }
-            for idx, step_text in enumerate(raw_steps[:8])
+            for idx, step_text in enumerate(safe_steps[:8])
         ]
 
         packs_used = sorted({p.get("checs_pack", "CMP") for p in prescriptions if p.get("checs_pack")})
-        subpack_str = " / ".join(packs_used) if packs_used else "CMP / TIMP"
+        subpack_str = " / ".join(packs_used) if packs_used else "NONE"
         severity = (
             "CLASS_1_EMERGENCY"
             if assessment.nasa_priority_class == "CLASS_1_EMERGENCY"
@@ -2006,6 +2027,7 @@ class LocalMedicalRAGEngine:
             "nasa_source_summary": nasa_source_summary,
             "nasa_citations": citations,
             "nasa_citation": {
+                "standard_id": source_rule.get("standard_id", ""),
                 "document": source_rule.get("source_revision", "No verified NASA requirement mapped"),
                 "section": source_rule.get("source_section", ""),
                 "url": source_rule.get("source_url", ""),
@@ -2270,6 +2292,33 @@ class LocalMedicalRAGEngine:
             "step_2_action": step_2,
         }
 
+    def _medication_safety_policy(self, packet: TelemetryPacket) -> Tuple[List[str], List[str]]:
+        """Return shared project lockouts for every actionable response field."""
+        environment = packet.environment
+        diagnostics = packet.specialized_diagnostics
+        unreliable = set(packet.unreliable_channels)
+        co2 = max(
+            environment.cabin_co2_mmhg if "cabin_co2_mmhg" not in unreliable else 0.0,
+            (environment.suit_pico2_mmhg or 0.0) if "suit_pico2_mmhg" not in unreliable else 0.0,
+        )
+        ambient_rate = environment.ambient_radiation_msv_h if "ambient_radiation_msv_h" not in unreliable else 0.0
+        radiation_risk = (
+            ambient_rate >= 0.25 or environment.donki_spe_active
+            or (diagnostics is not None and diagnostics.alc_cells_uL is not None and diagnostics.alc_cells_uL < 1500)
+        )
+        hypoxia = "spo2" not in unreliable and packet.vitals.spo2 < 92.0
+        blocked: List[str] = []
+        warnings: List[str] = []
+        if radiation_risk:
+            blocked.extend(("ibuprofen", "ketorolac", "aspirin", "nsaid", "enoxaparin", "apixaban", "clopidogrel"))
+            warnings.append("NSAIDs, ASPIRIN & ANTICOAGULANTS — PROHIBITED by the project radiation/bleeding-risk lockout.")
+        if co2 >= 2.8 or hypoxia:
+            blocked.extend(("hydromorphone", "hydrocodone", "morphine", "fentanyl", "zolpidem", "zaleplon", "lorazepam", "diazepam"))
+            warnings.append("OPIOIDS & SEDATIVES — PROHIBITED by the project hypercapnia/hypoxia lockout.")
+        if diagnostics is not None and diagnostics.ultrasound_ijv_thrombus:
+            warnings.append("EVA_SPACEWALK & HIGH-LOAD ARED RESISTIVE EXERCISE — PROHIBITED by the project thrombus lockout.")
+        return blocked, warnings
+
     def _apply_deterministic_safety_filter(
         self,
         prescriptions: List[Dict[str, Any]],
@@ -2278,86 +2327,25 @@ class LocalMedicalRAGEngine:
         packet: TelemetryPacket,
         assessment: AnomalyAssessment,
     ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[str]]:
-        """
-        Deterministic hard-coded pharmacological safety filter (Security & Safety Guardrails Part 3):
-        Dynamically enforces cross-hazard contraindications (e.g., concurrent radiation + hypercapnia).
-        """
-        safe_rx = [dict(p) for p in prescriptions]
-        safe_meds = [dict(m) for m in checs_meds]
-        safe_contra = list(contraindications)
-
-        e = packet.environment
-        v = packet.vitals
-        d = packet.specialized_diagnostics
-        effective_co2 = max(e.cabin_co2_mmhg, e.suit_pico2_mmhg or 0.0)
-        effective_rad = max(e.ambient_radiation_msv_h, e.bfo_dose_rate_mGy_hr or 0.0)
-
-        has_radiation_bleed_risk = (
-            effective_rad >= 0.25
-            or e.donki_spe_active
-            or (d is not None and d.alc_cells_uL is not None and d.alc_cells_uL < 1500.0)
-        )
-        has_hypercapnia_hypoxia_risk = (effective_co2 >= 2.8 or v.spo2 < 92.0)
-        has_thrombus_risk = (d is not None and d.ultrasound_ijv_thrombus is True)
-
-        if has_radiation_bleed_risk:
-            nsaid_anticoag_markers = (
-                "ibuprofen", "ketorolac", "aspirin", "nsaid", "enoxaparin", "apixaban", "clopidogrel",
-            )
-            filtered_rx: List[Dict[str, Any]] = []
-            for item in safe_rx:
-                med_str = str(item.get("medication", ""))
-                med_low = med_str.lower()
-                if "ibuprofen" in med_low or "nsaid" in med_low:
-                    cleaned = re.sub(
-                        r"\s*\(or\s+Ibuprofen[^)]*\)",
-                        "",
-                        med_str,
-                        flags=re.IGNORECASE,
-                    ).strip()
-                    item["medication"] = cleaned
-                    med_low = cleaned.lower()
-                if any(tok in med_low for tok in nsaid_anticoag_markers):
+        """Apply one medication policy to prescriptions and the medication catalog."""
+        blocked, warnings = self._medication_safety_policy(packet)
+        filtered: List[List[Dict[str, Any]]] = []
+        for entries, field in ((prescriptions, "medication"), (checs_meds, "drug")):
+            safe_entries: List[Dict[str, Any]] = []
+            for entry in entries:
+                item = dict(entry)
+                for action_field in ("medication", "drug", "dosage", "route"):
+                    if action_field in item and "ibuprofen" in blocked:
+                        item[action_field] = re.sub(
+                            r"\s*\(or\s+Ibuprofen[^)]*\)", "", str(item[action_field]),
+                            flags=re.IGNORECASE,
+                        ).strip()
+                action_text = " ".join(str(item.get(key, "")) for key in (field, "medication", "drug", "dosage", "route"))
+                if any(marker in action_text.lower() for marker in blocked):
                     continue
-                filtered_rx.append(item)
-            safe_rx = filtered_rx
-            for m in safe_meds:
-                drug_str = str(m.get("drug", ""))
-                if "ibuprofen" in drug_str.lower() or "nsaid" in drug_str.lower():
-                    m["drug"] = re.sub(
-                        r"\s*\(or\s+Ibuprofen[^)]*\)",
-                        "",
-                        drug_str,
-                        flags=re.IGNORECASE,
-                    ).strip()
-            if not any("NSAID" in c.upper() or "IBUPROFEN" in c.upper() for c in safe_contra):
-                safe_contra.append(
-                    "NSAIDs & ASPIRIN (Ibuprofen/Ketorolac/Aspirin) — PROHIBITED: "
-                    "Project simulation lockout: NSAIDs in radiation scenarios"
-                )
-
-        if has_hypercapnia_hypoxia_risk:
-            opioid_sedative_markers = (
-                "hydromorphone", "hydrocodone", "morphine", "fentanyl", "zolpidem", "zaleplon", "lorazepam", "diazepam",
-            )
-            safe_rx = [
-                item for item in safe_rx
-                if not any(tok in str(item.get("medication", "")).lower() for tok in opioid_sedative_markers)
-            ]
-            if not any("OPIOID" in c.upper() or "MORPHINE" in c.upper() for c in safe_contra):
-                safe_contra.append(
-                    "OPIOIDS (Morphine/Fentanyl/Hydromorphone) — PROHIBITED: "
-                    "Project simulation lockout: opioids in hypercapnia scenarios"
-                )
-
-        if has_thrombus_risk:
-            if not any("EVA_SPACEWALK" in c.upper() for c in safe_contra):
-                safe_contra.append(
-                    "EVA_SPACEWALK & HIGH-LOAD ARED RESISTIVE EXERCISE — PROHIBITED: "
-                    "Valsalva/suit pressure risks fatal pulmonary embolism"
-                )
-
-        return safe_rx, safe_meds, safe_contra
+                safe_entries.append(item)
+            filtered.append(safe_entries)
+        return filtered[0], filtered[1], list(dict.fromkeys(contraindications + warnings))
 
     def _is_nominal_asymptomatic(
         self,

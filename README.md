@@ -75,6 +75,8 @@ Each member has a dedicated, self-contained guide with their tasks, data files, 
 
 ---
 
+The development evaluation distinguishes supported diagnoses from presentations with no matching protocol. Eight seeds carry `related_cpg_id` for context and explicitly expect Mode B. Run `python -m backend.evaluate_blind_seeds` to see source-integrity checks, supported-case results, and a separate replay through the live server tick path. These development cases still need independent validation before their scores can establish generalization.
+
 ## 🛰️ Hybrid Dataset Strategy (Room for Improvement)
 
 NASA's official private challenge dataset is expected to be released within ~24 hours of kickoff. Our architecture is designed with **zero-friction dataset swappability**:
