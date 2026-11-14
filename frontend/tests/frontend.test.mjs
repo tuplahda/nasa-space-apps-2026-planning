@@ -81,7 +81,7 @@ test('blind acknowledgement enables only a currently available simulated action'
   let submitted = 0;
   const panel = new MedicalPanel(async () => { submitted++; });
   const assessment = {...data.cases.hypercapnia.assessment, blindIncident: {
-    id: 4, actions: [{id: 'restore_airflow', label: 'Restore airflow'}],
+    id: 4, phase: 'assessed', actions: [{id: 'restore_airflow', label: 'Restore airflow'}],
   }};
   panel.reset();
   panel.render(assessment);
@@ -90,11 +90,12 @@ test('blind acknowledgement enables only a currently available simulated action'
     entry.input.events.change();
   }
   assert.equal(submitted, 0);
-  assert.equal(panel.submit.textContent, 'Restore airflow');
+  assert.equal(panel.submit.textContent, 'Administer Treatment');
   assert.equal(panel.submit.disabled, false);
   panel.render({...assessment, blindIncident: {id: 4, actions: []}});
   await panel.recover();
-  assert.equal(panel.submit.hidden, true);
+  assert.equal(panel.submit.hidden, false);
+  assert.equal(panel.submit.disabled, true);
   assert.equal(submitted, 0);
 });
 test('checklist acknowledgements survive stream refresh and recovery submits once',async()=>{
@@ -177,7 +178,7 @@ test('actual GLB is upright, skeleton-free and pickable through translucent skin
 test('real HTML preserves unique IDs and all static module DOM references',async()=>{
   const html=await readFile(new URL('../index.html',import.meta.url),'utf8');
   const ids=[...html.matchAll(/id="([^"]+)"/g)].map(m=>m[1]);assert.equal(new Set(ids).size,ids.length);
-  for(const name of ['app','body_hud','telemetry','medical_panel','scenarios','websocket','mock_data']) {
+  for(const name of ['app','body_hud','telemetry','medical_panel','reports','scenarios','websocket','mock_data']) {
     const js=await readFile(new URL(`../js/${name}.js`,import.meta.url),'utf8');
     for(const match of js.matchAll(/(?:getElementById|setText)\('([^']+)'/g)) assert.ok(ids.includes(match[1]),`Missing DOM ID: ${match[1]}`);
   }

@@ -17,6 +17,7 @@ from backend.models.telemetry import (
 )
 from backend.services.anomaly_detector import EdgeAnomalyDetector
 from backend.services.rag_engine import LocalMedicalRAGEngine
+from backend.services.report_store import capture_report
 
 try:
     from fastapi import APIRouter, Body, HTTPException
@@ -40,6 +41,8 @@ def attach_contract_a_context(result: Dict[str, Any], packet: TelemetryPacket) -
         "cabin_pressure_kPa": packet.environment.cabin_pressure_kPa,
         "cabin_temp_C": packet.environment.cabin_temp_C,
     }
+    if isinstance(result.get("earth_report"), dict):
+        result["earth_report"] = capture_report(result["earth_report"], confidence=result.get("confidence"), assessment_id=result.get("diagnosis_id"))
     return result
 
 

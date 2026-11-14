@@ -86,10 +86,6 @@ export class TelemetryView {
     document.querySelector('.crew-avatar').textContent=(p.name || '—').replace(/^Cmdr\.\s*/,'').split(' ').map(s=>s[0]).slice(0,2).join('');
     setText('activity-badge',(p.activity_state || 'UNKNOWN').replaceAll('_',' '));
     setText('symptom-feed',p.symptom_log || 'No symptom report supplied.'); document.getElementById('symptom-feed').title=p.symptom_log || '';
-    setText('head-organ-value',finite(p.specialized_diagnostics?.oct_rnfl_um)?`OCT ${fmt(p.specialized_diagnostics.oct_rnfl_um)} µm`:'No ocular measurement');
-    setText('heart-organ-value',`HR ${fmt(v.heart_rate)} bpm`);
-    setText('lungs-organ-value',`SpO₂ ${fmt(v.spo2,1)}% · RR ${fmt(v.respiration_rate)}/min`);
-    setText('core-organ-value',`CBT ${fmt(v.core_temp_c,1)}°C · RAD ${fmt(e.ambient_radiation_msv_h,3)}`);
     document.getElementById('spo2-meter').style.width=finite(v.spo2)?`${Math.max(0,Math.min(100,v.spo2))}%`:'0%';
     const c=p.comms_status;
     setText('comms-detail',c?`Earth uplink · ${fmt(c.one_way_delay_sec ?? c.one_way_delay_s ?? c.one_way_latency_s)}s one-way · ${c.solar_conjunction_blackout ? 'BLACKOUT' : c.link_status || c.status || c.mode || 'status unavailable'}`:'Earth uplink · delay/status unavailable');
@@ -104,6 +100,7 @@ export class TelemetryView {
     path.style.animation='none'; path.style.strokeDasharray='none';
     document.querySelector('.heart-trace').setAttribute('aria-label','Last 60 heart rate samples');
     const result=classify(p,this.baselines);
+    for(const [id,region] of Object.entries({'head-organ-value':'SANS-01','eyes-organ-value':'SANS-01','heart-organ-value':'CV-02','lungs-organ-value':'ECLSS-03','core-organ-value':'RAD-04'}))setText(id,({cyan:'Normal',amber:'Attention',red:'Critical'})[result.statuses[region]]||'No status');
     const fields={'hr-val':'heart_rate','spo2-val':'spo2','rr-val':'respiration_rate','hrv-val':'hrv_ms','temp-val':'core_temp_c','co2-val':'cabin_co2_mmhg'};
     for (const [id,key] of Object.entries(fields)) document.getElementById(id).dataset.status=result.channels[key];
     return result.statuses;

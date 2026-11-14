@@ -38,6 +38,10 @@ def run_seed(reset, seed, duration=24):
         assert frame["blind_incident"]["phase"] == "observing"
         assert frame["anomaly_assessment"]["alert_level"] == "NOMINAL"
         assert "rag_diagnosis" not in frame
+    assert all("rag_diagnosis" not in frame for frame in frames)
+    assert frames[-1]["blind_incident"]["phase"] == "awaiting_doctor"
+    assert server.request_blind_assessment({"incident_id": ack["incident_id"]})["status"] == "ok"
+    frames.append(server.advance_telemetry())
     return engine, ack["incident_id"], frames
 
 
@@ -51,7 +55,7 @@ def test_seeded_telemetry_requires_streamed_evidence(simulator):
         assessment = next(frame for frame in frames if "rag_diagnosis" in frame)
         assert assessment["anomaly_assessment"]["trigger_rag_consultation"]
         assert assessment["rag_diagnosis"]["mode"] == mode
-        assert bool(assessment["blind_incident"]["actions"]) == ("MODE_A" in mode)
+        assert assessment["blind_incident"]["actions"][0]["physical_effect_modeled"] == ("MODE_A" in mode)
 
 
 def test_recovery_and_previous_incident_are_distinct(simulator):
@@ -82,8 +86,17 @@ def test_recovery_and_previous_incident_are_distinct(simulator):
     assert "rag_diagnosis" not in frame
     for _ in range(16):
         frame = server.advance_telemetry()
-    assert frame["blind_incident"]["recovery_cause"] == "automatic"
+    assert frame["blind_incident"]["recovery_cause"] is None
+    assert "rag_diagnosis" not in frame
+    assert server.request_blind_assessment({"incident_id": ack["incident_id"]})["status"] == "ok"
+    frame = server.advance_telemetry()
+    action = frame["blind_incident"]["actions"][0]
+    assert action["kind"] == "simulation_only"
+    assert not action["physical_effect_modeled"]
+    request = {"incident_id": ack["incident_id"], "action_id": action["id"],
+               "acknowledged_steps": [step["step"] for step in frame["rag_diagnosis"]["action_checklist"]]}
+    assert server.run_simulation_command("apply_treatment", request)["status"] == "ok"
     for _ in range(10):
         frame = server.advance_telemetry()
     assert frame["blind_incident"]["phase"] == "complete"
-    assert frame["blind_incident"]["recovery_cause"] == "automatic"
+    assert frame["blind_incident"]["recovery_cause"] == "operator"

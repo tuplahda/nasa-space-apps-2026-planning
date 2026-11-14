@@ -1,0 +1,7 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>A.R.E.S. layout and report QA</title>
+<style>body{margin:0;padding:12px;background:#071426;color:#ddecfa;font:14px/1.5 system-ui}button{padding:8px 12px;margin:0 6px 6px 0;background:#163856;color:#e5f6ff;border:1px solid #3684aa;border-radius:5px;font:inherit;cursor:pointer}header{display:flex;flex-wrap:wrap;gap:6px;align-items:center}h1{font-size:16px;margin:0 12px 8px 0}p{margin:5px 0}.note{color:#9db4ca;font-size:12px}#preview{position:relative;margin-top:10px;background:#041020;overflow:hidden}iframe{position:absolute;left:0;top:0;transform-origin:top left;border:0}#results{white-space:pre-wrap;color:#92dbce;max-height:115px;overflow:auto;margin:6px 0}#phase{color:#ffd489}</style></head>
+<body><header><h1>TEST ONLY · real dashboard in fixed CSS viewports</h1><button id="size-1366">Check 1366 × 768</button><button id="size-1920">Check 1920 × 1080</button><button id="case-a">Mode A recovery/PDF check</button><button id="case-b">Mode B recovery/PDF check</button></header>
+<p class="note">The preview is scaled only on this QA page; the embedded application uses the full selected viewport at 100% browser zoom. Tests use an isolated existing backend on port 8001.</p>
+<p id="phase" role="status">Loading the real dashboard…</p><pre id="results" role="status"></pre><div id="preview"><iframe id="app" title="Dashboard QA viewport"></iframe></div>
+<script type="module" src="layout_harness.js"></script></body></html>
