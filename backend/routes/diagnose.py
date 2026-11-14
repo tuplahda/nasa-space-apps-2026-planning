@@ -53,7 +53,7 @@ def build_contract_b_response(
 
 SWAGGER_DIAGNOSE_EXAMPLES: Dict[str, Dict[str, Any]] = {
     "mode_a_hypercapnia": {
-        "summary": "🟢 Mode A: EVA Hypercapnia (CO2 Toxicity — Locks Out Opioids)",
+        "summary": "Mode A: EVA Hypercapnia (CO2 Toxicity — Locks Out Opioids)",
         "description": "High cabin/suit CO2 (12.8 mmHg) + tachycardia + frontal headache -> Mode A (>=0.75).",
         "value": {
             "timestamp": "2026-11-14T10:15:30Z",
@@ -81,7 +81,7 @@ SWAGGER_DIAGNOSE_EXAMPLES: Dict[str, Dict[str, Any]] = {
         },
     },
     "mode_a_solar_radiation": {
-        "summary": "🟢 Mode A: Solar Particle Event / ARS (Locks Out NSAIDs/Aspirin)",
+        "summary": "Mode A: Solar Particle Event / ARS (Locks Out NSAIDs/Aspirin)",
         "description": "Radiation spike (4.2 mSv/h) + DONKI SPE active + emesis -> Mode A (>=0.75).",
         "value": {
             "timestamp": "2026-11-14T11:00:00Z",
@@ -110,7 +110,7 @@ SWAGGER_DIAGNOSE_EXAMPLES: Dict[str, Dict[str, Any]] = {
         },
     },
     "mode_a_sans": {
-        "summary": "🟢 Mode A: SANS Neuro-Ocular Syndrome (OCT RNFL > 105 μm)",
+        "summary": "Mode A: SANS Neuro-Ocular Syndrome (OCT RNFL > 105 μm)",
         "description": "Optic disc edema on OCT + blurry near vision at arm's length -> Mode A (>=0.75).",
         "value": {
             "timestamp": "2026-11-14T19:00:00Z",
@@ -141,7 +141,7 @@ SWAGGER_DIAGNOSE_EXAMPLES: Dict[str, Dict[str, Any]] = {
         },
     },
     "mode_b_zero_day": {
-        "summary": "🔴 Mode B: Unseen Zero-Day Anomaly (Certified Abstention < 0.75)",
+        "summary": "Mode B: Unseen Zero-Day Anomaly (Certified Abstention < 0.75)",
         "description": "Unclassified multi-system hypoxia (SpO2 89.2%) + hypotension (SBP 84 mmHg) + hyperthermia (38.9°C) at normal CO2/Radiation -> Triggers Mode B 4-Step Zero-Day Protocol.",
         "value": {
             "timestamp": "2026-11-14T14:20:00Z",
