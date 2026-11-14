@@ -104,11 +104,13 @@ NASA's official private challenge dataset is expected to be released within ~24 
 │   ├── system_mechanics_deep_dive.md           <-- Physiological equations & fluid shift math
 │   └── vanilla_frontend_architecture.md        <-- Shared DOM IDs, layout specs & API endpoints
 ├── data/
-│   ├── nasa_baselines_and_thresholds.json      <-- Zero-G vital ranges (HR, BP, SpO2, CO2)
-│   ├── rag_protocols_expanded.json             <-- 8 legacy scenarios + 32 NASA CPGs (CPG-01..32)
+│   ├── nasa_baselines_and_thresholds.json      <-- Shared Layer 1/2/4 baselines, cosinor, fluid-shift, DONKI/SRAG & recovery curves
+│   ├── simulation_scenario_seeds.json          <-- Dheer's 24 scenario seeds + 6 crisis trajectories + 21 symptom logs + PhysioNet/OSDR manifests
+│   ├── lab_reference_intervals.json            <-- Specimen-aware i-STAT CG8+/CG4+ & CBC warning/critical bands
+│   ├── rag_protocols_expanded.json             <-- Yohan's 8 legacy scenarios + 32 NASA CPGs (CPG-01..32)
 │   ├── checs_formulary.json                    <-- 54 pre-processed ISS CHeCS meds & lockouts
 │   ├── nasa_std_3001_rules.json                <-- 26 verbatim NASA-STD-3001 & SMAC rules
-│   ├── onboard_hardware_specs.json             <-- 5 onboard diagnostic device specs
+│   ├── onboard_hardware_specs.json             <-- 5 onboard diagnostic device specs (i-STAT, Ultrasound-2, C2M2, OCT, Tempus Pro)
 │   ├── rag_protocols_8_scenarios.json          <-- Original 8 scenarios (preserved for compatibility)
 │   ├── nasa_space_medicine_research.md         <-- Space medicine notes & CHeCS formulary
 │   └── arxiv_literature_citations.json         <-- Academic literature citations for judging

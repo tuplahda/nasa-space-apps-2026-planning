@@ -23,7 +23,9 @@ You are the **force multiplier and system integrator** of the team.
 | **2-Mode Clinical Spec** | [`artifacts/clinical_decision_protocol_2_modes.md`](../artifacts/clinical_decision_protocol_2_modes.md) | Verify medical accuracy of Mode A prescriptions and Mode B Zero-Day orders. |
 | **Frontend Architecture** | [`artifacts/vanilla_frontend_architecture.md`](../artifacts/vanilla_frontend_architecture.md) | DOM IDs and API endpoints used for end-to-end integration testing. |
 | **Safety Guardrails** | [`artifacts/security_and_safety_guardrails.md`](../artifacts/security_and_safety_guardrails.md) | Test deterministic fallback and anti-hallucination compliance. |
-| **8 Emergency Protocols** | [`data/rag_protocols_8_scenarios.json`](../data/rag_protocols_8_scenarios.json) | Reference for verifying AI differential diagnoses. |
+| **Expanded RAG Protocols** | [`data/rag_protocols_expanded.json`](../data/rag_protocols_expanded.json) | Reference for verifying all 40 AI differential diagnoses (8 legacy + 32 CPGs). |
+| **Simulation Scenario Seeds** | [`data/simulation_scenario_seeds.json`](../data/simulation_scenario_seeds.json) | Dheer's 24 scenario seeds + 21 symptom logs mapped 1-to-1 to Yohan's `CPG-*` IDs for Golden Loop testing. |
+| **Lab Reference Intervals** | [`data/lab_reference_intervals.json`](../data/lab_reference_intervals.json) | Specimen-aware `i-STAT` & `CBC` warning/critical limits for Mode B verification. |
 
 ---
 

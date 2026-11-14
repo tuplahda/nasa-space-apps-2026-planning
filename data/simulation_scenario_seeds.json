@@ -1,0 +1,489 @@
+{
+  "dataset_metadata": {
+    "name": "ARES-MED Unified Simulation Scenario Seeds, Symptom Logs & Real-Signal Replay Manifests",
+    "version": "2.0.0",
+    "sources": [
+      "Quantitative Physiological Dataset for Microgravity Spaceflight Simulation (PDF 1)",
+      "A.R.E.S. Med Deep Research Dossier (PDF 2)"
+    ],
+    "evidence_class": "mixed_literature_and_synthetic",
+    "offline_ready": true,
+    "description": "Unified scenario library for Dheer's Layer-1 simulator, mapped 1-to-1 to Yohan's RAG CPGs via linked_cpg_id. Scenario labels must remain hidden from the diagnostic agent during evaluation."
+  },
+  "state_space_model": {
+    "equation": "x_k(t) = baseline_k(t) + severity * delta_k * g_k(t) + eps_k(t)",
+    "onset_recovery_envelope": {
+      "pre_onset": "g_k(t) = 0  (t < onset)",
+      "onset": "g_k(t) = 1 - exp(-(t - onset) / tau_up_k)  (onset <= t < recovery)",
+      "recovery": "g_k(t) = g_k(recovery) * exp(-(t - recovery) / tau_down_k)  (t >= recovery)",
+      "rule": "Do not apply automatic recovery to untreated hemorrhage, tension pneumothorax, or ongoing toxic exposure."
+    },
+    "correlated_human_variability": {
+      "equation": "eps_t = Phi * eps_(t-1) + L * z_t; z_t ~ Normal(0, I); L * L^T = covariance",
+      "rule": "Preserve HR-RR coupling and realistic autocorrelation; never use independent white noise per channel."
+    },
+    "evaluation_blind_rule": "Hide scenario_id from Yohan's RAG agent; expose only 1 Hz telemetry, symptom_log, history, and permitted point-of-care diagnostics."
+  },
+  "quantitative_crisis_trajectories_and_symptom_logs": [
+    {
+      "trajectory_id": "TRAJ-HYPERCAPNIA",
+      "linked_cpg_id": "CPG-07",
+      "linked_legacy_scenario": "SCENARIO_1_HYPERCAPNIA",
+      "evidence_class": "literature_derived",
+      "physics_note": "Cerebral blood flow rises ~3.8% per mmHg delta-PaCO2 in eucapnia (35-55 mmHg) and ~3-6% per mmHg during hypercapnia.",
+      "tiers": [
+        {
+          "severity": "Mild",
+          "trigger_threshold": "ppCO2 2.8-4.5 mmHg (e.g., 3.5 mmHg)",
+          "symptom_log": "Woke up with a dull frontal pressure headache and mild facial warmth; sleep felt fragmented and eyes feel slightly dry."
+        },
+        {
+          "severity": "Moderate",
+          "trigger_threshold": "ppCO2 >= 4.5-5.0 mmHg (nausea, malaise, 5th CN dysesthesia)",
+          "symptom_log": "Frontal headache is throbbing now with mild nausea, malaise, and strange tingling along my cheek and jaw; breathing feels deeper at rest."
+        },
+        {
+          "severity": "Critical",
+          "trigger_threshold": "ppCO2 > 15 mmHg (acute hypercapnia, dyspnea, confusion)",
+          "symptom_log": "Severe air hunger and chest heaving, pounding headache, dizzy and losing track of checklist steps—switching to emergency scrubber bypass."
+        }
+      ]
+    },
+    {
+      "trajectory_id": "TRAJ-ARS-SPE",
+      "linked_cpg_id": "CPG-09",
+      "linked_legacy_scenario": "SCENARIO_4_SOLAR_RADIATION_ARS",
+      "evidence_class": "literature_derived",
+      "biodosimetry_equation": "N(t) = N0 * exp(-k(D)*t); at 3-4 Gy, 50% ALC drop at 48 h -> k = ln(2)/48 h = 0.0144 h^-1 (0.347 day^-1); normal ALC 1.5-3.5 x10^9/L",
+      "dose_tiers_gy": [
+        { "dose_gy": "<1.0", "severity": "Subclinical", "te_hours": "No vomiting within 8-10 h", "alc_48h": "1.5-3.5", "nadir_d3_6": ">1.5" },
+        { "dose_gy": "1.0-2.0", "severity": "Mild H-ARS", "te_hours": "4-16 h (10-50%)", "alc_48h": "1.0-1.5", "nadir_d3_6": "0.8-1.5" },
+        { "dose_gy": "2.0-4.0", "severity": "Moderate H-ARS (LD50/60 ~4.0 Gy)", "te_hours": "1-4 h (70-90%; ~2 h at 3-4 Gy)", "alc_48h": "0.5-1.0", "nadir_d3_6": "0.5-0.8" },
+        { "dose_gy": "4.0-6.0", "severity": "Severe H-ARS", "te_hours": "<1 h", "alc_48h": "0.1-0.5", "nadir_d3_6": "0.3-0.5" },
+        { "dose_gy": "6.0-8.0", "severity": "Very Severe BM+GI", "te_hours": "<1 h protracted", "alc_48h": "0.1-0.5", "nadir_d3_6": "0.1-0.3" },
+        { "dose_gy": ">8.0-20+", "severity": "Lethal GI/CNS", "te_hours": "Minutes (>10 Gy)", "alc_48h": "<0.1", "nadir_d3_6": "0.0-0.1" }
+      ],
+      "tiers": [
+        {
+          "severity": "Mild",
+          "trigger_threshold": "1.0-2.0 Gy (TE 4-16 h, fatigue 3-24 h)",
+          "symptom_log": "Developing mild nausea and zero appetite several hours after shelter egress; feeling unusually weak and drained during light cabin work."
+        },
+        {
+          "severity": "Moderate",
+          "trigger_threshold": "2.0-4.0 Gy (TE 1-4 h, fever, tachycardia, headache)",
+          "symptom_log": "Vomited twice within two hours of the storm peak; persistent headache, skin feels feverish, and my resting pulse is noticeably fast."
+        },
+        {
+          "severity": "Critical",
+          "trigger_threshold": ">= 6.0 Gy (TE < 1 h, high fever, diarrhea, hypotension/CNS)",
+          "symptom_log": "Immediate violent vomiting under an hour post-exposure with watery diarrhea, high fever, and severe dizziness and confusion when moving."
+        }
+      ]
+    },
+    {
+      "trajectory_id": "TRAJ-EVA-HEAT-STRAIN",
+      "linked_cpg_id": "CPG-15",
+      "linked_legacy_scenario": "SCENARIO_5_EVA_THERMAL_DCS",
+      "evidence_class": "literature_derived",
+      "thermal_physics": {
+        "microgravity_cbt_slope_c_per_min": 0.15,
+        "earth_cbt_slope_c_per_min": 0.10,
+        "comfort_heat_storage_limit_kj_kg": 3.0,
+        "cdo_ceiling_kj_kg": 4.7,
+        "adiabatic_time_to_cdo_min": "13.1-17.6 min at 350-470 W (78.5 kg mean astronaut mass)"
+      },
+      "tiers": [
+        {
+          "severity": "Mild",
+          "trigger_threshold": "Delta-Q_stored approaching +3.0 kJ/kg comfort limit",
+          "symptom_log": "LCVG feels tepid inside the torso; sweat is pooling on my forehead and my visor is starting to mist during translation."
+        },
+        {
+          "severity": "Moderate",
+          "trigger_threshold": "Delta-Q_stored between +3.0 and < +4.7 kJ/kg",
+          "symptom_log": "Heavy sweating inside the suit, heart pounding hard on simple glove grip tasks, and growing fatigue—calling for a thermal cooling pause."
+        },
+        {
+          "severity": "Critical",
+          "trigger_threshold": "Delta-Q_stored >= +4.7 kJ/kg (CDO ceiling, CBT > 40 C risk)",
+          "symptom_log": "Extreme heat exhaustion, dizzy with narrowing vision, and struggling to sequence tether steps—aborting EVA and returning to airlock."
+        }
+      ]
+    },
+    {
+      "trajectory_id": "TRAJ-ORTHOSTATIC-INTOLERANCE",
+      "linked_cpg_id": "CPG-14",
+      "linked_legacy_scenario": "SCENARIO_3_ORTHOSTATIC_INTOLERANCE",
+      "evidence_class": "literature_derived",
+      "kinetics_note": "R+1 standing HR 99 (+22 bpm); post-flight delta-HR >= 30 bpm; LDSF stand-test SAP -12 mmHg (-12%); presyncope at ~40% SV drop; BRS falls 50% (10 to 5 ms/mmHg).",
+      "tiers": [
+        {
+          "severity": "Mild",
+          "trigger_threshold": "Standing/G-load delta-HR ~+20-30 bpm, preserved BP",
+          "symptom_log": "Heart is racing noticeably as G-load builds during entry; slight head-lightness when sitting up, but vision stays clear."
+        },
+        {
+          "severity": "Moderate",
+          "trigger_threshold": "delta-HR >= +30 bpm, SAP dropping toward -12 mmHg",
+          "symptom_log": "Pounding tachycardia, sudden wave of lightheadedness and clammy sweat, and peripheral vision starting to dim when trying to sit upright."
+        },
+        {
+          "severity": "Critical",
+          "trigger_threshold": "~40% SV drop, severe SAP fall, presyncope imminent",
+          "symptom_log": "Severe gray-out closing in with intense nausea and ringing ears—remaining flat on my back, unable to stand for nominal egress."
+        }
+      ]
+    },
+    {
+      "trajectory_id": "TRAJ-HYPOXIA",
+      "linked_cpg_id": "CPG-08",
+      "linked_legacy_scenario": "SCENARIO_5_EVA_THERMAL_DCS",
+      "evidence_class": "literature_derived",
+      "equation": "PIO2 = (P_ambient_mmHg - 47) * FIO2",
+      "tiers": [
+        {
+          "severity": "Mild",
+          "trigger_threshold": "PIO2 ~14.4 kPa (108 mmHg; 2,440 m equivalent)",
+          "symptom_log": "Breathing feels slightly deeper and quicker during routine module work, with subtle lightheadedness."
+        },
+        {
+          "severity": "Moderate",
+          "trigger_threshold": "SpO2 < 90% sustained (> 30 s)",
+          "symptom_log": "Distinct air hunger and rapid breathing, throbbing headache, racing pulse, and noticeably sluggish reading digital displays."
+        },
+        {
+          "severity": "Critical",
+          "trigger_threshold": "Severe hypoxemia / progressive depressurization (PIO2 11.6-14.1 kPa)",
+          "symptom_log": "Severe confusion and dimming vision, tingling numbness in lips and fingers, gasping for breath and fumbling the emergency O2 valve."
+        }
+      ]
+    },
+    {
+      "trajectory_id": "TRAJ-SANS",
+      "linked_cpg_id": "CPG-06",
+      "linked_legacy_scenario": "SCENARIO_2_SANS",
+      "evidence_class": "literature_derived",
+      "equation": "IOP = F/C + PV (F ~ 2.9 uL/min, PV ~ 9-10 mmHg)",
+      "tiers": [
+        {
+          "severity": "Mild",
+          "trigger_threshold": "Early hyperopic shift (< 0.50 to >= 0.50 D), Frisen 0-1",
+          "symptom_log": "Near-field checklist text looks slightly soft this week; stepping up to stronger reading glasses sharpens it immediately."
+        },
+        {
+          "severity": "Moderate",
+          "trigger_threshold": "Choroidal folds / scotoma, ONSD ~7.2-7.5 mm",
+          "symptom_log": "Persistent farsighted blur even with updated lenses, faint wavy distortion near the center of my right eye, and dull ache behind the globes."
+        },
+        {
+          "severity": "Critical",
+          "trigger_threshold": "Frisen >= 2, headache, pulsatile tinnitus, TVOs, CSF > 25 cmH2O",
+          "symptom_log": "Constant headache, rhythmic whooshing sound in my ears, and brief seconds-long visual blackouts when turning my head—requesting flight surgeon consult."
+        }
+      ]
+    }
+  ],
+  "synthetic_scenario_seeds_24": [
+    {
+      "seed_id": "SEED-TOX-01",
+      "name": "Ammonia leak",
+      "category": "Toxicology",
+      "linked_cpg_id": "CPG-10",
+      "evidence_class": "synthetic",
+      "time_scale": "1-10 min; injury may evolve",
+      "vector": { "dHR_bpm": 15, "dSBP_mmHg": 5, "dDBP_mmHg": 3, "dSpO2_pct": -2, "dRR_bpm": 5, "dTcore_C": 0.1, "dRMSSD_pct": -25 },
+      "symptoms": "Burning eyes/throat, tearing, cough, chest tightness and dyspnea.",
+      "guardrail": "Use an exposure-driven branch, not a fixed concentration-to-vitals rule."
+    },
+    {
+      "seed_id": "SEED-TOX-02",
+      "name": "Hydrazine / MMH / N2O4 exposure",
+      "category": "Toxicology",
+      "linked_cpg_id": "CPG-11",
+      "evidence_class": "synthetic",
+      "time_scale": "Minutes; delayed lung effects possible",
+      "vector": { "dHR_bpm": 22, "dSBP_mmHg": -10, "dDBP_mmHg": -5, "dSpO2_pct": -5, "dRR_bpm": 8, "dTcore_C": 0.3, "dRMSSD_pct": -35 },
+      "symptoms": "Irritation, cough, dyspnea, nausea, headache; hydrazines can cause tremor/seizures.",
+      "guardrail": "Keep MMH and oxidizer-specific toxicology separate despite sharing an example stress vector."
+    },
+    {
+      "seed_id": "SEED-TOX-03",
+      "name": "Carbon monoxide poisoning",
+      "category": "Toxicology",
+      "linked_cpg_id": "CPG-12",
+      "evidence_class": "synthetic",
+      "time_scale": "10-60 min exposure-dependent",
+      "vector": { "dHR_bpm": 20, "dSBP_mmHg": -5, "dDBP_mmHg": -2, "dSpO2_pct": 0, "dRR_bpm": 6, "dTcore_C": 0.0, "dRMSSD_pct": -30 },
+      "symptoms": "Headache, dizziness, nausea, weakness, chest pain, confusion.",
+      "guardrail": "Conventional SpO2 may be falsely reassuring (0*); add hidden COHb state and mark saturation untrusted."
+    },
+    {
+      "seed_id": "SEED-TOX-04",
+      "name": "Combustion / smoke inhalation",
+      "category": "Toxicology",
+      "linked_cpg_id": "CPG-12",
+      "evidence_class": "synthetic",
+      "time_scale": "Minutes to hours",
+      "vector": { "dHR_bpm": 25, "dSBP_mmHg": -5, "dDBP_mmHg": -4, "dSpO2_pct": -8, "dRR_bpm": 10, "dTcore_C": 0.3, "dRMSSD_pct": -35 },
+      "symptoms": "Cough, hoarseness, soot exposure, airway irritation, dyspnea and confusion.",
+      "guardrail": "Delayed airway/lung deterioration and CO bias require separate branches; SpO2 alone cannot exclude toxicity."
+    },
+    {
+      "seed_id": "SEED-TRM-01",
+      "name": "Tension pneumothorax",
+      "category": "Trauma and Urgent Care",
+      "linked_cpg_id": "CPG-28",
+      "evidence_class": "synthetic",
+      "time_scale": "Seconds to minutes",
+      "vector": { "dHR_bpm": 30, "dSBP_mmHg": -25, "dDBP_mmHg": -15, "dSpO2_pct": -8, "dRR_bpm": 12, "dTcore_C": 0.0, "dRMSSD_pct": -45 },
+      "symptoms": "Chest pain, dyspnea, rapidly worsening distress and shock.",
+      "guardrail": "Rising intrathoracic pressure impairs venous return; use staged BP deterioration and NO automatic recovery."
+    },
+    {
+      "seed_id": "SEED-TRM-02",
+      "name": "Corneal abrasion / regolith in eye",
+      "category": "Trauma and Urgent Care",
+      "linked_cpg_id": "CPG-22",
+      "evidence_class": "synthetic",
+      "time_scale": "Immediate; pain may persist hours",
+      "vector": { "dHR_bpm": 8, "dSBP_mmHg": 5, "dDBP_mmHg": 3, "dSpO2_pct": 0, "dRR_bpm": 1, "dTcore_C": 0.0, "dRMSSD_pct": -10 },
+      "symptoms": "Foreign-body sensation, tearing, photophobia, pain and difficulty opening eye.",
+      "guardrail": "Systemic vitals remain almost normal; symptom_log and PanOptic fluorescein carry the signal."
+    },
+    {
+      "seed_id": "SEED-TRM-03",
+      "name": "Severe burn",
+      "category": "Trauma and Urgent Care",
+      "linked_cpg_id": "CPG-28",
+      "evidence_class": "synthetic",
+      "time_scale": "Immediate stress; volume loss hours",
+      "vector": { "dHR_bpm": 22, "dSBP_mmHg": -10, "dDBP_mmHg": -7, "dSpO2_pct": -3, "dRR_bpm": 8, "dTcore_C": 0.1, "dRMSSD_pct": -35 },
+      "symptoms": "Pain, erythema/blistering or deep injury, swelling; later fluid loss and thermal imbalance.",
+      "guardrail": "Include burn extent/depth and inhalation injury as distinct states."
+    },
+    {
+      "seed_id": "SEED-TRM-04",
+      "name": "Laceration / hemorrhage",
+      "category": "Trauma and Urgent Care",
+      "linked_cpg_id": "CPG-28",
+      "evidence_class": "synthetic",
+      "time_scale": "Minutes; rate-dependent",
+      "vector": { "dHR_bpm": 35, "dSBP_mmHg": -25, "dDBP_mmHg": -15, "dSpO2_pct": 0, "dRR_bpm": 12, "dTcore_C": -0.3, "dRMSSD_pct": -50 },
+      "symptoms": "Visible blood loss, pallor, thirst, weakness, dizziness and confusion.",
+      "guardrail": "SpO2 may remain normal despite low oxygen content; poor perfusion corrupts pulse signal; NO automatic recovery."
+    },
+    {
+      "seed_id": "SEED-TRM-05",
+      "name": "Dental abscess",
+      "category": "Trauma and Urgent Care",
+      "linked_cpg_id": "CPG-23",
+      "evidence_class": "synthetic",
+      "time_scale": "Hours to days",
+      "vector": { "dHR_bpm": 10, "dSBP_mmHg": 5, "dDBP_mmHg": 3, "dSpO2_pct": 0, "dRR_bpm": 2, "dTcore_C": 0.5, "dRMSSD_pct": -15 },
+      "symptoms": "Localized tooth pain, swelling, tenderness, fever, painful chewing.",
+      "guardrail": "Progressive facial swelling/trismus indicates a higher severity stage."
+    },
+    {
+      "seed_id": "SEED-TRM-06",
+      "name": "Ear / sinus barotrauma",
+      "category": "Trauma and Urgent Care",
+      "linked_cpg_id": "CPG-08",
+      "evidence_class": "synthetic",
+      "time_scale": "During pressure change",
+      "vector": { "dHR_bpm": 10, "dSBP_mmHg": 5, "dDBP_mmHg": 3, "dSpO2_pct": 0, "dRR_bpm": 1, "dTcore_C": 0.0, "dRMSSD_pct": -10 },
+      "symptoms": "Ear/sinus pain, fullness, hearing changes, vertigo.",
+      "guardrail": "Pulmonary barotrauma is a separate hypoxemic/chest-injury branch, not the same seed."
+    },
+    {
+      "seed_id": "SEED-MED-01",
+      "name": "Renal calculi / renal colic",
+      "category": "Internal Medicine",
+      "linked_cpg_id": "CPG-16",
+      "evidence_class": "synthetic",
+      "time_scale": "Sudden, episodic minutes-hours",
+      "vector": { "dHR_bpm": 20, "dSBP_mmHg": 10, "dDBP_mmHg": 5, "dSpO2_pct": 0, "dRR_bpm": 3, "dTcore_C": 0.0, "dRMSSD_pct": -20 },
+      "symptoms": "Severe flank pain radiating toward groin, nausea/vomiting, possible hematuria.",
+      "guardrail": "Fever requires infection/obstruction branch."
+    },
+    {
+      "seed_id": "SEED-MED-02",
+      "name": "Atrial fibrillation / arrhythmia",
+      "category": "Internal Medicine",
+      "linked_cpg_id": "CPG-05",
+      "linked_legacy_scenario": "SCENARIO_7_IJV_THROMBOSIS_ARRHYTHMIA",
+      "evidence_class": "synthetic",
+      "time_scale": "Abrupt or intermittent",
+      "vector": { "dHR_bpm": 35, "dSBP_mmHg": -15, "dDBP_mmHg": -8, "dSpO2_pct": -2, "dRR_bpm": 4, "dTcore_C": 0.0, "dRMSSD_pct": null },
+      "symptoms": "Palpitations, irregular pulse, weakness, dyspnea or dizziness; can be asymptomatic.",
+      "guardrail": "RMSSD must be null / flagged non-autonomic during Afib or frequent ectopy."
+    },
+    {
+      "seed_id": "SEED-MED-03",
+      "name": "Acute appendicitis",
+      "category": "Internal Medicine",
+      "linked_cpg_id": "CPG-01",
+      "evidence_class": "synthetic",
+      "time_scale": "Hours, progressive",
+      "vector": { "dHR_bpm": 15, "dSBP_mmHg": 0, "dDBP_mmHg": 0, "dSpO2_pct": 0, "dRR_bpm": 4, "dTcore_C": 0.6, "dRMSSD_pct": -20 },
+      "symptoms": "RLQ abdominal pain, anorexia, nausea and fever.",
+      "guardrail": "Pain localization and peritoneal findings belong in symptom/exam channels."
+    },
+    {
+      "seed_id": "SEED-MED-04",
+      "name": "Urinary retention",
+      "category": "Internal Medicine",
+      "linked_cpg_id": "CPG-17",
+      "linked_legacy_scenario": "SCENARIO_8_SAS_URINARY_RETENTION",
+      "evidence_class": "synthetic",
+      "time_scale": "Hours",
+      "vector": { "dHR_bpm": 12, "dSBP_mmHg": 10, "dDBP_mmHg": 5, "dSpO2_pct": 0, "dRR_bpm": 2, "dTcore_C": 0.0, "dRMSSD_pct": -15 },
+      "symptoms": "Inability to void, suprapubic discomfort/distention, urgency, agitation.",
+      "guardrail": "Do not require hypoxemia or fever in an uncomplicated case."
+    },
+    {
+      "seed_id": "SEED-MED-05",
+      "name": "Sepsis / systemic infection",
+      "category": "Internal Medicine",
+      "linked_cpg_id": "CPG-19",
+      "evidence_class": "synthetic",
+      "time_scale": "Hours to days, can accelerate",
+      "vector": { "dHR_bpm": 30, "dSBP_mmHg": -20, "dDBP_mmHg": -12, "dSpO2_pct": -5, "dRR_bpm": 10, "dTcore_C": 1.0, "dRMSSD_pct": -40 },
+      "symptoms": "Confusion, fever or feeling cold (hypothermic variant -1.0 C), clammy skin, tachycardia and breathlessness.",
+      "guardrail": "Include hypothermic variant (-1.0 C); normal temperature does not exclude sepsis."
+    },
+    {
+      "seed_id": "SEED-MED-06",
+      "name": "Anaphylaxis",
+      "category": "Internal Medicine",
+      "linked_cpg_id": "CPG-20",
+      "evidence_class": "synthetic",
+      "time_scale": "Minutes",
+      "vector": { "dHR_bpm": 35, "dSBP_mmHg": -25, "dDBP_mmHg": -15, "dSpO2_pct": -8, "dRR_bpm": 12, "dTcore_C": 0.0, "dRMSSD_pct": -50 },
+      "symptoms": "Urticaria/flushing, airway swelling, wheeze, GI symptoms and circulatory collapse.",
+      "guardrail": "Model airway and vascular components separately."
+    },
+    {
+      "seed_id": "SEED-MED-07",
+      "name": "Severe space motion sickness",
+      "category": "Internal Medicine",
+      "linked_cpg_id": "CPG-13",
+      "evidence_class": "synthetic",
+      "time_scale": "Minutes-hours; adaptation days",
+      "vector": { "dHR_bpm": 20, "dSBP_mmHg": 5, "dDBP_mmHg": 3, "dSpO2_pct": 0, "dRR_bpm": 4, "dTcore_C": 0.1, "dRMSSD_pct": -20 },
+      "symptoms": "Nausea, vomiting, pallor, sweating, malaise, disorientation.",
+      "guardrail": "Subsequent dehydration is a separate cumulative state."
+    },
+    {
+      "seed_id": "SEED-MED-08",
+      "name": "Hypothermia",
+      "category": "Internal Medicine",
+      "linked_cpg_id": "CPG-15",
+      "evidence_class": "synthetic",
+      "time_scale": "Minutes-hours; exposure-dependent",
+      "vector": { "dHR_bpm": -20, "dSBP_mmHg": -15, "dDBP_mmHg": -8, "dSpO2_pct": -2, "dRR_bpm": -4, "dTcore_C": -2.0, "dRMSSD_pct": null },
+      "symptoms": "Shivering, clumsiness, confusion, then slowing pulse/respiration as severe.",
+      "guardrail": "Low perfusion impairs oximetry; RMSSD invalid/null with temperature-altered rhythm."
+    },
+    {
+      "seed_id": "SEED-NEU-01",
+      "name": "Acute panic attack",
+      "category": "Behavioral and Neurologic",
+      "linked_cpg_id": "CPG-31",
+      "evidence_class": "synthetic",
+      "time_scale": "Peak within minutes; resolves variably",
+      "vector": { "dHR_bpm": 35, "dSBP_mmHg": 15, "dDBP_mmHg": 10, "dSpO2_pct": 0, "dRR_bpm": 16, "dTcore_C": 0.0, "dRMSSD_pct": -30 },
+      "symptoms": "Fear, chest tightness, dyspnea, tremor, tingling and lightheadedness.",
+      "guardrail": "Benign confounder test: hyperventilation need not lower SpO2; avoid diagnosing panic solely from vitals."
+    },
+    {
+      "seed_id": "SEED-NEU-02",
+      "name": "Severe sleep deprivation",
+      "category": "Behavioral and Neurologic",
+      "linked_cpg_id": "CPG-32",
+      "linked_legacy_scenario": "SCENARIO_6_CIRCADIAN_SLEEP",
+      "evidence_class": "synthetic",
+      "time_scale": "18-36 h and cumulative",
+      "vector": { "dHR_bpm": 8, "dSBP_mmHg": 3, "dDBP_mmHg": 2, "dSpO2_pct": 0, "dRR_bpm": 1, "dTcore_C": 0.1, "dRMSSD_pct": -15 },
+      "symptoms": "Sleepiness, attention lapses, irritability and slowed cognition.",
+      "guardrail": "Large acute vital changes are not required; use performance and sleep history."
+    },
+    {
+      "seed_id": "SEED-NEU-03",
+      "name": "Dehydration / volume depletion",
+      "category": "Behavioral and Neurologic",
+      "linked_cpg_id": "CPG-14",
+      "evidence_class": "synthetic",
+      "time_scale": "Hours",
+      "vector": { "dHR_bpm": 15, "dSBP_mmHg": -10, "dDBP_mmHg": -5, "dSpO2_pct": 0, "dRR_bpm": 3, "dTcore_C": 0.3, "dRMSSD_pct": -20 },
+      "symptoms": "Thirst, dry mouth, reduced urine output, weakness and postural lightheadedness.",
+      "guardrail": "Severity depends on fluid losses and intake."
+    },
+    {
+      "seed_id": "SEED-NEU-04",
+      "name": "Acute bronchospasm",
+      "category": "Behavioral and Neurologic",
+      "linked_cpg_id": "CPG-10",
+      "evidence_class": "synthetic",
+      "time_scale": "Minutes",
+      "vector": { "dHR_bpm": 25, "dSBP_mmHg": 5, "dDBP_mmHg": 2, "dSpO2_pct": -7, "dRR_bpm": 12, "dTcore_C": 0.0, "dRMSSD_pct": -30 },
+      "symptoms": "Wheeze, chest tightness, prolonged expiration, dyspnea.",
+      "guardrail": "Measurements can lag symptoms; severe obstruction may produce weak breath sounds."
+    },
+    {
+      "seed_id": "SEED-NEU-05",
+      "name": "Pulmonary embolism",
+      "category": "Behavioral and Neurologic",
+      "linked_cpg_id": "CPG-04",
+      "evidence_class": "synthetic",
+      "time_scale": "Abrupt minutes; variable course",
+      "vector": { "dHR_bpm": 30, "dSBP_mmHg": -10, "dDBP_mmHg": -5, "dSpO2_pct": -8, "dRR_bpm": 12, "dTcore_C": 0.2, "dRMSSD_pct": -35 },
+      "symptoms": "Sudden dyspnea, pleuritic discomfort, tachycardia, possible syncope.",
+      "guardrail": "Add VTE/IJV thrombosis risk/context state."
+    },
+    {
+      "seed_id": "SEED-NEU-06",
+      "name": "Seizure / postictal state",
+      "category": "Behavioral and Neurologic",
+      "linked_cpg_id": "CPG-11",
+      "evidence_class": "synthetic",
+      "time_scale": "Seconds-minutes, recovery variable",
+      "vector": { "dHR_bpm": 35, "dSBP_mmHg": 15, "dDBP_mmHg": 10, "dSpO2_pct": -8, "dRR_bpm": null, "dTcore_C": 0.2, "dRMSSD_pct": null },
+      "symptoms": "Altered awareness/convulsion followed by confusion and fatigue.",
+      "guardrail": "Use ictal/postictal phase machine, transient apnea, and motion artifact; RMSSD null."
+    }
+  ],
+  "real_signal_replay_manifests": {
+    "physionet_datasets": [
+      {
+        "dataset": "BIDMC PPG and Respiration 1.0.0",
+        "native_rates": "ECG/PPG/ImpResp 125 Hz; HR/PULSE/RESP/SpO2 1 Hz (bidmc_01_Numerics.csv)",
+        "use": "Best immediate 1 Hz replay adapter (clinical cohort, no continuous BP or core temp)"
+      },
+      {
+        "dataset": "Wearable Device Dataset from Induced Stress and Structured Exercise 1.0.1",
+        "native_rates": "Empatica E4: BVP 64 Hz, HR 1 Hz, EDA 4 Hz, skin TEMP 4 Hz, ACC 32 Hz, irregular IBI.csv",
+        "use": "Healthy stress/exercise variability, motion artifacts, and recovery (never relabel skin TEMP as core temp)"
+      },
+      {
+        "dataset": "Pulse Transit Time PPG 1.1.0",
+        "native_rates": "ECG & 6x PPG 500 Hz, load cells 80 Hz, IMU 500 Hz, spot BP/SpO2",
+        "use": "Movement & ECG-PPG timing (do not infer continuous calibrated BP from PPG/PTT alone)"
+      },
+      {
+        "dataset": "Apnea-ECG 1.0.0",
+        "native_rates": "Single-lead ECG 100 Hz (.hea/.dat WFDB) + 60s .apn annotations",
+        "use": "Sleep-related cyclic variability and annotation alignment"
+      }
+    ],
+    "nasa_osdr_alsda_records": [
+      { "id": "OSD-942", "domain": "Human 70d bed rest vastus lateralis gene expression (not 1 Hz telemetry)" },
+      { "id": "OSD-946", "domain": "Human 70d bed rest skeletal-muscle microRNA (not 1 Hz telemetry)" },
+      { "id": "OSD-195", "domain": "14 men 21d bed rest PlanHab gene expression" },
+      { "id": "OSD-198", "domain": "14 men 21d bed rest / hypoxia muscle microRNA" },
+      { "id": "OSD-575 / LSDS-8", "domain": "Inspiration4 4-crew 3d flight serum CMP & cytokine arrays (lab schema grounding)" },
+      { "id": "OSD-569", "domain": "Inspiration4 whole-blood molecular profiling (same cohort as OSD-575)" },
+      { "id": "OS-568", "domain": "19 men 30d -6 deg bed rest legacy orthostatic/exercise/PV endpoints" }
+    ]
+  }
+}

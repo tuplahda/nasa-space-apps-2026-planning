@@ -19,7 +19,8 @@ Build the entire **A.R.E.S. Med Mission Control Console** in clean, fast HTML/CS
 | **Frontend Architecture** | [`artifacts/vanilla_frontend_architecture.md`](../artifacts/vanilla_frontend_architecture.md) | **MUST READ:** Exact DOM IDs, layout specs, and API contracts. |
 | **2-Mode Clinical Spec** | [`artifacts/clinical_decision_protocol_2_modes.md`](../artifacts/clinical_decision_protocol_2_modes.md) | UI layout requirements for Mode A vs Mode B cards and checklists. |
 | **Chart.js Vendor Asset** | `frontend/vendor/chart.umd.min.js` | Local Chart.js library for 100% offline air-gapped biometrics charts. |
-| **Microgravity Thresholds** | [`data/nasa_baselines_and_thresholds.json`](../data/nasa_baselines_and_thresholds.json) | Threshold numbers for coloring gauges green, yellow, or red. |
+| **Microgravity Thresholds** | [`data/nasa_baselines_and_thresholds.json`](../data/nasa_baselines_and_thresholds.json) | Threshold numbers for coloring gauges green, yellow, or red, plus canonical 1 Hz telemetry fields. |
+| **Lab Reference Intervals** | [`data/lab_reference_intervals.json`](../data/lab_reference_intervals.json) | Specimen-aware `i-STAT` & `CBC` warning/critical bands for Mode B lab result cards. |
 
 ---
 

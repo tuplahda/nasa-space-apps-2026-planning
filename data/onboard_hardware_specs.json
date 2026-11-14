@@ -12,27 +12,23 @@
       "device_id": "HW-001",
       "name": "Abbott i-STAT Portable Clinical Analyzer",
       "category": "Point-of-Care Blood Chemistry & Blood Gas",
-      "cartridges_supported": ["Chem8+", "CG4+"],
+      "cartridges_supported": ["CG8+", "CG4+"],
       "measurable_parameters": [
-        "Na+ (Sodium)",
-        "K+ (Potassium)",
-        "Cl- (Chloride)",
-        "TCO2",
-        "Anion Gap",
-        "iCa (Ionized Calcium)",
-        "Glucose",
-        "BUN",
-        "Creatinine",
-        "Hematocrit / Hemoglobin",
-        "pH, pCO2, pO2, HCO3-, Lactate (CG4+)"
+        "Na+, K+, iCa (Ionized Calcium), Glucose, Hematocrit (CG8+ measured)",
+        "Hemoglobin, HCO3-, TCO2, Base Excess, sO2 (CG8+ calculated from measured values)",
+        "pH, pCO2, pO2, Lactate (CG4+ measured)"
+      ],
+      "capability_exclusions": [
+        "CG8+ does NOT measure Chloride (Cl-)",
+        "i-STAT does NOT count WBC, Platelets, or Absolute Lymphocyte Count (ALC) — never fabricate CBC fields from Hb/Hct"
       ],
       "clinical_triggers": [
-        "Verify Creatinine before Ketorolac or Valacyclovir",
         "Verify K+ before Lisinopril or TMP-SMX",
-        "Verify pCO2/pH/Lactate in hypercapnia, sepsis, or shock"
+        "Verify pCO2/pH/Lactate (CG4+) in hypercapnia, sepsis, or shock",
+        "Use specimen-aware reference intervals in data/lab_reference_intervals.json"
       ],
-      "spaceflight_constraints": "Cartridges have strict shelf-life expiration and are sensitive to ionizing radiation and thermal excursions. Requires bubble-free microgravity venous/fingerstick loading.",
-      "search_text": "Abbott i-STAT Chem8+ CG4+ blood chemistry electrolytes creatinine potassium lactate pCO2 pH expiration radiation sensitivity."
+      "spaceflight_constraints": "Cartridges have strict shelf-life expiration and are sensitive to ionizing radiation and thermal excursions. Requires bubble-free microgravity venous/arterial/capillary loading and mandatory specimen metadata.",
+      "search_text": "Abbott i-STAT CG8+ CG4+ blood chemistry electrolytes potassium iCa glucose lactate pCO2 pH does not supply CBC or Cl-."
     },
     {
       "device_id": "HW-002",
@@ -60,8 +56,9 @@
     },
     {
       "device_id": "HW-003",
-      "name": "C2M2 (Compact Hematology / CBC Analyzer)",
+      "name": "In-Situ Hematology Analyzer (within CSA C2M2 Connected-Care Architecture)",
       "category": "Point-of-Care Hematology",
+      "architecture_note": "C2M2 (Canadian Space Agency Connected Care Medical Module) is an integrated connected-care and decision-support platform concept, not a single named CBC analyzer; record the actual integrated hematology device and validation status.",
       "measurable_parameters": [
         "WBC (White Blood Cell Count) & Differential",
         "ALC (Absolute Lymphocyte Count)",
@@ -71,11 +68,11 @@
       ],
       "clinical_triggers": [
         "Leukocytosis / left shift confirms acute infection (appendicitis, sepsis, pneumonia)",
-        "Rapid ALC drop (Andrews curves) quantifies Acute Radiation Syndrome (ARS) severity",
-        "Thrombocytopenia locks out Aspirin, NSAIDs, Enoxaparin, Apixaban, Clopidogrel"
+        "Rapid ALC drop quantifies Acute Radiation Syndrome (ARS) severity",
+        "Thrombocytopenia (<=20 critical or <150 warning) locks out Aspirin, NSAIDs, Enoxaparin, Apixaban, Clopidogrel"
       ],
-      "spaceflight_constraints": "Microgravity fluidics require closed-cartridge capillary handling without free-air bubbles.",
-      "search_text": "C2M2 CBC hematology WBC leukocytosis ALC absolute lymphocyte count ARS radiation thrombocytopenia platelets."
+      "spaceflight_constraints": "Microgravity fluidics require closed-cartridge capillary handling without free-air bubbles; distinguish technology demonstration vs. flight-certified status.",
+      "search_text": "C2M2 Connected Care Medical Module hematology analyzer CBC WBC leukocytosis ALC absolute lymphocyte count ARS radiation thrombocytopenia platelets."
     },
     {
       "device_id": "HW-004",
