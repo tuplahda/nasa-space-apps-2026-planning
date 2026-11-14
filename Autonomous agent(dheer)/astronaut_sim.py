@@ -208,6 +208,7 @@ class AstronautSimulationEngine:
         self.dynamic_overrides: Dict[str, float] = {}
         self.dynamic_symptom_log: Optional[str] = None
         self.blind_crisis: Optional[str] = None
+        self.blind_assessment_requested: bool = False
         self.blind_onset_ticks = 0
         self.blind_progression_rate = 0.12
         self.blind_noise: Optional[random.Random] = None
@@ -383,6 +384,7 @@ class AstronautSimulationEngine:
         if normalized in ("nominal", "normal", "healthy", "baseline"):
             self._clear_dynamic_crisis_state()
             self.blind_crisis = self.blind_noise = self.blind_recovery_cause = None
+            self.blind_assessment_requested = False
             self.incident_id += 1
             self._treatment_options.clear()
             self._treatment_policy_key = None
@@ -404,6 +406,7 @@ class AstronautSimulationEngine:
             return {"status": "error", "message": "Unknown simulation scenario."}
         self._clear_dynamic_crisis_state()
         self.blind_crisis = self.blind_noise = self.blind_recovery_cause = None
+        self.blind_assessment_requested = False
         self.incident_id += 1
         self._treatment_options.clear()
         self._treatment_policy_key = None
@@ -490,7 +493,7 @@ class AstronautSimulationEngine:
         self.scenario_progression = round(rng.uniform(0.84, 1.0), 3)
         self.target_progression = 1.0
         self.temporary_crisis_ticks_remaining = ticks
-        self.temporary_crisis_auto_recover = True
+        self.temporary_crisis_auto_recover = not streaming
         self.last_simulated_crisis = chosen
         self.dynamic_crisis_label = chosen
 
@@ -560,6 +563,7 @@ class AstronautSimulationEngine:
 
         if streaming:
             self.blind_crisis = chosen
+            self.blind_assessment_requested = False
             self.blind_onset_ticks = 2
             self.blind_progression_rate = rng.uniform(0.08, 0.13)
             self.blind_noise = random.Random(rng.getrandbits(64))

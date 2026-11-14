@@ -39,7 +39,8 @@ flowchart TD
     end
 
     subgraph L3["Layer 3: NASA Level V RAG Medical Officer (Yohan)"]
-        EVAL -->|"Anomaly Detected!"| RAG["RAG Retrieval Engine<br/>(125 Pre-Processed Offline Chunks:<br/>rag_protocols_expanded, checs_formulary,<br/>nasa_std_3001_rules, onboard_hardware_specs)"]
+        EVAL --> OBSERVE["Stream changing vitals and edge anomaly status<br/>Doctor waits for explicit operator request"]
+        OBSERVE -->|"Analyze & Treat requested"| RAG["RAG Retrieval Engine<br/>(125 Pre-Processed Offline Chunks:<br/>rag_protocols_expanded, checs_formulary,<br/>nasa_std_3001_rules, onboard_hardware_specs)"]
         
         RAG --> DECIDE{"Confidence >= 0.75?"}
         
@@ -51,11 +52,12 @@ flowchart TD
     subgraph L4["Layer 4: Mission Control Console UI (Tivesh & Roy)"]
         OUT -->|"WebSocket: /ws/telemetry"| CHARTS["Tivesh: Rolling Biometric Charts<br/>(HR, BP, SpO2, Cabin CO2, Radiation)"]
         OUT -->|"Vitals State"| HUD["Tivesh: 3D Holographic Body HUD<br/>• Organ Pins: SANS-01, CV-02, ECLSS-03, RAD-04<br/>• Color shifts: Cyan ➔ Amber ➔ Pulsing Red"]
-        MODEA & MODEB -->|"REST: /api/diagnose"| MED_PANEL["Roy: AI Medical Officer Panel<br/>• 🔴 20-Min Mars Comms Lag Alert<br/>• Clinical Diagnosis & Lab Orders<br/>• Interactive Treatment Action Checklist"]
+        MODEA & MODEB -->|"Streamed doctor assessment"| MED_PANEL["Roy: AI Medical Officer Panel<br/>• 🔴 20-Min Mars Comms Lag Alert<br/>• Clinical Diagnosis & Lab Orders<br/>• Interactive Treatment Action Checklist"]
         
         SCHEDULE["Tivesh: Daily Routine Schedule<br/>• 08:00 Orthostatic BP & Hydration<br/>• 13:30 30-min ARED Exercise<br/>• 94% Mission Readiness Score"]
         
-        CRISIS["Top Bar Scenario Triggers<br/>[Nominal] [Solar Flare] [EVA Hypercapnia] [Mode B Zero-Day]"] -->|"POST /api/scenarios/trigger"| SIM
+        CRISIS["Simulate crisis"] -->|"POST /api/scenarios/simulate-crisis<br/>Stream vitals only"| SIM
+        DOCTOR["Analyze & Treat"] -->|"POST /api/scenarios/analyze-crisis"| OBSERVE
         MED_PANEL -->|"Treatment Checkbox Completed!<br/>POST /api/treatments/apply"| SIM
     end
 ```

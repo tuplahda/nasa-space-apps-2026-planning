@@ -170,6 +170,8 @@ button:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid
 }
 .run-button:hover { border-color: rgba(118, 227, 227, .7); background: rgba(56, 149, 157, .35); }
 .run-button:disabled { opacity: .65; cursor: wait; }
+.analyze-button { border-color: rgba(231, 180, 91, .5); color: #ffe1a5; background: linear-gradient(180deg, rgba(155, 108, 36, .25), rgba(86, 59, 23, .2)); }
+.analyze-button:hover { border-color: rgba(255, 208, 126, .8); background: rgba(155, 108, 36, .34); }
 .run-icon { font-size: 16px; }
 
 .api-state {

@@ -43,6 +43,7 @@
             <span class="run-icon" aria-hidden="true">&#9655;</span>
             <span id="run-label">Simulate crisis</span>
           </button>
+          <button class="run-button analyze-button" id="analyze-crisis" type="button" hidden>Analyze &amp; Treat</button>
           <button id="data-mode" class="mode-button" type="button" title="Switch between the backend astronaut agent and the local demonstration">Use local demo</button>
           <div class="api-state" id="api-state" role="status" aria-live="polite">
             <span class="state-light"></span>
@@ -177,7 +178,7 @@
                 <span class="result-severity" id="result-severity">—</span>
               </div>
               <h3 id="diagnosis-title">Telemetry ready</h3>
-              <p id="diagnosis-summary">Choose a case and simulate a crisis to see the onboard clinical engine result.</p>
+              <p id="diagnosis-summary">Simulate a crisis to stream changing vitals. Analyze &amp; Treat becomes available when anomalous telemetry appears.</p>
               <div class="confidence-row">
                 <span>ENGINE CONFIDENCE</span>
                 <strong id="confidence-value">—</strong>

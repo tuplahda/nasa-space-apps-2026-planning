@@ -48,11 +48,13 @@ The Blender source is `models/ares_upper_body_hologram.blend`; matching GLB copi
 | `WS /ws/telemetry` | 1 Hz agent frames, edge assessment and available rag_diagnosis |
 | `GET /api/telemetry/current` | HTTP fallback and fresh post-trigger snapshot |
 | `POST /api/scenarios/trigger` | scenario: nominal, hypercapnia, solar_flare, zero_day |
+| `POST /api/scenarios/simulate-crisis` | Starts a blind streaming crisis; returns an incident ID without diagnosis |
+| `POST /api/scenarios/analyze-crisis` | Explicitly asks the doctor to analyze the current incident ID |
 | `POST /api/diagnose` | Strict TelemetryPacket fields; excludes broadcast-only fields and scenario/force-mode hints |
 | `POST /api/treatments/apply` | treatment: li_oh_swap_and_o2 for hypercapnia; standard countermeasure protocol otherwise |
 | `GET /api/simulation/state`, `GET /health` | Integration validation and original-scenario restoration |
 
-The crisis button triggers the astronaut agent, then diagnoses the next matching snapshot. Subsequent streamed results follow the dynamically changing agent. Dropdown changes alone do not inject scenarios. UI solar maps to solar_flare; zero-day maps to zero_day.
+The **Simulate crisis** button starts a blinded random incident and streams changing telemetry only. Once the edge monitor has observed anomalous vitals, **Analyze & Treat** becomes available. Pressing it explicitly requests the clinical assessment from the current stream; only then does the doctor diagnosis and recommended-action checklist appear. Critical checklist items must be acknowledged before the existing **Start simulated recovery** action is enabled. Acknowledgements are not medical administration. The local demo remains labeled as a repository example. Dropdown changes alone do not inject backend scenarios. UI solar maps to solar_flare; zero-day maps to zero_day.
 
 ## Anatomy
 
@@ -74,7 +76,7 @@ Checkboxes record session acknowledgement with Mauritius timestamps, not adminis
 
 All seven modules passed syntax checks. All 14 frontend tests passed, covering validation, strict payloads, activity baselines, edge authority, four demos, API errors, checklist retention/submission guards, Mode B/citation states, obsolete responses, reconnect/stale/polling, and actual GLB loading, hierarchy, upright bounds, materials, fitting and through-skin picking.
 
-Real-server integration passed HTTP asset delivery, CORS for port 5500, 1 Hz WebSocket/reconnect, four scenario triggers, strict diagnosis requests, changing agent CO2, simulated recovery, and Mode A/B sample responses. Original scenario restored. git diff --check passed. No backend files changed; no commit or push.
+The earlier validation covered HTTP asset delivery, CORS for port 5500, 1 Hz WebSocket/reconnect, scenario triggers, strict diagnosis requests, changing agent CO2, simulated recovery, and Mode A/B sample responses. The staged crisis-to-doctor flow is a newer change and has not yet been validated against the live server.
 
 With Node 24+ (no packages required):
 
@@ -88,7 +90,7 @@ node frontend/tests/integration.mjs
 
 Actual browser screenshots, WebGL rendering, pointer controls and responsive visual QA were not completed. Browser extension access was unavailable; native computer use stopped because it could not verify Chrome's current URL. Loader/material/raycast tests do not prove visual correctness or absence of browser-only errors.
 
-The existing dependency-free backend fallback fails at TelemetryPacket.model_dump(). The tested FastAPI/Pydantic environment works with declared requirements. Backend code was left unchanged.
+The existing dependency-free backend fallback fails at TelemetryPacket.model_dump(). The FastAPI/Pydantic environment works with declared requirements. The latest staged crisis-to-doctor flow has not yet been tested.
 
 Explicit diagnosis of the backend nominal agent's full resting symptom sentence can return Mode B despite nominal edge telemetry. The frontend preserves that response. The offline nominal fixture uses the engine's accepted No symptoms phrase and returns nominal normally.
 

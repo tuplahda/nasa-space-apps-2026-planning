@@ -106,6 +106,8 @@ def run_simulation_command(action: Any, payload: Dict[str, Any]) -> Dict[str, An
         return astronaut_sim.trigger_scenario(payload.get("scenario") or payload.get("scenario_id"))
     if action in ("simulate_crisis", "random_crisis", "trigger_random_crisis"):
         return simulate_crisis_action(payload)
+    if action == "analyze_blind_crisis":
+        return request_blind_assessment(payload)
     if action == "apply_treatment":
         if astronaut_sim.blind_crisis:
             return apply_blind_action(payload)
@@ -120,8 +122,8 @@ def run_simulation_command(action: Any, payload: Dict[str, Any]) -> Dict[str, An
 @_simulation_locked
 def simulate_crisis_action(payload: Dict[str, Any] | None = None) -> Dict[str, Any]:
     """
-    Inject a dynamic random temporary vital problem for demo purposes, immediately
-    advance telemetry for RAG decisioning, and capture the automatic Earth report.
+    In streaming mode, inject a dynamic random temporary vital problem without
+    running the clinical decision engine. A separate operator command starts assessment.
     """
     global latest_earth_report, latest_telemetry
     data = payload if isinstance(payload, dict) else {}
@@ -202,6 +204,24 @@ def simulate_crisis_action(payload: Dict[str, Any] | None = None) -> Dict[str, A
         "report_download_url": "/api/reports/latest/download",
         "telemetry": snapshot,
     }
+
+
+@_simulation_locked
+def request_blind_assessment(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Start clinical assessment only after the operator requests it for a live incident."""
+    snapshot = latest_telemetry or {}
+    incident = snapshot.get("blind_incident") or {}
+    incident_id = payload.get("incident_id")
+    if (not astronaut_sim.blind_crisis
+            or type(incident_id) is not int
+            or incident_id != astronaut_sim.incident_id
+            or snapshot.get("simulation_incident") != incident_id):
+        return {"status": "error", "message": "There is no matching active blind incident."}
+    if incident.get("phase") != "awaiting_doctor":
+        return {"status": "error", "message": "Wait for anomalous telemetry before requesting the doctor assessment."}
+    astronaut_sim.blind_assessment_requested = True
+    incident["phase"] = "analyzing"
+    return {"status": "ok", "incident_id": incident_id, "phase": "analyzing"}
 
 
 # Only checklist-backed environmental controls have a modeled physical effect.
@@ -440,6 +460,23 @@ def advance_telemetry() -> Dict[str, Any]:
                 refresh_treatment_options(payload["rag_diagnosis"], packet, assessment, policy)
     if blind and astronaut_sim.active_scenario == "nominal":
         assessment.trigger_rag_consultation = False
+    blind_assessment_available = bool(assessment.trigger_rag_consultation)
+    if blind:
+        blind_assessment_available = (
+            blind_assessment_available or astronaut_sim.scenario_progression >= 0.35
+        )
+        prior_decision = previous.get("rag_diagnosis") if same_incident else None
+        if recovery_monitoring:
+            assessment.trigger_rag_consultation = False
+        elif astronaut_sim.blind_assessment_requested and isinstance(prior_decision, dict):
+            payload["rag_diagnosis"] = prior_decision
+            assessment.trigger_rag_consultation = False
+        elif astronaut_sim.blind_assessment_requested:
+            assessment.trigger_rag_consultation = True
+        else:
+            # Layer 2 may flag and display anomalous telemetry, but Layer 3 stays
+            # idle until the operator explicitly asks the doctor to assess it.
+            assessment.trigger_rag_consultation = False
     payload["recovery_status"] = status
     payload["anomaly_assessment"] = assessment.model_dump()
     payload["routine_schedule"] = astronaut_sim.get_routine_schedule(assessment.readiness_score_0_100)
@@ -464,7 +501,10 @@ def advance_telemetry() -> Dict[str, Any]:
         decision = payload.get("rag_diagnosis")
         complete = astronaut_sim.active_scenario == "nominal"
         phase = ("complete" if complete else "recovering" if status == "ACTIVE"
-                 else "assessed" if decision else "observing")
+                 else "assessed" if decision
+                 else "analyzing" if astronaut_sim.blind_assessment_requested
+                 else "awaiting_doctor" if blind_assessment_available
+                 else "observing")
         payload["blind_incident"] = {
             "id": astronaut_sim.incident_id, "phase": phase,
             "recovery_cause": astronaut_sim.blind_recovery_cause,
@@ -632,10 +672,16 @@ if FASTAPI_AVAILABLE:
         payload: Dict[str, Any] | None = Body(default=None),
     ) -> JSONResponse:
         """
-        Demo endpoint: inject a random temporary vital crisis (especially when nominal),
-        evaluate through Layer 2/3 RAG, and auto-generate a downloadable Earth report.
+        Inject and stream a random temporary crisis without running a clinical diagnosis.
+        Use the analyze-crisis endpoint after anomalous telemetry is visible.
         """
         result = run_simulation_command("simulate_crisis", payload or {})
+        return JSONResponse(result, status_code=command_status(result))
+
+    @app.post("/api/scenarios/analyze-crisis", tags=["Simulation Control"])
+    async def analyze_blind_crisis_endpoint(payload: Dict[str, Any]) -> JSONResponse:
+        """Start the doctor assessment for the current blind incident on operator request."""
+        result = run_simulation_command("analyze_blind_crisis", payload)
         return JSONResponse(result, status_code=command_status(result))
 
     @app.get("/api/reports/latest", tags=["Earth Uplink Reports"])
@@ -757,8 +803,9 @@ OFFLINE_API_DOCS = """<!DOCTYPE html>
 
     <div class="endpoint">
       <div><span class="method-post">POST</span><span class="path">/api/scenarios/trigger</span> — Inject Crisis Scenario</div>
-      <p style="font-size:13px;color:#94a3b8;">Use these demo shortcuts or get the full scenario list.</p>
-      <button onclick="sendPost('/api/scenarios/simulate-crisis', JSON.stringify({}), 'scenarioResp')">Simulate Random Crisis</button>
+      <p style="font-size:13px;color:#94a3b8;">A random crisis streams vitals first. After anomalous telemetry appears, request the doctor assessment separately.</p>
+      <button onclick="sendPost('/api/scenarios/simulate-crisis', JSON.stringify({streaming: true}), 'scenarioResp')">Simulate Random Crisis</button>
+      <button onclick="analyzeCurrentBlindIncident()">Analyze Current Blind Crisis</button>
       <button onclick="sendPost('/api/scenarios/trigger', JSON.stringify({scenario: 'hypercapnia'}), 'scenarioResp')">Trigger Hypercapnia</button>
       <button onclick="sendPost('/api/scenarios/trigger', JSON.stringify({scenario: 'solar_flare'}), 'scenarioResp')">Trigger Solar Flare</button>
       <button onclick="sendPost('/api/scenarios/trigger', JSON.stringify({scenario: 'zero_day'}), 'scenarioResp')">Trigger Mode B Demo</button>
@@ -836,6 +883,24 @@ OFFLINE_API_DOCS = """<!DOCTYPE html>
 
     async function sendGet(url, targetId = 'getResp') {
       return sendRequest(url, {method: 'GET'}, targetId);
+    }
+
+    async function analyzeCurrentBlindIncident() {
+      const out = document.getElementById('scenarioResp');
+      try {
+        const response = await fetch('/api/telemetry/current', {cache: 'no-store'});
+        const packet = await response.json();
+        const incidentId = packet?.blind_incident?.id;
+        if (!response.ok || !Number.isInteger(incidentId)) {
+          out.textContent = 'No active blind incident is available to analyze.';
+          out.dataset.status = 'error';
+          return;
+        }
+        await sendPost('/api/scenarios/analyze-crisis', JSON.stringify({incident_id: incidentId}), 'scenarioResp');
+      } catch (error) {
+        out.textContent = `Assessment request failed: ${error.message}`;
+        out.dataset.status = 'error';
+      }
     }
   </script>
 </body>
@@ -946,6 +1011,7 @@ class AresMedStdlibRequestHandler(BaseHTTPRequestHandler):
             "/api/scenarios/trigger": "trigger_scenario",
             "/api/scenarios/simulate-crisis": "simulate_crisis",
             "/api/simulate-crisis": "simulate_crisis",
+            "/api/scenarios/analyze-crisis": "analyze_blind_crisis",
             "/api/treatments/apply": "apply_treatment",
             "/api/simulation/activity": "set_activity",
         }.get(parsed.path)

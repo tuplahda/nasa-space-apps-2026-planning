@@ -18,6 +18,9 @@ export class Backend {
     if (seed !== undefined) payload.seed = seed;
     return this.request('/api/scenarios/simulate-crisis', payload);
   }
+  analyzeBlindCrisis(incidentId) {
+    return this.request('/api/scenarios/analyze-crisis', {incident_id: incidentId});
+  }
   applyBlindAction(incidentId, actionId) {
     return this.request('/api/treatments/apply', {incident_id: incidentId, action_id: actionId});
   }

@@ -12,8 +12,8 @@ const blindSeed = requestedSeed !== null && /^-?\d+$/.test(requestedSeed)
 let view,body,mock,connection,packet,mode='waiting',transport='',activeKey='nominal',busy=false,generation=0,lastScenario;
 let rehearsal = query.get('mode') === 'rehearsal';
 let expectedIncident = null, lastIncident = null, revealedIncident = null;
-let startingBlind = false;
-const button=document.getElementById('run-assessment'), modeButton=document.getElementById('data-mode');
+let startingBlind = false, analysisPending = false;
+const button=document.getElementById('run-assessment'), analyzeButton=document.getElementById('analyze-crisis'), modeButton=document.getElementById('data-mode');
 const rehearsalToggle = document.getElementById('rehearsal-toggle');
 const casePicker = document.getElementById('rehearsal-cases');
 const incidentStatus = document.getElementById('blind-status');
@@ -26,7 +26,8 @@ const panel=new MedicalPanel(async()=> {
   return api.recover(activeKey);
 });
 function updateControls() {
-  const active = packet?.blind_incident && packet.blind_incident.phase !== 'complete';
+  const incident = packet?.blind_incident;
+  const active = incident && incident.phase !== 'complete';
   const named = mode === 'demo' || rehearsal;
   casePicker.hidden = !named;
   rehearsalToggle.hidden = mode === 'demo';
@@ -34,6 +35,11 @@ function updateControls() {
   rehearsalToggle.setAttribute('aria-pressed', String(rehearsal));
   setText('rehearsal-toggle', rehearsal ? 'Exit rehearsal' : 'Rehearsal mode');
   setText('run-label', named ? 'Run selected case' : 'Simulate crisis');
+  const doctorPending = analysisPending || incident?.phase === 'analyzing';
+  analyzeButton.hidden = mode !== 'backend' || !incident
+    || (!['awaiting_doctor', 'analyzing'].includes(incident.phase) && !analysisPending);
+  analyzeButton.disabled = busy || doctorPending || incident?.phase !== 'awaiting_doctor';
+  analyzeButton.textContent = doctorPending ? 'Doctor Analyzing…' : 'Analyze & Treat';
   button.disabled = busy || mode === 'waiting' || !!active || expectedIncident !== null
     || (!named && !!packet?.active_scenario_id && packet.active_scenario_id !== 'nominal');
 }
@@ -43,11 +49,13 @@ function showIncident(incident) {
   if (!incident) return;
   const recovery = incident.recovery_cause === 'operator' ? 'Operator-triggered recovery' : 'Automatic recovery';
   incidentStatus.textContent = {
-    observing: 'Collecting streamed telemetry.',
-    assessed: 'Assessment based on streamed telemetry.',
+    observing: 'Crisis telemetry is developing.',
+    awaiting_doctor: 'Anomalous vitals detected. Awaiting doctor analysis.',
+    analyzing: 'Doctor is analyzing the current telemetry.',
+    assessed: 'Doctor assessment based on streamed telemetry.',
     recovering: recovery + ' in progress.',
     complete: recovery + ' complete.',
-  }[incident.phase];
+  }[incident.phase] || 'Monitoring the current incident.';
   if (revealedIncident === incident.id && incident.reveal) {
     incidentStatus.textContent += ` Simulated incident: ${incident.reveal}.`;
   }
@@ -69,6 +77,7 @@ function ingest(p,source) {
   if (expectedIncident !== null && p.simulation_incident >= expectedIncident) expectedIncident = null;
   if (Number.isInteger(p.simulation_incident) && lastIncident !== p.simulation_incident) {
     lastIncident = p.simulation_incident;
+    analysisPending = false;
     panel.reset('Waiting for the astronaut agent assessment.');
   }
   packet=p;transport=source;const scenario=p.active_scenario_id;
@@ -79,10 +88,11 @@ function ingest(p,source) {
   }
   const states=view.update(p,source);body?.update(p,states);sourceLabel();
   if (incident) {
+    if (['assessed', 'recovering', 'complete'].includes(incident.phase)) analysisPending = false;
     showIncident(incident);
     if (p.rag_diagnosis) panel.render({...p.rag_diagnosis, blindIncident: incident});
-    else if (panel.assessment) panel.reset('Monitoring the current incident.');
-    setText('assessment-latency', p.rag_diagnosis ? 'STREAMED ASSESSMENT' : 'COLLECTING TELEMETRY');
+    else if (panel.assessment) panel.reset('Waiting for the doctor to analyze the current telemetry.');
+    setText('assessment-latency', p.rag_diagnosis ? 'DOCTOR ASSESSMENT' : incident.phase === 'awaiting_doctor' ? 'READY FOR DOCTOR ANALYSIS' : incident.phase === 'analyzing' ? 'DOCTOR ANALYZING…' : 'COLLECTING TELEMETRY');
     updateControls();
     return;
   }
@@ -96,14 +106,14 @@ function ingest(p,source) {
 function demo(automatic=false) {
   generation++; busy=false;button.disabled=false;button.classList.remove('is-loading');button.setAttribute('aria-busy','false');
   mode='demo';view.reset();packet=null;lastScenario=undefined;activeKey=document.getElementById('case-select').value;
-  expectedIncident=lastIncident=null;startingBlind=false;showIncident(null);updateControls();
+  expectedIncident=lastIncident=null;startingBlind=false;analysisPending=false;showIncident(null);updateControls();
   if(!automatic) connection?.stop();
   mock.select(activeKey);panel.reset();mock.start(p=>ingest(p,'demo'));panel.render(mock.assessment());
   status('simulated','SIMULATED · LOCAL DEMO');modeButton.textContent='Connect to backend';sourceLabel();
 }
 function followBackend() {
   generation++;mode='waiting';packet=null;lastScenario=undefined;mock.stop();connection?.stop();view.reset();panel.reset();status('connecting','CONNECTING API');sourceLabel();
-  expectedIncident=lastIncident=null;startingBlind=false;showIncident(null);updateControls();
+  expectedIncident=lastIncident=null;startingBlind=false;analysisPending=false;showIncident(null);updateControls();
   modeButton.textContent='Use local demo';
   connection=new TelemetryConnection(api.base,(p,t)=> {
     if(mode!=='backend') {generation++;mode='backend';mock.stop();view.reset();panel.reset();modeButton.textContent='Use local demo';status('connected',`API CONNECTED · ${t==='WebSocket'?'WS':'HTTP'}`);}
@@ -119,7 +129,7 @@ function followBackend() {
 }
 button.addEventListener('click',async()=> {
   if(button.disabled || busy || !mock) return;
-  const key=document.getElementById('case-select').value;busy=true;button.disabled=true;button.classList.add('is-loading');button.setAttribute('aria-busy','true');setText('assessment-latency','SIMULATING…');panel.error('');
+  const key=document.getElementById('case-select').value;busy=true;analysisPending=false;button.disabled=true;button.classList.add('is-loading');button.setAttribute('aria-busy','true');setText('assessment-latency','SIMULATING…');panel.error('');
   const started=performance.now(),version=generation;
   try {
     if(mode==='demo') {mock.select(key);activeKey=key;panel.reset();ingest(mock.packet(),'demo');panel.render(mock.assessment());}
@@ -147,6 +157,22 @@ button.addEventListener('click',async()=> {
     setText('assessment-latency',`${mode==='demo'?'DEMO RENDER':'ASSESSMENT'} ${(performance.now()-started).toFixed(0)} ms`);
   } catch(e) {if(version===generation){panel.error(e.message);setText('assessment-latency','ASSESSMENT FAILED');}}
   finally {if(version===generation){startingBlind=false;busy=false;button.classList.remove('is-loading');button.setAttribute('aria-busy','false');updateControls();}}
+});
+analyzeButton.addEventListener('click', async()=> {
+  const incident = packet?.blind_incident;
+  if(analyzeButton.disabled || busy || mode !== 'backend' || incident?.phase !== 'awaiting_doctor') return;
+  const version=generation;
+  busy=true;analysisPending=true;analyzeButton.disabled=true;analyzeButton.textContent='Doctor Analyzing…';
+  setText('assessment-latency','DOCTOR ANALYZING…');panel.error('');
+  try {
+    await api.analyzeBlindCrisis(incident.id);
+    if(version !== generation) return;
+    showIncident({...incident, phase:'analyzing'});
+  } catch(e) {
+    if(version === generation) {analysisPending=false;panel.error(e.message);setText('assessment-latency','ASSESSMENT REQUEST FAILED');}
+  } finally {
+    if(version === generation) {busy=false;updateControls();}
+  }
 });
 rehearsalToggle.addEventListener('click', () => { rehearsal = !rehearsal; updateControls(); });
 revealButton.addEventListener('click', () => {
