@@ -92,6 +92,8 @@ async def broadcast_telemetry_loop() -> None:
             # Assemble payload for WebSocket broadcast
             p_dict = packet.model_dump()
             p_dict["anomaly_assessment"] = assessment.model_dump()
+            p_dict["routine_schedule"] = astronaut_sim.get_routine_schedule()
+            p_dict["mission_readiness_pct"] = assessment.readiness_score_0_100
 
             if assessment.trigger_rag_consultation:
                 rag_out = rag_engine.diagnose(packet, assessment)
@@ -182,6 +184,8 @@ if FASTAPI_AVAILABLE:
             init_dict = init_packet.model_dump()
             assessment = anomaly_detector.evaluate_packet(init_packet)
             init_dict["anomaly_assessment"] = assessment.model_dump()
+            init_dict["routine_schedule"] = astronaut_sim.get_routine_schedule()
+            init_dict["mission_readiness_pct"] = assessment.readiness_score_0_100
             await websocket.send_text(json.dumps(init_dict))
 
             while True:
@@ -263,6 +267,16 @@ if FASTAPI_AVAILABLE:
         p_dict = packet.model_dump()
         p_dict["anomaly_assessment"] = assessment.model_dump()
         return p_dict
+
+    @app.get("/api/scenarios/list", tags=["Simulation Control"])
+    async def list_scenarios_endpoint() -> List[Dict[str, str]]:
+        """List all available crisis trajectories and 24 scenario seeds."""
+        return astronaut_sim.list_available_scenarios()
+
+    @app.get("/api/simulation/schedule", tags=["Simulation Control"])
+    async def simulation_schedule_endpoint() -> Dict[str, Any]:
+        """Get daily flight operational schedule and active block."""
+        return astronaut_sim.get_routine_schedule()
 
     @app.get("/api/space-weather", tags=["Space Weather"])
     async def space_weather_endpoint() -> Dict[str, Any]:
@@ -456,6 +470,12 @@ class AresMedStdlibRequestHandler(BaseHTTPRequestHandler):
             p_dict = packet.model_dump()
             p_dict["anomaly_assessment"] = assessment.model_dump()
             self._send_json(200, p_dict)
+            return
+        if parsed.path == "/api/scenarios/list":
+            self._send_json(200, astronaut_sim.list_available_scenarios())
+            return
+        if parsed.path == "/api/simulation/schedule":
+            self._send_json(200, astronaut_sim.get_routine_schedule())
             return
         if parsed.path == "/api/space-weather":
             rep = donki_service.get_space_weather(

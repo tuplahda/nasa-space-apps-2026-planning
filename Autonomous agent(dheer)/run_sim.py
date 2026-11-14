@@ -18,23 +18,26 @@ from backend.services.astronaut_sim import astronaut_sim
 
 
 def main() -> None:
-    print("=" * 80)
+    print("=" * 85)
     print(" A.R.E.S. MED - AUTONOMOUS ASTRONAUT AGENT ENGINE (DHEER)")
     print(" Live 1Hz Microgravity Biotelemetry Generator")
-    print(" Target: Cmdr. Maya Lin (ASTRO-01) | Mission Day 84")
-    print("=" * 80)
-    print("Commands:")
-    print("  [h] Trigger Hypercapnia (CO2 Scrubber Failure)")
-    print("  [f] Trigger Solar Flare (High-Flux Radiation Event)")
-    print("  [s] Trigger SANS (Neuro-Ocular Syndrome)")
-    print("  [d] Trigger Decompression (Suit Pressure Drop)")
+    print(" Target: Cmdr. Maya Lin (ASTRO-01) | Mission Day 84 (Post-FD75 Adapted)")
+    print("=" * 85)
+    print("Trajectory Controls:")
+    print("  [h] Trigger Hypercapnia (TRAJ-HYPERCAPNIA / CPG-07)")
+    print("  [f] Trigger Solar Flare (TRAJ-ARS-SPE / CPG-09)")
+    print("  [t] Trigger EVA Heat Strain (TRAJ-EVA-HEAT-STRAIN / CPG-15)")
+    print("  [o] Trigger Orthostatic Intolerance (TRAJ-ORTHOSTATIC-INTOLERANCE / CPG-14)")
+    print("  [d] Trigger Cabin Decompression (TRAJ-HYPOXIA / CPG-08)")
+    print("  [s] Trigger SANS (TRAJ-SANS / CPG-06)")
     print("  [c] Apply Countermeasure (Initiate Smooth Biological Recovery)")
+    print("Activity State Controls:")
     print("  [1] Set State: SLEEP")
     print("  [2] Set State: IVA_REST")
     print("  [3] Set State: ARED_EXERCISE")
     print("  [4] Set State: EVA_SPACEWALK")
     print("  [q] Quit Simulation Runner")
-    print("-" * 80)
+    print("-" * 85)
 
     try:
         iteration = 0
@@ -52,8 +55,8 @@ def main() -> None:
                 f"HR: {v.heart_rate:5.1f} bpm | "
                 f"BP: {int(v.blood_pressure_sys)}/{int(v.blood_pressure_dia)} | "
                 f"SpO2: {v.spo2:4.1f}% | "
+                f"Temp: {v.core_temp_c:5.2f} C | "
                 f"CO2: {e.cabin_co2_mmhg:4.1f} mmHg | "
-                f"Rad: {e.ambient_radiation_msv_h:5.3f} mSv/h | "
                 f"Mode: {scen_tag}"
             )
 

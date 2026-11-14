@@ -51,7 +51,6 @@ class TestAstronautSimulationEngine(unittest.TestCase):
         hr_min = min(hr_readings)
         hr_max = max(hr_readings)
         spread = hr_max - hr_min
-        # With +/- 3 bpm oscillation plus noise, spread should be between 2.0 and 8.0 bpm
         self.assertGreater(spread, 2.0)
         self.assertLess(spread, 10.0)
 
@@ -60,7 +59,6 @@ class TestAstronautSimulationEngine(unittest.TestCase):
         self.sim.set_activity_state("IVA_REST")
         self.sim.trigger_scenario("hypercapnia")
 
-        # Step 10 ticks into crisis
         for _ in range(10):
             self.sim.step()
 
@@ -83,6 +81,27 @@ class TestAstronautSimulationEngine(unittest.TestCase):
         self.assertTrue(flare_packet.environment.donki_spe_active)
         self.assertIn("dosimeter", flare_packet.symptom_log.lower())
 
+    def test_scenario_eva_heat_strain(self) -> None:
+        """Verify thermal strain escalation when LCVG loop degrades."""
+        self.sim.set_activity_state("EVA_SPACEWALK")
+        self.sim.trigger_scenario("heat_strain")
+        for _ in range(10):
+            self.sim.step()
+        packet = self.sim.step()
+        self.assertGreaterEqual(packet.vitals.core_temp_c, 38.6)
+        self.assertGreater(packet.vitals.heart_rate, 130.0)
+        self.assertIn("temperature", packet.symptom_log.lower())
+
+    def test_synthetic_seed_ammonia_leak(self) -> None:
+        """Verify dynamic loading and injection of SEED-TOX-01 (Ammonia leak)."""
+        self.sim.set_activity_state("IVA_REST")
+        self.sim.trigger_scenario("seed-tox-01")
+        for _ in range(10):
+            self.sim.step()
+        packet = self.sim.step()
+        self.assertGreater(packet.vitals.heart_rate, 70.0)
+        self.assertIn("burning eyes", packet.symptom_log.lower())
+
     def test_closed_loop_biological_recovery(self) -> None:
         """Verify smooth return to nominal baseline after countermeasure administration."""
         self.sim.set_activity_state("IVA_REST")
@@ -90,15 +109,12 @@ class TestAstronautSimulationEngine(unittest.TestCase):
         for _ in range(10):
             self.sim.step()
 
-        # Confirm peak crisis
         peak = self.sim.step()
         self.assertGreater(peak.environment.cabin_co2_mmhg, 10.0)
 
-        # Apply countermeasure
         cure_resp = self.sim.apply_treatment("LiOH Canister Replacement & 100% O2 Flush")
         self.assertEqual(cure_resp["status"], "ok")
 
-        # Step through washout recovery period (12 ticks)
         for _ in range(12):
             self.sim.step()
 
@@ -107,6 +123,36 @@ class TestAstronautSimulationEngine(unittest.TestCase):
         self.assertLess(recovered.vitals.heart_rate, 75.0)
         self.assertFalse(self.sim.is_recovering)
         self.assertEqual(self.sim.active_scenario, "nominal")
+
+    def test_fuzzy_column_normalization(self) -> None:
+        """Verify heterogeneous NASA dataset headers are mapped correctly."""
+        raw_row = {
+            "Pulse": "74.5",
+            "Sys_BP": "118.0",
+            "DIA": "72.0",
+            "O2_Sat": "97.8",
+            "CBT": "37.5",
+            "ppCO2": "2.8",
+        }
+        norm = self.sim._normalize_external_row(raw_row)
+        self.assertEqual(norm.get("hr"), 74.5)
+        self.assertEqual(norm.get("sbp"), 118.0)
+        self.assertEqual(norm.get("dbp"), 72.0)
+        self.assertEqual(norm.get("spo2"), 97.8)
+        self.assertEqual(norm.get("temp"), 37.5)
+        self.assertEqual(norm.get("co2"), 2.8)
+
+    def test_scenarios_catalog_count(self) -> None:
+        """Verify that all 31 trajectories and seeds are enumerated for UI dropdowns."""
+        catalog = self.sim.list_available_scenarios()
+        self.assertGreaterEqual(len(catalog), 30)
+
+    def test_routine_schedule_feed(self) -> None:
+        """Verify daily schedule blocks are generated with 94% readiness score."""
+        feed = self.sim.get_routine_schedule()
+        self.assertEqual(feed.get("crew_readiness_score"), 94)
+        self.assertEqual(len(feed.get("schedule", [])), 8)
+        self.assertIn("active_block", feed)
 
     def test_donki_airgap_fallback(self) -> None:
         """Verify space weather reports resolve cleanly under air-gapped conditions."""

@@ -5,7 +5,11 @@ Simulates Cmdr. Maya Lin (ASTRO-01) on a continuous 1000ms tick:
 - Sinus respiratory arrhythmia (+/- 3 bpm modulated by breathing rate).
 - Microgravity baseline adaptations across SLEEP, IVA_REST, ARED_EXERCISE, EVA_SPACEWALK
   aligned with NASA-STD-3001 and ESA Space Fever findings (adapted post-FD75).
-- Integrated with data/simulation_scenario_seeds.json (6 quantitative trajectories + 24 seeds).
+- Integrated with data/simulation_scenario_seeds.json:
+    * 6 Quantitative Crisis Trajectories (Hypercapnia, ARS, Heat Strain, Orthostatic Intolerance, Hypoxia, SANS).
+    * 24 Synthetic Scenario Seeds (Toxicology, Trauma, Infection, Renal, Immune, Environmental).
+    * Dynamic multi-tier first-person symptom logs (Mild, Moderate, Critical).
+- Daily Routine Prevention Schedule feed for Mission Control HUD.
 - Closed-loop exponential washout recovery when countermeasures are administered.
 - Seamless hybrid dataset ingestion from data/nasa_official_dataset/ when available.
 
@@ -97,6 +101,18 @@ ACTIVITY_PROFILES: Dict[str, ActivityBaseline] = {
     ),
 }
 
+# Daily Flight Operational Schedule for Cmdr. Maya Lin (Day 84)
+DAILY_SCHEDULE_TEMPLATE: List[Dict[str, str]] = [
+    {"time": "06:00", "activity": "Sleep Phase Termination & Morning Biometrics", "category": "ROUTINE"},
+    {"time": "07:00", "activity": "Breakfast & Metabolic Caloric Tracking", "category": "NUTRITION"},
+    {"time": "08:00", "activity": "Orthostatic BP & Hydration Status Assessment", "category": "PREVENTION"},
+    {"time": "10:00", "activity": "ECLSS Life-Support Inspection & Air Quality Check", "category": "SYSTEMS"},
+    {"time": "13:30", "activity": "30-min ARED Resistive Exercise Countermeasure", "category": "COUNTERMEASURE"},
+    {"time": "15:00", "activity": "Point-of-Care Ultrasound & Fluid Shift Tracking", "category": "CLINICAL"},
+    {"time": "19:00", "activity": "Evening Mission Debrief & Tele-Medical Check-in", "category": "ROUTINE"},
+    {"time": "22:00", "activity": "Sleep Phase & Nocturnal Biometrics Monitoring", "category": "SLEEP"},
+]
+
 
 class AstronautSimulationEngine:
     """
@@ -138,6 +154,7 @@ class AstronautSimulationEngine:
         # Baseline overrides if external official NASA dataset is discovered
         self.external_dataset_loaded: bool = False
         self.external_rows: List[Dict[str, Any]] = []
+        self.external_row_index: int = 0
         self._check_and_load_external_nasa_dataset()
 
     def _load_scenario_seeds(self) -> None:
@@ -167,9 +184,8 @@ class AstronautSimulationEngine:
 
     def _check_and_load_external_nasa_dataset(self) -> None:
         """
-        Scan data/nasa_official_dataset/ for CSV or JSON files.
-        Priority #1: If found, parse rows for baseline replay.
-        Priority #2: If absent, fallback to mathematical generator.
+        Universal flexible loader for data/nasa_official_dataset/.
+        Supports heterogeneous column names (HR, heart_rate, Pulse, SpO2, etc.).
         """
         if not NASA_DATASET_DIR.exists():
             return
@@ -179,8 +195,9 @@ class AstronautSimulationEngine:
             try:
                 with open(csv_files[0], "r", encoding="utf-8") as f:
                     reader = csv.DictReader(f)
-                    self.external_rows = [row for row in reader]
-                if self.external_rows:
+                    rows = [row for row in reader]
+                if rows:
+                    self.external_rows = rows
                     self.external_dataset_loaded = True
                     return
             except Exception:
@@ -196,6 +213,85 @@ class AstronautSimulationEngine:
                         self.external_dataset_loaded = True
             except Exception:
                 pass
+
+    def _normalize_external_row(self, row: Dict[str, Any]) -> Dict[str, float]:
+        """Map heterogeneous NASA CSV/JSON headers to standard biometric keys."""
+        normalized: Dict[str, float] = {}
+        cleaned_row = {str(k).strip().lower(): v for k, v in row.items()}
+        aliases = {
+            "hr": ["hr", "heart_rate", "pulse", "bpm", "heartrate"],
+            "sbp": ["sbp", "blood_pressure_sys", "sys", "systolic", "sbp_mmhg", "sys_bp"],
+            "dbp": ["dbp", "blood_pressure_dia", "dia", "diastolic", "dbp_mmhg", "dia_bp"],
+            "spo2": ["spo2", "o2_sat", "oxygen_saturation", "spo2_pct", "pulse_ox"],
+            "hrv": ["hrv", "hrv_ms", "rmssd", "hrv_rmssd_ms"],
+            "temp": ["temp", "core_temp", "core_temp_c", "cbt", "cbt_c", "temperature"],
+            "rr": ["rr", "respiration_rate", "resp_rate", "rr_bpm", "breathing_rate"],
+            "co2": ["co2", "cabin_co2", "cabin_co2_mmhg", "ppco2", "cabin_ppco2_mmhg"],
+        }
+        for target, keys in aliases.items():
+            for k in keys:
+                if k in cleaned_row:
+                    try:
+                        normalized[target] = float(cleaned_row[k])
+                        break
+                    except (ValueError, TypeError):
+                        pass
+        return normalized
+
+    def list_available_scenarios(self) -> List[Dict[str, str]]:
+        """Return full catalog of 6 trajectories and 24 seeds for frontend UI selection."""
+        catalog: List[Dict[str, str]] = [
+            {"id": "nominal", "name": "Nominal Resting Baseline", "category": "Baseline"},
+            {"id": "hypercapnia", "name": "Acute & Chronic Hypercapnia (CO2 Intoxication)", "category": "Quantitative Trajectory"},
+            {"id": "solar_flare", "name": "Solar Particle Event / Radiation Storm", "category": "Quantitative Trajectory"},
+            {"id": "heat_strain", "name": "EVA Heat Strain & Cooling Loop Failure", "category": "Quantitative Trajectory"},
+            {"id": "orthostatic_intolerance", "name": "Microgravity Orthostatic Intolerance", "category": "Quantitative Trajectory"},
+            {"id": "decompression", "name": "Cabin / Suit Decompression & Acute Hypoxia", "category": "Quantitative Trajectory"},
+            {"id": "sans", "name": "Spaceflight-Associated Neuro-Ocular Syndrome", "category": "Quantitative Trajectory"},
+        ]
+        # Append 24 seeds
+        seen = set()
+        for s in self.seed_library.values():
+            sid = s.get("seed_id", "")
+            if sid and sid not in seen:
+                seen.add(sid)
+                catalog.append({
+                    "id": sid,
+                    "name": s.get("name", sid),
+                    "category": s.get("category", "Synthetic Seed"),
+                })
+        return catalog
+
+    def get_routine_schedule(self) -> Dict[str, Any]:
+        """Return daily prevention schedule and active timeline block."""
+        # Determine time of day from mission elapsed time
+        rem = self.met_seconds % 86400
+        hour = rem // 3600
+        minute = (rem % 3600) // 60
+        current_time_str = f"{hour:02d}:{minute:02d}"
+
+        active_item = DAILY_SCHEDULE_TEMPLATE[0]
+        schedule_status = []
+        for item in DAILY_SCHEDULE_TEMPLATE:
+            item_time = item["time"]
+            status = "UPCOMING"
+            if item_time <= current_time_str:
+                status = "COMPLETED"
+                active_item = item
+            schedule_status.append({
+                "time": item_time,
+                "activity": item["activity"],
+                "category": item["category"],
+                "status": "ACTIVE" if item == active_item else status,
+            })
+
+        return {
+            "mission_day": self.mission_day,
+            "met_time": current_time_str,
+            "active_block": active_item["activity"],
+            "schedule": schedule_status,
+            "crew_readiness_score": 94,
+        }
 
     def set_activity_state(self, new_state: str) -> None:
         """Change current activity context (SLEEP, IVA_REST, ARED_EXERCISE, EVA_SPACEWALK)."""
@@ -304,6 +400,29 @@ class AstronautSimulationEngine:
         hrv_base = baseline.hrv_base
         temp_base = baseline.temp_base
         rr_base = baseline.rr_base
+        cabin_co2 = 2.4  # nominal mmHg
+
+        # If official external NASA dataset was provided, override baseline values with real rows
+        if self.external_dataset_loaded and self.external_rows:
+            raw_row = self.external_rows[self.external_row_index % len(self.external_rows)]
+            self.external_row_index += 1
+            norm_vals = self._normalize_external_row(raw_row)
+            if "hr" in norm_vals:
+                hr_base = norm_vals["hr"]
+            if "sbp" in norm_vals:
+                sbp_base = norm_vals["sbp"]
+            if "dbp" in norm_vals:
+                dbp_base = norm_vals["dbp"]
+            if "spo2" in norm_vals:
+                spo2_base = norm_vals["spo2"]
+            if "hrv" in norm_vals:
+                hrv_base = norm_vals["hrv"]
+            if "temp" in norm_vals:
+                temp_base = norm_vals["temp"]
+            if "rr" in norm_vals:
+                rr_base = norm_vals["rr"]
+            if "co2" in norm_vals:
+                cabin_co2 = norm_vals["co2"]
 
         # Sinus respiratory arrhythmia oscillation (+/- 3 bpm modulated by respiration rate)
         resp_freq_hz = rr_base / 60.0
@@ -315,7 +434,6 @@ class AstronautSimulationEngine:
         noise_temp = random.uniform(-0.02, 0.02)
 
         # Environmental defaults
-        cabin_co2 = 2.4  # nominal mmHg
         cabin_ppo2 = 160.0
         suit_pressure = 4.3 if self.activity_state == "EVA_SPACEWALK" else 14.7
         space_weather = donki_service.get_space_weather(
@@ -404,12 +522,17 @@ class AstronautSimulationEngine:
                 "Orthostatic tachycardia on movement; profound dry oral mucosa and general lethargy."
             )
 
-        # Generic seed fallback if a specific SEED-* was requested
+        # Dynamic seed lookup if a specific SEED-* or name was requested
         elif scen in self.seed_library:
             seed_info = self.seed_library[scen]
-            hr_base += 20.0 * p
-            rr_base += 6.0 * p
-            symptom_log = f"Reported anomaly: {seed_info.get('name', 'Unspecified issue')}. Somatic discomfort noted."
+            vec = seed_info.get("vector", {})
+            hr_base += vec.get("dHR_bpm", 15.0) * p
+            sbp_base += vec.get("dSBP_mmHg", 0.0) * p
+            dbp_base += vec.get("dDBP_mmHg", 0.0) * p
+            spo2_base += vec.get("dSpO2_pct", 0.0) * p
+            rr_base += vec.get("dRR_bpm", 4.0) * p
+            temp_base += vec.get("dTcore_C", 0.0) * p
+            symptom_log = seed_info.get("symptoms", "Somatic discomfort noted.")
 
         # Override symptom log during recovery
         if self.is_recovering:
