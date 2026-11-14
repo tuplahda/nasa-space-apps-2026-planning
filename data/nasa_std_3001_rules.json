@@ -1,307 +1,508 @@
 {
   "dataset_metadata": {
-    "name": "NASA-STD-3001 & JSC 20584 Pre-Processed Environmental and Clinical Threshold Rules",
-    "version": "1.0.0",
+    "name": "A.R.E.S. Med registry of spaceflight requirements and exposure limits",
+    "version": "1.1.0",
     "source": "NASA-STD-3001 Vol 1 & Vol 2, JSC 20584 (SMACs)",
-    "total_rules": 26,
+    "total_rules": 29,
     "offline_ready": true,
-    "description": "Pre-processed deterministic and RAG-retrievable clinical, radiation, atmospheric, and SMAC threshold rules."
+    "description": "Each entry identifies its source revision, location and verification status. Rule summaries are project paraphrases. Nonempty verbatim_rule fields contain direct excerpts. Historical records describe superseded requirements."
   },
   "rules": [
     {
       "standard_id": "V1 3001",
-      "domain": "Level of Care",
-      "title": "Mission Level of Care Assignment",
-      "verbatim_rule": "NASA-STD-3001 [V1 3001]: Crew medical care capabilities shall be assigned by mission duration, distance, and evacuation capability across Levels I through V.",
-      "numeric_thresholds": {
-        "levels": ["Level I", "Level II", "Level III", "Level IV", "Level V"]
-      },
-      "search_text": "V1 3001 Level of Care mission duration distance evacuation capability Levels I II III IV V."
+      "domain": "Crew selection",
+      "title": "Crew selection and annual recertification",
+      "source_url": "https://standards.nasa.gov/sites/default/files/standards/NASA/C/nasa-std-3001-vol-1-rev-c-signature.pdf",
+      "source_revision": "NASA-STD-3001 Volume 1, Revision C",
+      "source_section": "3.1.2",
+      "verification_status": "verified_primary_source",
+      "rule_summary": "OCHMO-STD-100.1A guides crew medical and psychological selection and annual recertification.",
+      "verbatim_rule": "",
+      "numeric_thresholds": {},
+      "search_text": "V1 3001 Crew selection and annual recertification OCHMO-STD-100.1A guides crew medical and psychological selection and annual recertification."
     },
     {
       "standard_id": "Level I",
       "domain": "Level of Care",
-      "title": "Level I Medical Care (< 8 Days, LEO)",
-      "verbatim_rule": "Level I (Low Earth Orbit < 8 days): Space Motion Sickness (SMS), basic first aid, and immediate deorbit/return capability.",
-      "numeric_thresholds": {
-        "max_duration_days": 8,
-        "orbit": "LEO"
-      },
-      "search_text": "Level I medical care < 8 days LEO Space Motion Sickness basic first aid immediate return."
+      "title": "Historical Level I medical care",
+      "source_url": "https://standards.nasa.gov/sites/default/files/standards/NASA/B/Historical/NASA-STD-3001-VOL-1A-Chg1-1.pdf",
+      "source_revision": "NASA-STD-3001 Volume 1, Revision A with Change 1 (superseded)",
+      "source_section": "4.1.2",
+      "verification_status": "verified_historical_source",
+      "rule_summary": "Revision A covered first aid and follow-up planning for survival training, transfers to LEO vehicles and suborbital flights.",
+      "verbatim_rule": "",
+      "numeric_thresholds": {},
+      "search_text": "Level I Historical Level I medical care Revision A covered first aid and follow-up planning for survival training, transfers to LEO vehicles and suborbital flights."
     },
     {
       "standard_id": "Level II",
       "domain": "Level of Care",
-      "title": "Level II Medical Care (<= 30 Days, LEO)",
-      "verbatim_rule": "Level II (LEO <= 30 days): Basic clinical diagnostics, oral/topical pharmaceuticals, and stabilizing return.",
+      "title": "Historical Level II medical care",
+      "source_url": "https://standards.nasa.gov/sites/default/files/standards/NASA/B/Historical/NASA-STD-3001-VOL-1A-Chg1-1.pdf",
+      "source_revision": "NASA-STD-3001 Volume 1, Revision A with Change 1 (superseded)",
+      "source_section": "4.1.3",
+      "verification_status": "verified_historical_source",
+      "rule_summary": "Revision A assigned basic life support and ambulatory diagnostics to LEO missions shorter than 30 days.",
+      "verbatim_rule": "",
       "numeric_thresholds": {
-        "max_duration_days": 30,
-        "orbit": "LEO"
+        "orbit": "LEO",
+        "max_duration_days_exclusive": 30
       },
-      "search_text": "Level II medical care <= 30 days LEO basic clinical diagnostics oral topical pharmaceuticals."
+      "search_text": "Level II Historical Level II medical care Revision A assigned basic life support and ambulatory diagnostics to LEO missions shorter than 30 days."
     },
     {
       "standard_id": "Level III",
       "domain": "Level of Care",
-      "title": "Level III Medical Care (> 30 Days, LEO)",
-      "verbatim_rule": "Level III (LEO > 30 days, ISS): Advanced life support (ACLS), dental, limited minor surgery, telemedicine support, and medical evacuation.",
+      "title": "Historical Level III medical care",
+      "source_url": "https://standards.nasa.gov/sites/default/files/standards/NASA/B/Historical/NASA-STD-3001-VOL-1A-Chg1-1.pdf",
+      "source_revision": "NASA-STD-3001 Volume 1, Revision A with Change 1 (superseded)",
+      "source_section": "4.1.4",
+      "verification_status": "verified_historical_source",
+      "rule_summary": "Revision A provided limited advanced life support, trauma and dental care for short missions beyond LEO, including lunar or planetary missions up to 30 days.",
+      "verbatim_rule": "",
       "numeric_thresholds": {
-        "min_duration_days": 30,
-        "orbit": "LEO"
+        "example_destination": "Lunar or planetary",
+        "example_max_duration_days_inclusive": 30
       },
-      "search_text": "Level III medical care > 30 days LEO ISS ACLS dental minor surgery telemedicine evacuation."
+      "search_text": "Level III Historical Level III medical care Revision A provided limited advanced life support, trauma and dental care for short missions beyond LEO, including lunar or planetary missions up to 30 days."
     },
     {
       "standard_id": "Level IV",
       "domain": "Level of Care",
-      "title": "Level IV Medical Care (> 30 Days, Lunar)",
-      "verbatim_rule": "Level IV (Lunar > 30 days): Enhanced autonomous medical imaging (ultrasound), IV/IM interventions, delayed evacuation (days).",
+      "title": "Historical Level IV medical care",
+      "source_url": "https://standards.nasa.gov/sites/default/files/standards/NASA/B/Historical/NASA-STD-3001-VOL-1A-Chg1-1.pdf",
+      "source_revision": "NASA-STD-3001 Volume 1, Revision A with Change 1 (superseded)",
+      "source_section": "4.1.5",
+      "verification_status": "verified_historical_source",
+      "rule_summary": "Revision A covered LEO missions over 30 days and lunar or planetary surface stays over 30 and up to 210 days.",
+      "verbatim_rule": "",
       "numeric_thresholds": {
-        "min_duration_days": 30,
-        "destination": "Lunar"
+        "leo_min_duration_days_exclusive": 30,
+        "surface_min_duration_days_exclusive": 30,
+        "surface_max_duration_days_inclusive": 210
       },
-      "search_text": "Level IV medical care > 30 days Lunar autonomous imaging ultrasound IV IM delayed evacuation."
+      "search_text": "Level IV Historical Level IV medical care Revision A covered LEO missions over 30 days and lunar or planetary surface stays over 30 and up to 210 days."
     },
     {
       "standard_id": "Level V",
       "domain": "Level of Care",
-      "title": "Level V Medical Care (Deep Space / Mars)",
-      "verbatim_rule": "Level V (Mars / Deep Space, no timely evacuation): Full autonomous medical/surgical stabilization, onboard clinical AI decision support, and definitive in-situ care.",
+      "title": "Historical Level V medical care",
+      "source_url": "https://standards.nasa.gov/sites/default/files/standards/NASA/B/Historical/NASA-STD-3001-VOL-1A-Chg1-1.pdf",
+      "source_revision": "NASA-STD-3001 Volume 1, Revision A with Change 1 (superseded)",
+      "source_section": "4.1.6",
+      "verification_status": "verified_historical_source",
+      "rule_summary": "Revision A called for a physician-level caregiver on autonomous lunar or planetary missions over 210 days. Resources and mission risk limited available care.",
+      "verbatim_rule": "",
       "numeric_thresholds": {
-        "destination": "Mars / Deep Space",
-        "evacuation_capable": false
+        "destination": "Lunar or planetary",
+        "min_duration_days_exclusive": 210
       },
-      "search_text": "Level V medical care Mars Deep Space no evacuation autonomous medical surgical stabilization onboard clinical AI."
+      "search_text": "Level V Historical Level V medical care Revision A called for a physician-level caregiver on autonomous lunar or planetary missions over 210 days. Resources and mission risk limited available care."
     },
     {
       "standard_id": "V1 3004",
-      "domain": "Crew Medical Officer",
-      "title": "CMO Training & Autonomous Support",
-      "verbatim_rule": "NASA-STD-3001 [V1 3004]: Crew Medical Officers (CMOs) shall be trained to execute autonomous diagnostic and therapeutic procedures using onboard checklists and decision support.",
+      "domain": "Medical care",
+      "title": "Planning in-mission medical capabilities",
+      "source_url": "https://standards.nasa.gov/sites/default/files/standards/NASA/C/nasa-std-3001-vol-1-rev-c-signature.pdf",
+      "source_revision": "NASA-STD-3001 Volume 1, Revision C",
+      "source_section": "3.1.5",
+      "verification_status": "verified_primary_source",
+      "rule_summary": "Programs plan training, equipment and treatment capabilities around assessed risks, flight surgeon input, crew needs and vehicle constraints.",
+      "verbatim_rule": "",
       "numeric_thresholds": {},
-      "search_text": "V1 3004 Crew Medical Officer CMO autonomous diagnostic therapeutic procedures checklists."
+      "search_text": "V1 3004 Planning in-mission medical capabilities Programs plan training, equipment and treatment capabilities around assessed risks, flight surgeon input, crew needs and vehicle constraints."
+    },
+    {
+      "standard_id": "V1 4029",
+      "domain": "Radiation",
+      "title": "ALARA exposure minimization",
+      "source_url": "https://standards.nasa.gov/sites/default/files/standards/NASA/C/nasa-std-3001-vol-1-rev-c-signature.pdf",
+      "source_revision": "NASA-STD-3001 Volume 1, Revision C",
+      "source_section": "4.8.1",
+      "verification_status": "verified_primary_source",
+      "rule_summary": "Minimize crew radiation exposure under the ALARA principle.",
+      "verbatim_rule": "All crewmember radiation exposures shall be minimized using the ALARA principle.",
+      "numeric_thresholds": {},
+      "search_text": "V1 4029 ALARA exposure minimization Minimize crew radiation exposure under the ALARA principle."
     },
     {
       "standard_id": "V1 4030",
       "domain": "Radiation",
-      "title": "Career Effective Dose Limit (600 mSv)",
-      "verbatim_rule": "NASA-STD-3001 [V1 4030]: Career space permissible exposure limit (PEL) for all ages and sexes is 600 mSv total effective dose.",
+      "title": "Career effective dose limit",
+      "source_url": "https://standards.nasa.gov/sites/default/files/standards/NASA/C/nasa-std-3001-vol-1-rev-c-signature.pdf",
+      "source_revision": "NASA-STD-3001 Volume 1, Revision C",
+      "source_section": "4.8.2",
+      "verification_status": "verified_primary_source",
+      "rule_summary": "Total career spaceflight effective dose must stay below 600 mSv for every crewmember.",
+      "verbatim_rule": "shall be less than 600 mSv.",
       "numeric_thresholds": {
         "career_effective_dose_limit_msv": 600
       },
-      "search_text": "V1 4030 Radiation career effective dose limit PEL 600 mSv all ages sexes."
+      "search_text": "V1 4030 Career effective dose limit Total career spaceflight effective dose must stay below 600 mSv for every crewmember."
     },
     {
       "standard_id": "V1 4031",
       "domain": "Radiation",
-      "title": "ALARA Principle",
-      "verbatim_rule": "NASA-STD-3001 [V1 4031]: Radiation exposure shall be kept As Low As Reasonably Achievable (ALARA) via storm sheltering and operational scheduling.",
-      "numeric_thresholds": {},
-      "search_text": "V1 4031 Radiation ALARA As Low As Reasonably Achievable storm sheltering."
+      "title": "Solar particle event design limit",
+      "source_url": "https://standards.nasa.gov/sites/default/files/standards/NASA/C/nasa-std-3001-vol-1-rev-c-signature.pdf",
+      "source_revision": "NASA-STD-3001 Volume 1, Revision C",
+      "source_section": "4.8.3",
+      "verification_status": "verified_primary_source",
+      "rule_summary": "Shielding design must keep effective dose below 250 mSv for the reference solar particle event based on the October 1989 events.",
+      "verbatim_rule": "",
+      "numeric_thresholds": {
+        "design_reference_spe_effective_dose_limit_msv": 250
+      },
+      "search_text": "V1 4031 Solar particle event design limit Shielding design must keep effective dose below 250 mSv for the reference solar particle event based on the October 1989 events."
     },
     {
       "standard_id": "V1 4032",
       "domain": "Radiation",
-      "title": "Short-Term Non-Cancer / Tissue Reaction Limits",
-      "verbatim_rule": "NASA-STD-3001 [V1 4032]: Short-term (30-day and 1-year) organ dose limits prevent deterministic tissue reactions (ARS, skin erythema, lens cataracts, CNS).",
-      "numeric_thresholds": {},
-      "search_text": "V1 4032 Radiation short-term 30-day 1-year organ dose limits deterministic tissue reactions ARS."
+      "title": "Exposure from nuclear technologies",
+      "source_url": "https://standards.nasa.gov/sites/default/files/standards/NASA/C/nasa-std-3001-vol-1-rev-c-signature.pdf",
+      "source_revision": "NASA-STD-3001 Volume 1, Revision C",
+      "source_section": "4.8.4",
+      "verification_status": "verified_primary_source",
+      "rule_summary": "Effective dose from mission nuclear technologies must remain below 20 mSv per mission year, scaled to mission duration.",
+      "verbatim_rule": "",
+      "numeric_thresholds": {
+        "nuclear_technology_effective_dose_limit_msv_per_mission_year": 20
+      },
+      "search_text": "V1 4032 Exposure from nuclear technologies Effective dose from mission nuclear technologies must remain below 20 mSv per mission year, scaled to mission duration."
     },
     {
       "standard_id": "V1 4033",
       "domain": "Radiation",
-      "title": "Solar Particle Event (SPE) Dosimetry & Alerting",
-      "verbatim_rule": "NASA-STD-3001 [V1 4033]: Active personal and area radiation dosimetry shall provide real-time SPE alerting for immediate crew storm-shelter ingress.",
-      "numeric_thresholds": {},
-      "search_text": "V1 4033 Radiation Solar Particle Event SPE dosimetry real-time alerting storm shelter."
+      "title": "Galactic cosmic radiation design limits",
+      "source_url": "https://standards.nasa.gov/sites/default/files/standards/NASA/C/nasa-std-3001-vol-1-rev-c-signature.pdf",
+      "source_revision": "NASA-STD-3001 Volume 1, Revision C",
+      "source_section": "4.8.5",
+      "verification_status": "verified_primary_source",
+      "rule_summary": "For habitats designed for more than 60 crewed days, keep GCR effective dose rates below 1.3 mSv/day in free space and 0.9 mSv/day on planetary surfaces.",
+      "verbatim_rule": "",
+      "numeric_thresholds": {
+        "design_duration_days_exclusive_min": 60,
+        "free_space_msv_per_day_limit": 1.3,
+        "planetary_surface_msv_per_day_limit": 0.9
+      },
+      "search_text": "V1 4033 Galactic cosmic radiation design limits For habitats designed for more than 60 crewed days, keep GCR effective dose rates below 1.3 mSv/day in free space and 0.9 mSv/day on planetary surfaces."
     },
     {
       "standard_id": "Table 4.8-1 (BFO)",
       "domain": "Radiation",
-      "title": "Blood Forming Organs (BFO) Short-Term Limits",
-      "verbatim_rule": "NASA-STD-3001 Table 4.8-1 (BFO): 30-day limit = 250 mGy-Eq; 1-year limit = 500 mGy-Eq; Career limit = not applicable (governed by 600 mSv effective dose).",
+      "title": "Blood-forming organ dose limits",
+      "source_url": "https://standards.nasa.gov/sites/default/files/standards/NASA/C/nasa-std-3001-vol-1-rev-c-signature.pdf",
+      "source_revision": "NASA-STD-3001 Volume 1, Revision C",
+      "source_section": "4.8.2, Table 4.8-1, p. 41, BFO",
+      "verification_status": "verified_primary_source",
+      "rule_summary": "BFO limits are 250 mGy-Eq over 30 days and 500 mGy-Eq over one year. The career entry is inapplicable.",
+      "verbatim_rule": "",
       "numeric_thresholds": {
         "bfo_30_day_mgy_eq": 250,
         "bfo_1_year_mgy_eq": 500
       },
-      "search_text": "Table 4.8-1 BFO Blood Forming Organs 30-day 250 mGy-Eq 1-year 500 mGy-Eq bone marrow ARS."
+      "search_text": "Table 4.8-1 (BFO) Blood-forming organ dose limits BFO limits are 250 mGy-Eq over 30 days and 500 mGy-Eq over one year. The career entry is inapplicable."
     },
     {
       "standard_id": "Table 4.8-1 (Skin)",
       "domain": "Radiation",
-      "title": "Skin Short-Term & Career Limits",
-      "verbatim_rule": "NASA-STD-3001 Table 4.8-1 (Skin): 30-day limit = 1500 mGy-Eq; 1-year limit = 3000 mGy-Eq; Career limit = 6000 mGy-Eq.",
+      "title": "Skin dose limits",
+      "source_url": "https://standards.nasa.gov/sites/default/files/standards/NASA/C/nasa-std-3001-vol-1-rev-c-signature.pdf",
+      "source_revision": "NASA-STD-3001 Volume 1, Revision C",
+      "source_section": "4.8.2, Table 4.8-1, p. 41, Skin",
+      "verification_status": "verified_primary_source",
+      "rule_summary": "Skin limits are 1,500, 3,000 and 6,000 mGy-Eq over 30 days, one year and a career, respectively.",
+      "verbatim_rule": "",
       "numeric_thresholds": {
         "skin_30_day_mgy_eq": 1500,
         "skin_1_year_mgy_eq": 3000,
         "skin_career_mgy_eq": 6000
       },
-      "search_text": "Table 4.8-1 Skin radiation 30-day 1500 mGy-Eq 1-year 3000 mGy-Eq career 6000 mGy-Eq erythema."
+      "search_text": "Table 4.8-1 (Skin) Skin dose limits Skin limits are 1,500, 3,000 and 6,000 mGy-Eq over 30 days, one year and a career, respectively."
     },
     {
       "standard_id": "Table 4.8-1 (Lens)",
       "domain": "Radiation",
-      "title": "Eye Lens Short-Term & Career Limits",
-      "verbatim_rule": "NASA-STD-3001 Table 4.8-1 (Lens): 30-day limit = 1000 mGy-Eq; 1-year limit = 2000 mGy-Eq; Career limit = 4000 mGy-Eq.",
+      "title": "Lens dose limits",
+      "source_url": "https://standards.nasa.gov/sites/default/files/standards/NASA/C/nasa-std-3001-vol-1-rev-c-signature.pdf",
+      "source_revision": "NASA-STD-3001 Volume 1, Revision C",
+      "source_section": "4.8.2, Table 4.8-1, p. 41, Lens",
+      "verification_status": "verified_primary_source",
+      "rule_summary": "Lens limits are 1,000, 2,000 and 4,000 mGy-Eq over 30 days, one year and a career, respectively.",
+      "verbatim_rule": "",
       "numeric_thresholds": {
         "lens_30_day_mgy_eq": 1000,
         "lens_1_year_mgy_eq": 2000,
         "lens_career_mgy_eq": 4000
       },
-      "search_text": "Table 4.8-1 Eye Lens radiation 30-day 1000 mGy-Eq 1-year 2000 mGy-Eq career 4000 mGy-Eq cataracts."
+      "search_text": "Table 4.8-1 (Lens) Lens dose limits Lens limits are 1,000, 2,000 and 4,000 mGy-Eq over 30 days, one year and a career, respectively."
     },
     {
       "standard_id": "Table 4.8-1 (Circulatory)",
       "domain": "Radiation",
-      "title": "Circulatory System Short-Term & Career Limits",
-      "verbatim_rule": "NASA-STD-3001 Table 4.8-1 (Circulatory): 30-day limit = 250 mGy-Eq; 1-year limit = 500 mGy-Eq; Career limit = 1000 mGy-Eq.",
+      "title": "Circulatory dose limits",
+      "source_url": "https://standards.nasa.gov/sites/default/files/standards/NASA/C/nasa-std-3001-vol-1-rev-c-signature.pdf",
+      "source_revision": "NASA-STD-3001 Volume 1, Revision C",
+      "source_section": "4.8.2, Table 4.8-1, p. 41, Circulatory",
+      "verification_status": "verified_primary_source",
+      "rule_summary": "Dose averaged across heart muscle and adjacent arteries is limited to 250, 500 and 1,000 mGy-Eq over 30 days, one year and a career, respectively.",
+      "verbatim_rule": "",
       "numeric_thresholds": {
         "circulatory_30_day_mgy_eq": 250,
         "circulatory_1_year_mgy_eq": 500,
         "circulatory_career_mgy_eq": 1000
       },
-      "search_text": "Table 4.8-1 Circulatory radiation 30-day 250 mGy-Eq 1-year 500 mGy-Eq career 1000 mGy-Eq."
+      "search_text": "Table 4.8-1 (Circulatory) Circulatory dose limits Dose averaged across heart muscle and adjacent arteries is limited to 250, 500 and 1,000 mGy-Eq over 30 days, one year and a career, respectively."
     },
     {
       "standard_id": "Table 4.8-1 (CNS)",
       "domain": "Radiation",
-      "title": "Central Nervous System (CNS) Short-Term & Career Limits",
-      "verbatim_rule": "NASA-STD-3001 Table 4.8-1 (CNS): 30-day limit = 500 mGy-Eq; 1-year limit = 1000 mGy-Eq; Career limit = 1500 mGy-Eq.",
+      "title": "Central nervous system dose limits",
+      "source_url": "https://standards.nasa.gov/sites/default/files/standards/NASA/C/nasa-std-3001-vol-1-rev-c-signature.pdf",
+      "source_revision": "NASA-STD-3001 Volume 1, Revision C",
+      "source_section": "4.8.2, Table 4.8-1, p. 41, CNS",
+      "verification_status": "verified_primary_source",
+      "rule_summary": "Hippocampal limits are 500, 1,000 and 1,500 mGy over 30 days, one year and a career. For ions with Z >= 10, annual and career limits are 100 and 250 mGy. The table gives no 30-day value for those ions.",
+      "verbatim_rule": "",
       "numeric_thresholds": {
-        "cns_30_day_mgy_eq": 500,
-        "cns_1_year_mgy_eq": 1000,
-        "cns_career_mgy_eq": 1500
+        "cns_30_day_mgy": 500,
+        "cns_1_year_mgy": 1000,
+        "cns_career_mgy": 1500,
+        "cns_z_ge_10_1_year_mgy": 100,
+        "cns_z_ge_10_career_mgy": 250
       },
-      "search_text": "Table 4.8-1 CNS Central Nervous System radiation 30-day 500 mGy-Eq 1-year 1000 mGy-Eq career 1500 mGy-Eq."
+      "search_text": "Table 4.8-1 (CNS) Central nervous system dose limits Hippocampal limits are 500, 1,000 and 1,500 mGy over 30 days, one year and a career. For ions with Z >= 10, annual and career limits are 100 and 250 mGy. The table gives no 30-day value for those ions."
     },
     {
-      "standard_id": "V2 6073",
+      "standard_id": "V2 6004",
       "domain": "Atmosphere / CO2",
-      "title": "Cabin ppCO2 Nominal & Action Limits",
-      "verbatim_rule": "NASA-STD-3001 [V2 6073]: Spacecraft cabin partial pressure of CO2 (ppCO2) 1-hour average shall not exceed 3.0 mmHg (nominal < 2.0 mmHg; 24-hour average <= 2.5 mmHg). Above 3.0 mmHg triggers hypercapnia mitigation.",
+      "title": "Nominal habitat CO2",
+      "source_url": "https://standards.nasa.gov/system/files/tmp/NASA-STD-3001%20Vol%202%20Rev%20F.pdf#page=51",
+      "source_revision": "NASA-STD-3001 Volume 2, Revision F (2026-07-14)",
+      "source_section": "6.2.1.3, p. 51",
+      "verification_status": "verified_primary_source",
+      "rule_summary": "The requirement applies to the one-hour mean in inhabited cabin volume. Off-nominal response criteria are mission-specific.",
+      "verbatim_rule": "The system shall limit the average one-hour CO2 partial pressure (ppCO2) in the habitable volume to no more than 3 mmHg.",
       "numeric_thresholds": {
-        "ppco2_nominal_max_mmhg": 2.0,
-        "ppco2_24h_avg_max_mmhg": 2.5,
-        "ppco2_1h_avg_max_mmhg": 3.0
+        "ppco2_1h_avg_max_mmhg": 3
       },
-      "search_text": "V2 6073 ppCO2 CO2 partial pressure 2.0 mmHg nominal 2.5 mmHg 24h 3.0 mmHg 1h max hypercapnia."
+      "simulation_assumptions": {
+        "ppco2_nominal_target_mmhg": 2,
+        "ppco2_24h_target_mmhg": 2.5
+      },
+      "search_text": "V2 6004 habitat CO2 rolling one-hour mean ppCO2."
     },
     {
-      "standard_id": "V2 6074",
+      "standard_id": "V2 6003",
       "domain": "Atmosphere / O2",
-      "title": "Cabin ppO2 Hypoxia & Hyperoxia Bounds",
-      "verbatim_rule": "NASA-STD-3001 [V2 6074]: Cabin oxygen partial pressure (ppO2) shall be maintained between 19.5 kPa (146 mmHg) and 23.1 kPa (173 mmHg) for nominal normoxic operations; emergency hypoxia < 16.0 kPa (120 mmHg).",
+      "title": "Inspired oxygen exposure bands",
+      "source_url": "https://standards.nasa.gov/system/files/tmp/NASA-STD-3001%20Vol%202%20Rev%20F.pdf#page=49",
+      "source_revision": "NASA-STD-3001 Volume 2, Revision F (2026-07-14)",
+      "source_section": "6.2.1.2, Table 6.2-1, pp. 49–51",
+      "verification_status": "verified_primary_source",
+      "rule_summary": "Table 6.2-1 defines inspired oxygen exposure bands by duration. Its normoxia target is 145–155 mmHg PIO2. Interpreting a dry cabin oxygen reading also requires ambient pressure.",
+      "verbatim_rule": "",
       "numeric_thresholds": {
-        "ppo2_min_kpa": 19.5,
-        "ppo2_max_kpa": 23.1,
-        "ppo2_min_mmhg": 146,
-        "ppo2_max_mmhg": 173,
-        "ppo2_hypoxia_alert_kpa": 16.0
+        "inspired_o2_normoxia_target_min_mmhg": 145,
+        "inspired_o2_normoxia_target_max_mmhg": 155
       },
-      "search_text": "V2 6074 ppO2 oxygen partial pressure 19.5 kPa 23.1 kPa 146 173 mmHg hypoxia 16.0 kPa."
+      "simulation_assumptions": {
+        "ambient_o2_low_kpa": 19.5,
+        "ambient_o2_high_kpa": 23.1,
+        "ambient_o2_alert_kpa": 16
+      },
+      "search_text": "V2 6003 inspired oxygen PIO2 duration normoxia hypoxia hyperoxia."
     },
     {
-      "standard_id": "V2 6081",
+      "standard_id": "V2 6006",
       "domain": "Atmosphere / Pressure",
-      "title": "Cabin Total Pressure & Decompression",
-      "verbatim_rule": "NASA-STD-3001 [V2 6081]: Nominal cabin total pressure is 101.3 kPa (14.7 psi) or exploration 56.5 kPa (8.2 psi / 34% O2); rapid pressure drop > 0.5 kPa/min signals hull breach / DCS risk.",
+      "title": "Total pressure for indefinite exposure",
+      "source_url": "https://standards.nasa.gov/system/files/tmp/NASA-STD-3001%20Vol%202%20Rev%20F.pdf#page=52",
+      "source_revision": "NASA-STD-3001 Volume 2, Revision F (2026-07-14)",
+      "source_section": "6.2.2.1, p. 52",
+      "verification_status": "verified_primary_source",
+      "rule_summary": "The indefinite exposure range is above 34.5 kPa through 103 kPa inclusive. DCS mitigation is a separate program requirement under V2 6008.",
+      "verbatim_rule": "",
       "numeric_thresholds": {
+        "total_pressure_min_exclusive_kpa": 34.5,
+        "total_pressure_max_inclusive_kpa": 103
+      },
+      "simulation_assumptions": {
         "nominal_iss_kpa": 101.3,
-        "exploration_atm_kpa": 56.5,
-        "exploration_o2_pct": 34
+        "alternative_atmosphere_kpa": 56.5,
+        "alternative_atmosphere_o2_pct": 34,
+        "pressure_drop_alert_kpa_per_min": 0.5
       },
-      "search_text": "V2 6081 cabin total pressure 101.3 kPa 56.5 kPa 8.2 psi decompression sickness DCS."
+      "search_text": "V2 6006 total cabin pressure indefinite exposure."
     },
     {
-      "standard_id": "V2 6095",
+      "standard_id": "V2 6008",
+      "domain": "Atmosphere / Decompression sickness",
+      "title": "Ground validation of DCS mitigation",
+      "source_url": "https://standards.nasa.gov/system/files/tmp/NASA-STD-3001%20Vol%202%20Rev%20F.pdf#page=53",
+      "source_revision": "NASA-STD-3001 Volume 2, Revision F (2026-07-14)",
+      "source_section": "6.2.2.4, pp. 53–54",
+      "verification_status": "verified_primary_source",
+      "rule_summary": "Programs validate mission-specific mitigation in ground chamber exposures. The target is a DCS probability below 4% at 95% confidence, with no serious DCS and assessment of venous gas emboli. This requirement governs ground protocol validation.",
+      "verbatim_rule": "",
+      "numeric_thresholds": {
+        "ground_validation_dcs_probability_max_exclusive_pct": 4,
+        "ground_validation_confidence_pct": 95
+      },
+      "search_text": "V2 6008 decompression sickness DCS ground chamber protocol validation venous gas emboli."
+    },
+    {
+      "standard_id": "V2 6012",
       "domain": "Thermal",
-      "title": "Cabin Temperature & Humidity Comfort/Safety",
-      "verbatim_rule": "NASA-STD-3001 [V2 6095]: Cabin temperature shall be maintained between 18.3 C (65 F) and 26.7 C (80 F) with relative humidity 25% to 75%.",
-      "numeric_thresholds": {
-        "temp_min_c": 18.3,
-        "temp_max_c": 26.7,
-        "rh_min_pct": 25,
-        "rh_max_pct": 75
+      "title": "Cabin temperature and humidity envelope",
+      "source_url": "https://standards.nasa.gov/system/files/tmp/NASA-STD-3001%20Vol%202%20Rev%20F.pdf#page=54",
+      "source_revision": "NASA-STD-3001 Volume 2, Revision F (2026-07-14)",
+      "source_section": "6.2.3.1, Figure 6.2-2, pp. 54–55",
+      "verification_status": "verified_primary_source",
+      "rule_summary": "Figure 6.2-2 specifies a joint temperature and humidity envelope for occupied pressurized operations, with exceptions for suited operations, ascent, entry, landing and postlanding.",
+      "verbatim_rule": "",
+      "numeric_thresholds": {},
+      "simulation_assumptions": {
+        "independent_temp_min_c": 18.3,
+        "independent_temp_max_c": 26.7,
+        "independent_rh_min_pct": 25,
+        "independent_rh_max_pct": 75
       },
-      "search_text": "V2 6095 cabin temperature 18.3 C 26.7 C humidity 25% 75% thermal."
+      "search_text": "V2 6012 cabin humidity temperature envelope operating limits."
     },
     {
-      "standard_id": "V2 6115",
+      "standard_id": "V2 6079",
       "domain": "Acoustic / Sleep",
-      "title": "Acoustic Noise Limits for Crew Sleep & Hearing",
-      "verbatim_rule": "NASA-STD-3001 [V2 6115]: Continuous cabin noise shall not exceed NC-50 (~58 dBA) in work areas and NC-40 (~48 dBA) in crew sleep quarters to prevent circadian disruption and NIHL.",
+      "title": "Continuous noise in crew sleep areas",
+      "source_url": "https://standards.nasa.gov/system/files/tmp/NASA-STD-3001%20Vol%202%20Rev%20F.pdf#page=95",
+      "source_revision": "NASA-STD-3001 Volume 2, Revision F (2026-07-14)",
+      "source_section": "6.6.1.8, Table 6.6-3, pp. 95–96",
+      "verification_status": "verified_primary_source",
+      "rule_summary": "Crew quarters and sleep areas on missions longer than 30 days use the NC-40 octave-band limits. V2 6078 separately covers workspace noise using NC-50.",
+      "verbatim_rule": "",
       "numeric_thresholds": {
-        "work_max_dba": 58,
-        "sleep_max_dba": 48
+        "mission_duration_min_exclusive_days": 30,
+        "sleep_noise_criterion_curve_nc": 40
       },
-      "search_text": "V2 6115 acoustic noise NC-50 58 dBA work NC-40 48 dBA sleep circadian hearing."
+      "simulation_assumptions": {
+        "work_alert_dba": 58,
+        "sleep_alert_dba": 48
+      },
+      "search_text": "V2 6079 sleep crew quarters continuous noise NC-40 octave bands."
     },
     {
-      "standard_id": "V2 11032",
+      "standard_id": "V2 7042",
+      "domain": "Physiological countermeasures / Orthostatic intolerance",
+      "title": "Countermeasure capability for orthostatic intolerance",
+      "source_url": "https://standards.nasa.gov/system/files/tmp/NASA-STD-3001%20Vol%202%20Rev%20F.pdf#page=127",
+      "source_revision": "NASA-STD-3001 Volume 2, Revision F (2026-07-14)",
+      "source_section": "7.4.3, pp. 127–128",
+      "verification_status": "verified_primary_source",
+      "rule_summary": "The vehicle must support orthostatic countermeasures during return to gravity and sustained head-to-foot acceleration. The requirement establishes a system capability.",
+      "verbatim_rule": "",
+      "numeric_thresholds": {},
+      "search_text": "V2 7042 orthostatic intolerance return to gravity acceleration countermeasure capability."
+    },
+    {
+      "standard_id": "V2 11011",
       "domain": "EVA / Suit",
-      "title": "EVA Suit Cooling & Core Temperature Limits",
-      "verbatim_rule": "NASA-STD-3001 [V2 11032]: During EVA, crew core body temperature shall be maintained <= 38.5 C (abort EVA if >= 39.0 C or LCVG failure) and metabolic rate <= 470 W sustained.",
+      "title": "Heat storage during nominal suited operations",
+      "source_url": "https://standards.nasa.gov/system/files/tmp/NASA-STD-3001%20Vol%202%20Rev%20F.pdf#page=226",
+      "source_revision": "NASA-STD-3001 Volume 2, Revision F (2026-07-14)",
+      "source_section": "11.1.4.5, p. 226",
+      "verification_status": "verified_primary_source",
+      "rule_summary": "Nominal suited heat storage must fall between −1.9 and +3.0 kJ/kg, exclusive, using the 41 Node Man or Wissler model. The constrained quantity is stored energy per unit mass.",
+      "verbatim_rule": "",
       "numeric_thresholds": {
+        "heat_storage_min_exclusive_kj_per_kg": -1.9,
+        "heat_storage_max_exclusive_kj_per_kg": 3
+      },
+      "simulation_assumptions": {
         "eva_core_temp_caution_c": 38.5,
-        "eva_core_temp_abort_c": 39.0,
+        "eva_core_temp_abort_c": 39,
         "eva_metabolic_sustained_max_w": 470
       },
-      "search_text": "V2 11032 EVA suit cooling core temperature 38.5 C 39.0 C abort LCVG heat strain."
+      "search_text": "V2 11011 EVA spacesuit modeled heat storage thermoregulation."
     },
     {
       "standard_id": "JSC 20584 (NH3 - 1h)",
       "domain": "Toxicology / SMAC",
       "title": "Ammonia (NH3) 1-Hour SMAC",
-      "verbatim_rule": "JSC 20584 SMAC (Ammonia NH3): 1-hour Spacecraft Maximum Allowable Concentration = 30 ppm (20 mg/m3). Immediate mask/oxygen and cabin scrub if exceeded.",
+      "verbatim_rule": "",
       "numeric_thresholds": {
         "chemical": "Ammonia (NH3)",
         "duration": "1-hour",
         "smac_ppm": 30,
-        "smac_mg_m3": 20
+        "smac_1h_ppm": 30
       },
-      "search_text": "JSC 20584 SMAC Ammonia NH3 1-hour 30 ppm 20 mg/m3 coolant leak."
+      "search_text": "Ammonia (NH3) 1-Hour SMAC The one-hour ammonia exposure limit is 30 ppm.",
+      "source_revision": "JSC 20584, Revision D (2026-02)",
+      "source_url": "https://www.nasa.gov/wp-content/uploads/2026/02/jsc-20584-smacs-rev-d.pdf#page=9",
+      "source_section": "SMAC table, p. 9, CAS 7664-41-7",
+      "verification_status": "verified_primary_source",
+      "rule_summary": "The one-hour ammonia exposure limit is 30 ppm."
     },
     {
       "standard_id": "JSC 20584 (NH3 - 24h/Long)",
       "domain": "Toxicology / SMAC",
       "title": "Ammonia (NH3) 24-Hour & Long-Term SMAC",
-      "verbatim_rule": "JSC 20584 SMAC (Ammonia NH3): 24-hour SMAC = 20 ppm; 7-day to 180-day SMAC = 10 ppm; 1000-day SMAC = 3 ppm.",
+      "verbatim_rule": "",
       "numeric_thresholds": {
         "chemical": "Ammonia (NH3)",
         "smac_24h_ppm": 20,
-        "smac_7d_180d_ppm": 10,
+        "smac_7d_ppm": 3,
+        "smac_30d_ppm": 3,
+        "smac_180d_ppm": 3,
         "smac_1000d_ppm": 3
       },
-      "search_text": "JSC 20584 SMAC Ammonia NH3 24-hour 20 ppm 7-day 180-day 10 ppm 1000-day 3 ppm."
+      "search_text": "Ammonia (NH3) 24-Hour & Long-Term SMAC Ammonia limits are 20 ppm for 24 hours and 3 ppm for each listed longer duration.",
+      "source_revision": "JSC 20584, Revision D (2026-02)",
+      "source_url": "https://www.nasa.gov/wp-content/uploads/2026/02/jsc-20584-smacs-rev-d.pdf#page=9",
+      "source_section": "SMAC table, p. 9, CAS 7664-41-7",
+      "verification_status": "verified_primary_source",
+      "rule_summary": "Ammonia limits are 20 ppm for 24 hours and 3 ppm for each listed longer duration."
     },
     {
       "standard_id": "JSC 20584 (CO)",
       "domain": "Toxicology / SMAC",
       "title": "Carbon Monoxide (CO) SMACs",
-      "verbatim_rule": "JSC 20584 SMAC (Carbon Monoxide CO): 1-hour = 425 ppm; 24-hour = 100 ppm; 7-day = 55 ppm; 30-180-day = 15 ppm; 1000-day = 15 ppm. Fire/pyrolysis indicator.",
+      "verbatim_rule": "",
       "numeric_thresholds": {
         "chemical": "Carbon Monoxide (CO)",
         "smac_1h_ppm": 425,
         "smac_24h_ppm": 100,
         "smac_7d_ppm": 55,
-        "smac_30d_1000d_ppm": 15
+        "smac_30d_ppm": 15,
+        "smac_180d_ppm": 15,
+        "smac_1000d_ppm": 15
       },
-      "search_text": "JSC 20584 SMAC Carbon Monoxide CO 1-hour 425 ppm 24-hour 100 ppm 7-day 55 ppm 30-180-day 15 ppm fire smoke."
+      "search_text": "Carbon Monoxide (CO) SMACs Carbon monoxide limits decrease from 425 ppm for one hour to 15 ppm at 30, 180 and 1000 days.",
+      "source_revision": "JSC 20584, Revision D (2026-02)",
+      "source_url": "https://www.nasa.gov/wp-content/uploads/2026/02/jsc-20584-smacs-rev-d.pdf#page=10",
+      "source_section": "SMAC table, p. 10, CAS 630-08-0",
+      "verification_status": "verified_primary_source",
+      "rule_summary": "Carbon monoxide limits decrease from 425 ppm for one hour to 15 ppm at 30, 180 and 1000 days."
     },
     {
       "standard_id": "JSC 20584 (N2H4)",
       "domain": "Toxicology / SMAC",
       "title": "Hydrazine (N2H4) SMACs",
-      "verbatim_rule": "JSC 20584 SMAC (Hydrazine N2H4): 1-hour = 4 ppm; 24-hour = 0.3 ppm; 7-day = 0.04 ppm; 30-180-day = 0.02 ppm; 1000-day = 0.004 ppm. Hypergolic propellant hazard post-EVA.",
+      "verbatim_rule": "",
       "numeric_thresholds": {
         "chemical": "Hydrazine (N2H4)",
         "smac_1h_ppm": 4,
         "smac_24h_ppm": 0.3,
         "smac_7d_ppm": 0.04,
-        "smac_30d_180d_ppm": 0.02,
-        "smac_1000d_ppm": 0.004
+        "smac_30d_ppm": 0.02,
+        "smac_180d_ppm": 0.004,
+        "smac_1000d_ppm": null
       },
-      "search_text": "JSC 20584 SMAC Hydrazine N2H4 1-hour 4 ppm 24-hour 0.3 ppm 7-day 0.04 ppm propellant post-EVA decontamination."
+      "search_text": "Hydrazine (N2H4) SMACs Hydrazine limits decrease to 0.004 ppm at 180 days. The table gives no 1000-day limit.",
+      "source_revision": "JSC 20584, Revision D (2026-02)",
+      "source_url": "https://www.nasa.gov/wp-content/uploads/2026/02/jsc-20584-smacs-rev-d.pdf#page=13",
+      "source_section": "SMAC table, p. 13, CAS 302-01-2",
+      "verification_status": "verified_primary_source",
+      "rule_summary": "Hydrazine limits decrease to 0.004 ppm at 180 days. The table gives no 1000-day limit."
     }
   ]
 }

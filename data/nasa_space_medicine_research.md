@@ -1,3 +1,5 @@
+> Evidence status: Curated project background notes, not a clinical authority. Treat clinical steps, doses, thresholds and quotations as unverified unless individually mapped to a verified primary source in nasa_std_3001_rules.json.
+
 # Autonomous Biomedical Telemetry, Edge Anomaly Detection, and Clinical Decision Support Reference
 
 > [!IMPORTANT]

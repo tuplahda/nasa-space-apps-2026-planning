@@ -52,15 +52,15 @@ ACTIVITY_STATE_MAP: Dict[str, str] = {
 }
 
 PARAM_DISPLAY_NAMES: Dict[str, Tuple[str, str]] = {
-    "hr_bpm": ("Heart Rate", "NASA-STD-3001 [V1 3003a]"),
-    "sbp_mmHg": ("Systolic BP", "NASA-STD-3001 [V1 3003a]"),
-    "dbp_mmHg": ("Diastolic BP", "NASA-STD-3001 [V1 3003a]"),
-    "spo2_pct": ("SpO2", "NASA-STD-3001 [V2 6003]"),
-    "hrv_rmssd_ms": ("HRV (RMSSD)", "NASA-STD-3001 [V1 3003a]"),
-    "cbt_C": ("Core Body Temp", "NASA-STD-3001 [V2 6012]"),
-    "rr_bpm": ("Respiration Rate", "NASA-STD-3001 [V1 3003a]"),
-    "cabin_ppCO2_mmHg": ("Cabin CO2", "NASA-STD-3001 [V2 6004]"),
-    "ambient_radiation_msv_h": ("Ambient Radiation", "NASA-STD-3001 [V1 4030]"),
+    "hr_bpm": ("Heart Rate", "Project physiology baseline"),
+    "sbp_mmHg": ("Systolic BP", "Project physiology baseline"),
+    "dbp_mmHg": ("Diastolic BP", "Project physiology baseline"),
+    "spo2_pct": ("SpO2", "NASA-STD-3001 V2 6003 (oxygen requirement context)"),
+    "hrv_rmssd_ms": ("HRV (RMSSD)", "Project physiology baseline"),
+    "cbt_C": ("Core Body Temp", "NASA-STD-3001 V2 6012 (thermal design context)"),
+    "rr_bpm": ("Respiration Rate", "Project physiology baseline"),
+    "cabin_ppCO2_mmHg": ("Cabin CO2", "Project CO2 alert (NASA V2 6004 uses a 1-hour average)"),
+    "ambient_radiation_msv_h": ("Ambient Radiation", "Project radiation alert threshold"),
 }
 
 
@@ -210,7 +210,7 @@ class EdgeAnomalyDetector:
                 key, vals.get(key, 0.0), activity, mission_day, spec
             )
 
-        # Evaluate Cabin/Suit CO2 (`NASA-STD-3001 [V2 6004]`)
+        # Evaluate Cabin/Suit CO2 (`Project CO2 alert (NASA V2 6004 uses a 1-hour average)`)
         co2 = vals.get("cabin_ppCO2_mmHg", 2.0)
         if activity == "EVA_SPACEWALK" and co2 >= 12.5:
             results["cabin_ppCO2_mmHg"] = ("CRITICAL_RED", "< 2.0 mmHg", "> 12.5 mmHg (Suit Limit)", "mmHg")
@@ -221,7 +221,7 @@ class EdgeAnomalyDetector:
         else:
             results["cabin_ppCO2_mmHg"] = ("NOMINAL", "< 2.5 mmHg", "Nominal", "mmHg")
 
-        # Evaluate Ambient Radiation (`NASA-STD-3001 [V1 4030]`)
+        # Evaluate Ambient Radiation (`Project radiation telemetry alert`)
         rad = vals.get("ambient_radiation_msv_h", 0.054)
         if rad >= 2.0:
             results["ambient_radiation_msv_h"] = ("CRITICAL_RED", "< 0.06 mSv/h", ">= 2.0 mSv/h (SPE Crisis)", "mSv/h")
@@ -370,7 +370,7 @@ class EdgeAnomalyDetector:
                     expected_ug_range="1500-4000 cells/μL",
                     threshold_breached="< 1500 cells/μL (Andrews Radiation Depletion)",
                     severity="CRITICAL_RED",
-                    standard_ref="NASA-STD-3001 [V1 4030]",
+                    standard_ref="Project radiation alert threshold",
                     rolling_avg_10s=diag.alc_cells_uL,
                     slew_rate_per_sec=0.0,
                     debounced=True,

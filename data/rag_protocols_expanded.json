@@ -1,22 +1,22 @@
 {
   "dataset_metadata": {
-    "name": "ARES-MED Expanded Pre-Processed Clinical RAG Protocols",
-    "version": "2.0.0",
-    "source": "Original 8 Spaceflight Scenarios + 32 NASA Space Medicine CPGs (CPG-01 through CPG-32)",
+    "name": "ARES-MED simulated clinical scenarios",
+    "version": "2.1.0",
+    "source": "Project simulation corpus with NASA references for mission risks, spacecraft requirements and exposure limits.",
     "total_scenarios": 8,
     "total_cpg_protocols": 32,
     "total_protocol_chunks": 40,
     "offline_ready": true,
-    "description": "Self-contained clinical protocol chunks preserving Layer-1 deterministic equations alongside 32 autonomous Level I-V Clinical Practice Guidelines."
+    "description": "The CPG identifiers are project labels. Clinical criteria, equations, medications, lockouts and checklists are unverified simulation content. Each citation identifies the claim its source supports.",
+    "source_review_date": "2026-11-14"
   },
   "legacy_8_scenarios": [
     {
       "scenario_id": "SCENARIO_1_HYPERCAPNIA",
       "title": "Acute and Chronic Hypercapnia (CO2 Toxicity & ECLSS Scrubbing Degradation)",
       "nasa_citations": [
-        "NASA-STD-3001 Vol 2 Rev D [V2 6004]",
-        "OCHMO-TB-004 (Carbon Dioxide)",
-        "ISS Medical Checklist JSC-48522-E4"
+        "NASA-STD-3001 Vol 2 Rev F, 6.2.1.3 [V2 6004] (The habitable system must limit average cabin CO2 partial pressure to 3 mmHg over one hour).",
+        "OCHMO-TB-004 Rev D, pp. 8-9 (The technical brief describes ISS carbon dioxide removal systems)."
       ],
       "layer1_equations": {
         "delta_CO2": "max(0, ppCO2(t) - 2.0)",
@@ -46,15 +46,37 @@
         "If ppCO2 > 5.0 mmHg or trigeminal symptoms: deploy 100% O2 via demand mask (RSP) and run i-STAT venous blood gas (MDP).",
         "Administer Ibuprofen 400 mg PO or Acetaminophen 650 mg PO from CMP (avoid opioids).",
         "Suspend 75% VO2max ARED exercise and shift crew diet toward higher fat (RQ -> 0.85) to cut metabolic CO2 production by 20%."
-      ]
+      ],
+      "verified_rule_ids": [
+        "V2 6004"
+      ],
+      "source_audit": {
+        "clinical_status": "unverified_project_simulation",
+        "unverified_fields": [
+          "layer1_equations",
+          "symptoms_by_severity",
+          "checs_medications",
+          "autonomous_checklist"
+        ],
+        "references": [
+          {
+            "citation": "NASA-STD-3001 Vol 2 Rev F, 6.2.1.3 [V2 6004]",
+            "url": "https://standards.nasa.gov/system/files/tmp/NASA-STD-3001%20Vol%202%20Rev%20F.pdf",
+            "supports": "The habitable system must limit average cabin CO2 partial pressure to 3 mmHg over one hour."
+          },
+          {
+            "citation": "OCHMO-TB-004 Rev D, pp. 8-9",
+            "url": "https://www.nasa.gov/wp-content/uploads/2023/12/ochmo-tb-004-carbon-dioxide.pdf",
+            "supports": "The technical brief describes ISS carbon dioxide removal systems."
+          }
+        ]
+      }
     },
     {
       "scenario_id": "SCENARIO_2_SANS",
       "title": "Spaceflight-Associated Neuro-Ocular Syndrome (SANS)",
       "nasa_citations": [
-        "NASA HRP Evidence Book: SANS",
-        "NASA SANS Clinical Practice Guideline (CPG)",
-        "ISS Medical Checklist JSC-48522"
+        "OCHMO-MTB-001, February 2024, p. 10, Figure 1 (NASA's SANS medical technical brief provides a reference overview of ophthalmic testing)."
       ],
       "layer1_equations": {
         "rnfl_um": "95 + 18 * ln(1 + max(0, flight_day - 15) / 30)",
@@ -83,14 +105,30 @@
         "Prescribe adjustable Space Anticipation Glasses calibrated to +0.75 to +1.50 D hyperopic shift.",
         "Initiate nightly Lower Body Negative Pressure (LBNP) therapy (reduces CVP to 1.2 mmHg and choroidal area expansion by 74%).",
         "Apply Venoconstrictive Thigh Cuffs (VTCs), clamp cabin ppCO2 < 2.5 mmHg, and moderate peak ARED Valsalva loads."
-      ]
+      ],
+      "verified_rule_ids": [],
+      "source_audit": {
+        "clinical_status": "unverified_project_simulation",
+        "unverified_fields": [
+          "layer1_equations",
+          "symptoms_by_severity",
+          "checs_medications",
+          "autonomous_checklist"
+        ],
+        "references": [
+          {
+            "citation": "OCHMO-MTB-001, February 2024, p. 10, Figure 1",
+            "url": "https://www.nasa.gov/wp-content/uploads/2024/02/ochmo-mtb-001-sans.pdf",
+            "supports": "NASA's SANS medical technical brief provides a reference overview of ophthalmic testing."
+          }
+        ]
+      }
     },
     {
       "scenario_id": "SCENARIO_3_ORTHOSTATIC_INTOLERANCE",
       "title": "Orthostatic Intolerance and Gravitational Transition Pre-Syncope",
       "nasa_citations": [
-        "NASA-STD-3001 Fitness-for-Duty Orthostatic Hypotension Standard (4.2.11)",
-        "ISS Medical Checklist JSC-48522"
+        "NASA-STD-3001 Vol 2 Rev F, 7.4.3 [V2 7042] (The vehicle must provide countermeasures for orthostatic intolerance on return to gravity and during specified head-to-foot acceleration)."
       ],
       "layer1_equations": {
         "sbp_mmHg": "112 - 28 * (1 - exp(-t / 1.8)) - step(t - 4) * 18 * (t - 4)",
@@ -116,17 +154,36 @@
       "autonomous_checklist": [
         "Command crewmember into immediate supine, legs-elevated (Trendelenburg) posture to restore venous return.",
         "Attach Inspiratory Threshold Valve (ITV / ITD) to facemask (RSP) — boosts stroke volume to 138 mL and cardiac output to 8.9 L/min.",
-        "Don lower-body compression garments and execute NASA Fluid Loading Protocol (1.0-1.5 L isotonic fluid).",
+        "Don lower-body compression garments and model a fluid-loading exercise (1.0-1.5 L isotonic fluid).",
         "If severe post-landing hypotension persists: infuse 500-1,000 mL 0.9% Normal Saline via CHeCS IV pump (ISP)."
-      ]
+      ],
+      "verified_rule_ids": [
+        "V2 7042"
+      ],
+      "source_audit": {
+        "clinical_status": "unverified_project_simulation",
+        "unverified_fields": [
+          "layer1_equations",
+          "symptoms_by_severity",
+          "checs_medications",
+          "autonomous_checklist"
+        ],
+        "references": [
+          {
+            "citation": "NASA-STD-3001 Vol 2 Rev F, 7.4.3 [V2 7042]",
+            "url": "https://standards.nasa.gov/system/files/tmp/NASA-STD-3001%20Vol%202%20Rev%20F.pdf",
+            "supports": "The vehicle must provide countermeasures for orthostatic intolerance on return to gravity and during specified head-to-foot acceleration."
+          }
+        ]
+      }
     },
     {
       "scenario_id": "SCENARIO_4_SOLAR_RADIATION_ARS",
       "title": "Acute Radiation Syndrome (ARS) from Solar Particle Event (SPE)",
       "nasa_citations": [
-        "NASA-STD-3001 Vol 1 Rev C [V1 4030] Space Permissible Exposure Limits",
-        "NASA DONKI API (/DONKI/SEP & /DONKI/FLR)",
-        "ISS Medical Checklist JSC-48522"
+        "NASA-STD-3001 Vol 1 Rev C, 4.8.1 [V1 4029] (Crew radiation protection uses the ALARA principle).",
+        "NASA-STD-3001 Vol 1 Rev C, 4.8.3 [V1 4031] (The system design must protect the crew against a specified solar particle reference event).",
+        "NASA CCMC DONKI, About and Catalogs (The research catalog records solar flares and solar energetic particle events)."
       ],
       "layer1_equations": {
         "bfo_dose_rate_mGy_hr": "0.054 + A_SPE * ((t - t0)/tau)^(k-1) * exp(-((t - t0)/tau)^k)",
@@ -147,19 +204,48 @@
         }
       ],
       "autonomous_checklist": [
-        "ALARA Protocol: Abort EVA immediately upon DONKI /FLR or /SEP notification; retreat to high-hydrogen Storm Shelter.",
+        "In this exercise, simulate EVA termination and shelter entry when the scenario injects a solar event and local dosimetry alert.",
         "Administer Ondansetron 4-8 mg ODT/IV (OMP/TIMP) and initiate 0.9% Normal Saline IV rehydration (ISP) with i-STAT electrolytes.",
         "Perform serial C2M2 offline Complete Blood Count (CBC) assays every 6 hours to track Andrews lymphocyte depletion kinetics.",
         "Initiate prophylactic antimicrobials (Levofloxacin, Valacyclovir, Fluconazole) and use Acetaminophen (NO NSAIDs/Aspirin) for fever."
-      ]
+      ],
+      "verified_rule_ids": [
+        "V1 4029",
+        "V1 4031"
+      ],
+      "source_audit": {
+        "clinical_status": "unverified_project_simulation",
+        "unverified_fields": [
+          "layer1_equations",
+          "symptoms_by_severity",
+          "checs_medications",
+          "autonomous_checklist"
+        ],
+        "references": [
+          {
+            "citation": "NASA-STD-3001 Vol 1 Rev C, 4.8.1 [V1 4029]",
+            "url": "https://standards.nasa.gov/sites/default/files/standards/NASA/C/nasa-std-3001-vol-1-rev-c-signature.pdf",
+            "supports": "Crew radiation protection uses the ALARA principle."
+          },
+          {
+            "citation": "NASA-STD-3001 Vol 1 Rev C, 4.8.3 [V1 4031]",
+            "url": "https://standards.nasa.gov/sites/default/files/standards/NASA/C/nasa-std-3001-vol-1-rev-c-signature.pdf",
+            "supports": "The system design must protect the crew against a specified solar particle reference event."
+          },
+          {
+            "citation": "NASA CCMC DONKI, About and Catalogs",
+            "url": "https://ccmc.gsfc.nasa.gov/tools/DONKI/",
+            "supports": "The research catalog records solar flares and solar energetic particle events."
+          }
+        ]
+      }
     },
     {
       "scenario_id": "SCENARIO_5_EVA_THERMAL_DCS",
       "title": "EVA Thermal Strain ('Space Fever'), Dehydration, and Decompression Sickness (DCS)",
       "nasa_citations": [
-        "NASA-STD-3001 Vol 1 & Vol 2 [V2 6006]",
-        "NASA EVA Probabilistic Risk Assessment (PRA)",
-        "ISS Medical Checklist JSC-48522"
+        "NASA-STD-3001 Vol 2 Rev F, 6.2.2.4 [V2 6008] (The program must establish mission-specific decompression sickness mitigation and demonstrate its performance in ground testing).",
+        "NASA-STD-3001 Vol 2 Rev F, 11.1.4.5 [V2 11011] (The spacesuit design must limit modeled crewmember heat storage during nominal suited activity)."
       ],
       "layer1_equations": {
         "cbt_C": "37.8 + 2.6 * (1 - exp(-t / 45))",
@@ -183,15 +269,38 @@
         "Abort EVA, ingress airlock, and repressurize to 101.3 kPa (14.7 psia) to compress nitrogen microbubbles.",
         "Doff spacesuit and apply active surface cooling packs (neck, axillae, groin) until CBT < 38.0 °C.",
         "Place astronaut on 100% O2 via tight-fitting mask (RSP), infuse 1.0-2.0 L Normal Saline IV (ISP), and run i-STAT panel."
-      ]
+      ],
+      "verified_rule_ids": [
+        "V2 6008",
+        "V2 11011"
+      ],
+      "source_audit": {
+        "clinical_status": "unverified_project_simulation",
+        "unverified_fields": [
+          "layer1_equations",
+          "symptoms_by_severity",
+          "checs_medications",
+          "autonomous_checklist"
+        ],
+        "references": [
+          {
+            "citation": "NASA-STD-3001 Vol 2 Rev F, 6.2.2.4 [V2 6008]",
+            "url": "https://standards.nasa.gov/system/files/tmp/NASA-STD-3001%20Vol%202%20Rev%20F.pdf",
+            "supports": "The program must establish mission-specific decompression sickness mitigation and demonstrate its performance in ground testing."
+          },
+          {
+            "citation": "NASA-STD-3001 Vol 2 Rev F, 11.1.4.5 [V2 11011]",
+            "url": "https://standards.nasa.gov/system/files/tmp/NASA-STD-3001%20Vol%202%20Rev%20F.pdf",
+            "supports": "The spacesuit design must limit modeled crewmember heat storage during nominal suited activity."
+          }
+        ]
+      }
     },
     {
       "scenario_id": "SCENARIO_6_CIRCADIAN_SLEEP",
       "title": "Circadian Desynchrony, Sleep Architecture Fragmentation, and Behavioral Asthenia",
       "nasa_citations": [
-        "NASA Spaceflight Standard Measures (SSM) — Sleep & Cognition Test Battery (CTB)",
-        "NASA-STD-3001 [V2 6012] Thermal Comfort",
-        "ISS CHeCS Formulary"
+        "NASA-STD-3001 Vol 2 Rev F, 6.6.1.8 [V2 6079] (For missions longer than 30 days, the sleep-area acoustic requirement uses the NC-40 octave-band curve)."
       ],
       "layer1_equations": {
         "sleep_onset_latency_min": "65",
@@ -214,17 +323,35 @@
       ],
       "autonomous_checklist": [
         "Configure dynamic solid-state lighting: 480 nm blue-enriched light upon waking; blue-depleted dim light 2 hours pre-sleep.",
-        "Cool Crew Quarters to 18-20 °C ([V2 6012]) and verify local sleep-station fan & ppCO2 < 2.5 mmHg.",
+        "Check sleep-station temperature, ventilation and local cabin CO2 in the simulation.",
         "Administer Melatonin 3 mg PO or Zaleplon 5-10 mg PO at bedtime (OMP); use Caffeine/Modafinil prior to critical EVA/docking.",
         "Activate C2M2 offline VR relaxation, CBT modules, and asynchronous Private Psychological Conference."
-      ]
+      ],
+      "verified_rule_ids": [
+        "V2 6079"
+      ],
+      "source_audit": {
+        "clinical_status": "unverified_project_simulation",
+        "unverified_fields": [
+          "layer1_equations",
+          "symptoms_by_severity",
+          "checs_medications",
+          "autonomous_checklist"
+        ],
+        "references": [
+          {
+            "citation": "NASA-STD-3001 Vol 2 Rev F, 6.6.1.8 [V2 6079]",
+            "url": "https://standards.nasa.gov/system/files/tmp/NASA-STD-3001%20Vol%202%20Rev%20F.pdf",
+            "supports": "For missions longer than 30 days, the sleep-area acoustic requirement uses the NC-40 octave-band curve."
+          }
+        ]
+      }
     },
     {
       "scenario_id": "SCENARIO_7_IJV_THROMBOSIS_ARRHYTHMIA",
       "title": "Spaceflight Venous Thromboembolism (IJV Thrombosis) and Cardiac Arrhythmia",
       "nasa_citations": [
-        "ISS Vascular Contingency Pack Protocol",
-        "ISS Medical Checklist JSC-48522 (ACLS / CMRS)"
+        "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2 (Mission planning considers venous thromboembolism and atrial arrhythmias)."
       ],
       "layer1_equations": {
         "ijv_uncomplicated_hr_bpm": "84",
@@ -248,14 +375,30 @@
         "Initiate subcutaneous Enoxaparin followed by oral Apixaban from the Vascular Contingency Pack (VCP).",
         "Lock out crewmember from EVA and high-load ARED resistive exercise; stage Protamine and PCC reversal agents.",
         "If VT/VF cardiac arrest occurs: secure crewmember to electrically isolated CMRS, defibrillate via AED/Zoll, place ILMA airway (RSP), and administer Epinephrine 0.1 mg/mL (EMTP)."
-      ]
+      ],
+      "verified_rule_ids": [],
+      "source_audit": {
+        "clinical_status": "unverified_project_simulation",
+        "unverified_fields": [
+          "layer1_equations",
+          "symptoms_by_severity",
+          "checs_medications",
+          "autonomous_checklist"
+        ],
+        "references": [
+          {
+            "citation": "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2",
+            "url": "https://www.nasa.gov/reference/appendix-e-health-and-medical-care-technical-requirements/",
+            "supports": "Mission planning considers venous thromboembolism and atrial arrhythmias."
+          }
+        ]
+      }
     },
     {
       "scenario_id": "SCENARIO_8_SAS_URINARY_RETENTION",
       "title": "Early-Mission Space Adaptation Syndrome (SAS), Rhinosinusitis, and Acute Urinary Retention",
       "nasa_citations": [
-        "ISS Medical Checklist JSC-48522 (SAS & Bladder Catheterization)",
-        "NASA IMM Clinical Finding Forms (CLIFFs)"
+        "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2 (Mission planning considers space motion sickness, congestion and urinary retention)."
       ],
       "layer1_equations": {
         "sas_vagal_hr_bpm": "48",
@@ -278,18 +421,34 @@
         "For SAS: Minimize head pitch/roll movements; administer Ondansetron 4 mg ODT or Promethazine 25 mg + Caffeine 100-200 mg (CMP/TIMP).",
         "For Cephalad Rhinosinusitis: Administer Pseudoephedrine PO and Oxymetazoline nasal spray (limit <= 3 days).",
         "If unable to void >8 hours: Perform AI-guided bladder ultrasound (MDP) and administer Tamsulosin 0.4 mg PO (OMP).",
-        "If bladder volume >500 mL: Perform sterile urethral catheterization per JSC-48522 using Lidocaine Jelly and MTP catheter kit."
-      ]
+        "If bladder volume >500 mL: Perform sterile urethral catheterization using Lidocaine Jelly and MTP catheter kit."
+      ],
+      "verified_rule_ids": [],
+      "source_audit": {
+        "clinical_status": "unverified_project_simulation",
+        "unverified_fields": [
+          "layer1_equations",
+          "symptoms_by_severity",
+          "checs_medications",
+          "autonomous_checklist"
+        ],
+        "references": [
+          {
+            "citation": "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2",
+            "url": "https://www.nasa.gov/reference/appendix-e-health-and-medical-care-technical-requirements/",
+            "supports": "Mission planning considers space motion sickness, congestion and urinary retention."
+          }
+        ]
+      }
     }
   ],
   "clinical_practice_guidelines": [
     {
       "protocol_id": "CPG-01",
       "category": "Surgical / Abdominal",
-      "title": "Acute Appendicitis (Non-Operative Level V Management)",
+      "title": "Acute Appendicitis (Simulated Non-Operative Management)",
       "nasa_citations": [
-        "NASA-STD-3001 Level V",
-        "ISS Medical Checklist / CHeCS"
+        "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2 (Mission planning considers appendicitis)."
       ],
       "diagnostic_criteria": [
         "RLQ abdominal pain, anorexia, fever, rebound tenderness",
@@ -312,15 +471,31 @@
         "Bisacodyl (acute surgical abdomen)",
         "Ibuprofen / Ketorolac / Aspirin (bleeding/perforation risk)"
       ],
-      "search_text": "CPG-01 Acute Appendicitis Level V non-operative RLQ pain leukocytosis C2M2 Ultrasound-2 Ertapenem Ceftriaxone Hydromorphone NPO IV fluids."
+      "search_text": "CPG-01 Acute Appendicitis non-operative RLQ pain leukocytosis C2M2 Ultrasound-2 Ertapenem Ceftriaxone Hydromorphone NPO IV fluids.",
+      "verified_rule_ids": [],
+      "source_audit": {
+        "clinical_status": "unverified_project_simulation",
+        "unverified_fields": [
+          "diagnostic_criteria",
+          "autonomous_checklist",
+          "prescribed_meds",
+          "drug_lockouts"
+        ],
+        "references": [
+          {
+            "citation": "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2",
+            "url": "https://www.nasa.gov/reference/appendix-e-health-and-medical-care-technical-requirements/",
+            "supports": "Mission planning considers appendicitis."
+          }
+        ]
+      }
     },
     {
       "protocol_id": "CPG-02",
       "category": "Cardiovascular",
       "title": "Acute Coronary Syndrome (ACS) / Myocardial Infarction",
       "nasa_citations": [
-        "NASA-STD-3001 Level III-V",
-        "ISS Medical Checklist / EMTP"
+        "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2 (Mission planning considers acute coronary disease)."
       ],
       "diagnostic_criteria": [
         "Substernal chest pain, diaphoresis, dyspnea, radiating arm/jaw pain",
@@ -343,15 +518,31 @@
         "Nitroglycerin if SBP < 90 mmHg or PDE5 inhibitor use",
         "Aspirin/Clopidogrel/Enoxaparin if ARS thrombocytopenia"
       ],
-      "search_text": "CPG-02 Acute Coronary Syndrome ACS MI chest pain Tempus Pro 12-lead ECG Aspirin Nitroglycerin Clopidogrel Atorvastatin Enoxaparin."
+      "search_text": "CPG-02 Acute Coronary Syndrome ACS MI chest pain Tempus Pro 12-lead ECG Aspirin Nitroglycerin Clopidogrel Atorvastatin Enoxaparin.",
+      "verified_rule_ids": [],
+      "source_audit": {
+        "clinical_status": "unverified_project_simulation",
+        "unverified_fields": [
+          "diagnostic_criteria",
+          "autonomous_checklist",
+          "prescribed_meds",
+          "drug_lockouts"
+        ],
+        "references": [
+          {
+            "citation": "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2",
+            "url": "https://www.nasa.gov/reference/appendix-e-health-and-medical-care-technical-requirements/",
+            "supports": "Mission planning considers acute coronary disease."
+          }
+        ]
+      }
     },
     {
       "protocol_id": "CPG-03",
       "category": "Cardiovascular / Resuscitation",
       "title": "Cardiac Arrest / Ventricular Fibrillation (ACLS)",
       "nasa_citations": [
-        "NASA-STD-3001 Level III-V",
-        "ISS ACLS Crew Restraint Protocol"
+        "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2 (Mission planning considers cardiac arrest)."
       ],
       "diagnostic_criteria": [
         "Unresponsive, apneic, pulseless",
@@ -369,15 +560,31 @@
       "drug_lockouts": [
         "Ensure no conductive fluid/oxygen pooling before defibrillation shock"
       ],
-      "search_text": "CPG-03 Cardiac Arrest ACLS VF pVT defibrillation Tempus Pro Epinephrine 1 mg IV CMRS microgravity CPR."
+      "search_text": "CPG-03 Cardiac Arrest ACLS VF pVT defibrillation Tempus Pro Epinephrine 1 mg IV CMRS microgravity CPR.",
+      "verified_rule_ids": [],
+      "source_audit": {
+        "clinical_status": "unverified_project_simulation",
+        "unverified_fields": [
+          "diagnostic_criteria",
+          "autonomous_checklist",
+          "prescribed_meds",
+          "drug_lockouts"
+        ],
+        "references": [
+          {
+            "citation": "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2",
+            "url": "https://www.nasa.gov/reference/appendix-e-health-and-medical-care-technical-requirements/",
+            "supports": "Mission planning considers cardiac arrest."
+          }
+        ]
+      }
     },
     {
       "protocol_id": "CPG-04",
       "category": "Vascular / Hematology",
       "title": "Internal Jugular Vein (IJV) Thrombosis",
       "nasa_citations": [
-        "NASA-STD-3001",
-        "ISS Ultrasound-2 Vascular Protocol"
+        "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2 (Mission planning considers venous thromboembolism)."
       ],
       "diagnostic_criteria": [
         "Cephalad fluid shift, neck fullness/asymmetry, facial plethora",
@@ -398,15 +605,31 @@
       "drug_lockouts": [
         "Active trauma, internal hemorrhage, planned surgery, severe thrombocytopenia"
       ],
-      "search_text": "CPG-04 Internal Jugular Vein IJV Thrombosis Ultrasound-2 Grade 3 4 Doppler Enoxaparin Apixaban Protamine PCC."
+      "search_text": "CPG-04 Internal Jugular Vein IJV Thrombosis Ultrasound-2 Grade 3 4 Doppler Enoxaparin Apixaban Protamine PCC.",
+      "verified_rule_ids": [],
+      "source_audit": {
+        "clinical_status": "unverified_project_simulation",
+        "unverified_fields": [
+          "diagnostic_criteria",
+          "autonomous_checklist",
+          "prescribed_meds",
+          "drug_lockouts"
+        ],
+        "references": [
+          {
+            "citation": "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2",
+            "url": "https://www.nasa.gov/reference/appendix-e-health-and-medical-care-technical-requirements/",
+            "supports": "Mission planning considers venous thromboembolism."
+          }
+        ]
+      }
     },
     {
       "protocol_id": "CPG-05",
       "category": "Cardiovascular",
       "title": "Supraventricular Tachycardia / Atrial Fibrillation",
       "nasa_citations": [
-        "NASA-STD-3001",
-        "ISS Holter & Tempus Pro Rhythm Protocol"
+        "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2 (Mission planning considers atrial arrhythmias)."
       ],
       "diagnostic_criteria": [
         "Palpitations, lightheadedness, irregular or narrow-complex tachycardia (>130-150 bpm)",
@@ -424,15 +647,32 @@
         "Caffeine, Modafinil",
         "Metoprolol if cardiogenic shock, bradycardia, or imminent reentry G-transition"
       ],
-      "search_text": "CPG-05 Supraventricular Tachycardia SVT Atrial Fibrillation Afib Tempus Pro Holter Metoprolol i-STAT K+."
+      "search_text": "CPG-05 Supraventricular Tachycardia SVT Atrial Fibrillation Afib Tempus Pro Holter Metoprolol i-STAT K+.",
+      "verified_rule_ids": [],
+      "source_audit": {
+        "clinical_status": "unverified_project_simulation",
+        "unverified_fields": [
+          "diagnostic_criteria",
+          "autonomous_checklist",
+          "prescribed_meds",
+          "drug_lockouts"
+        ],
+        "references": [
+          {
+            "citation": "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2",
+            "url": "https://www.nasa.gov/reference/appendix-e-health-and-medical-care-technical-requirements/",
+            "supports": "Mission planning considers atrial arrhythmias."
+          }
+        ]
+      }
     },
     {
       "protocol_id": "CPG-06",
       "category": "Neuro-Ocular",
       "title": "Spaceflight-Associated Neuro-ocular Syndrome (SANS)",
       "nasa_citations": [
-        "NASA-STD-3001 Vol 2",
-        "ISS SANS Clinical Practice Guideline"
+        "OCHMO-MTB-001, February 2024, p. 10, Figure 1 (NASA's SANS medical technical brief provides a reference overview of ophthalmic testing).",
+        "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2 (Mission planning considers SANS)."
       ],
       "diagnostic_criteria": [
         "Hyperopic visual acuity shift, near-vision blurring, headache",
@@ -441,7 +681,7 @@
       ],
       "autonomous_checklist": [
         "Measure ONSD via Ultrasound-2 and perform OCT / PanOptic fundoscopy",
-        "Verify cabin ppCO2 < 2.0 mmHg (V2 6073) as hypercapnia exacerbates cerebral vasodilation",
+        "Review cabin CO2 measurements and ventilation as environmental context for this simulated case",
         "Apply Lower Body Negative Pressure (LBNP) / thigh cuffs to reverse cephalad fluid shift",
         "Deploy spaceflight corrective lenses if hyperopic shift impairs operations"
       ],
@@ -451,17 +691,40 @@
       "drug_lockouts": [
         "Pseudoephedrine (elevates IOP and blood pressure)"
       ],
-      "search_text": "CPG-06 SANS Spaceflight Associated Neuro-ocular Syndrome ONSD > 5.9 mm Ultrasound-2 OCT PanOptic Frisen choroidal folds RNFL ppCO2 LBNP."
+      "search_text": "CPG-06 SANS Spaceflight Associated Neuro-ocular Syndrome ONSD > 5.9 mm Ultrasound-2 OCT PanOptic Frisen choroidal folds RNFL ppCO2 LBNP.",
+      "verified_rule_ids": [],
+      "source_audit": {
+        "clinical_status": "unverified_project_simulation",
+        "unverified_fields": [
+          "diagnostic_criteria",
+          "autonomous_checklist",
+          "prescribed_meds",
+          "drug_lockouts"
+        ],
+        "references": [
+          {
+            "citation": "OCHMO-MTB-001, February 2024, p. 10, Figure 1",
+            "url": "https://www.nasa.gov/wp-content/uploads/2024/02/ochmo-mtb-001-sans.pdf",
+            "supports": "NASA's SANS medical technical brief provides a reference overview of ophthalmic testing."
+          },
+          {
+            "citation": "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2",
+            "url": "https://www.nasa.gov/reference/appendix-e-health-and-medical-care-technical-requirements/",
+            "supports": "Mission planning considers SANS."
+          }
+        ]
+      }
     },
     {
       "protocol_id": "CPG-07",
       "category": "Environmental / Respiratory",
       "title": "Acute Hypercapnia (Cabin CO2 Toxicity)",
       "nasa_citations": [
-        "NASA-STD-3001 [V2 6073]"
+        "NASA-STD-3001 Vol 2 Rev F, 6.2.1.3 [V2 6004] (The habitable system must limit average cabin CO2 partial pressure to 3 mmHg over one hour).",
+        "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2 (Mission planning considers headache associated with CO2)."
       ],
       "diagnostic_criteria": [
-        "Cabin ppCO2 > 3.0 mmHg (1h avg) or > 2.5 mmHg (24h avg)",
+        "Environmental evidence: average cabin ppCO2 above 3 mmHg over one hour; assess crew findings separately",
         "Throbbing frontal headache, tachypnea, dyspnea, cognitive slowing",
         "Tempus Pro ETCO2 elevated; i-STAT CG4+ elevated pCO2 / respiratory acidosis"
       ],
@@ -477,18 +740,42 @@
         "Hydrocodone/APAP, Hydromorphone (opioid respiratory depression)",
         "Zolpidem (CNS/respiratory depression)"
       ],
-      "search_text": "CPG-07 Acute Hypercapnia CO2 toxicity V2 6073 ppCO2 > 3.0 mmHg headache ETCO2 i-STAT CG4+ lockout opioids Zolpidem."
+      "search_text": "CPG-07 Acute Hypercapnia CO2 toxicity V2 6004 average cabin ppCO2 > 3.0 mmHg over one hour headache ETCO2 i-STAT CG4+ lockout opioids Zolpidem.",
+      "verified_rule_ids": [
+        "V2 6004"
+      ],
+      "source_audit": {
+        "clinical_status": "unverified_project_simulation",
+        "unverified_fields": [
+          "diagnostic_criteria",
+          "autonomous_checklist",
+          "prescribed_meds",
+          "drug_lockouts"
+        ],
+        "references": [
+          {
+            "citation": "NASA-STD-3001 Vol 2 Rev F, 6.2.1.3 [V2 6004]",
+            "url": "https://standards.nasa.gov/system/files/tmp/NASA-STD-3001%20Vol%202%20Rev%20F.pdf",
+            "supports": "The habitable system must limit average cabin CO2 partial pressure to 3 mmHg over one hour."
+          },
+          {
+            "citation": "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2",
+            "url": "https://www.nasa.gov/reference/appendix-e-health-and-medical-care-technical-requirements/",
+            "supports": "Mission planning considers headache associated with CO2."
+          }
+        ]
+      }
     },
     {
       "protocol_id": "CPG-08",
       "category": "Environmental / Barotrauma",
       "title": "Decompression Sickness (DCS)",
       "nasa_citations": [
-        "NASA-STD-3001 [V2 6081]",
-        "ISS EVA DCS Contingency"
+        "NASA-STD-3001 Vol 2 Rev F, 6.2.2.4 [V2 6008] (The program must establish mission-specific decompression sickness mitigation and demonstrate its performance in ground testing).",
+        "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2 (Mission planning considers decompression sickness)."
       ],
       "diagnostic_criteria": [
-        "EVA suit pressure drop or rapid cabin depressurization (>0.5 kPa/min)",
+        "Simulated exposure: EVA suit pressure drop or rapid cabin depressurization (>0.5 kPa/min in this exercise)",
         "Deep joint pain ('bends'), paresthesias, cutis marmorata, vertigo, or neurological deficits"
       ],
       "autonomous_checklist": [
@@ -505,22 +792,48 @@
       "drug_lockouts": [
         "Sedatives that mask neurological deterioration"
       ],
-      "search_text": "CPG-08 Decompression Sickness DCS bends EVA suit pressure drop V2 6081 100% O2 hyperbaric repressurization IV fluids."
+      "search_text": "CPG-08 Decompression Sickness DCS bends EVA suit pressure drop V2 6008 100% O2 hyperbaric repressurization IV fluids.",
+      "verified_rule_ids": [
+        "V2 6008"
+      ],
+      "source_audit": {
+        "clinical_status": "unverified_project_simulation",
+        "unverified_fields": [
+          "diagnostic_criteria",
+          "autonomous_checklist",
+          "prescribed_meds",
+          "drug_lockouts"
+        ],
+        "references": [
+          {
+            "citation": "NASA-STD-3001 Vol 2 Rev F, 6.2.2.4 [V2 6008]",
+            "url": "https://standards.nasa.gov/system/files/tmp/NASA-STD-3001%20Vol%202%20Rev%20F.pdf",
+            "supports": "The program must establish mission-specific decompression sickness mitigation and demonstrate its performance in ground testing."
+          },
+          {
+            "citation": "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2",
+            "url": "https://www.nasa.gov/reference/appendix-e-health-and-medical-care-technical-requirements/",
+            "supports": "Mission planning considers decompression sickness."
+          }
+        ]
+      }
     },
     {
       "protocol_id": "CPG-09",
       "category": "Radiation",
       "title": "Acute Radiation Syndrome (ARS) / Solar Particle Event (SPE)",
       "nasa_citations": [
-        "NASA-STD-3001 [V1 4030-4033, Table 4.8-1]"
+        "NASA-STD-3001 Vol 1 Rev C, 4.8.1 [V1 4029] (Crew radiation protection uses the ALARA principle).",
+        "NASA-STD-3001 Vol 1 Rev C, 4.8.3 [V1 4031] (The system design must protect the crew against a specified solar particle reference event).",
+        "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2 (Mission planning considers acute radiation syndrome)."
       ],
       "diagnostic_criteria": [
-        "SPE dosimetry alert; BFO dose > 250 mGy-Eq (30d) or career > 600 mSv",
+        "Simulated acute exposure: SPE event and local dosimetry consistent with a recent dose increase; assess time since exposure and crew findings",
         "Prodromal nausea, vomiting, fatigue within hours of exposure",
         "C2M2 CBC: Rapid Absolute Lymphocyte Count (ALC) drop and progressive thrombocytopenia"
       ],
       "autonomous_checklist": [
-        "Order immediate ingress to spacecraft solar storm shelter (ALARA, V1 4031)",
+        "Simulate moving the crew into the spacecraft storm shelter in response to the exercise exposure",
         "Perform serial C2M2 CBC (ALC & platelets) every 6-12 hours for biological dosimetry",
         "Administer Ondansetron 4-8 mg ODT for prodromal emesis and IV hydration (ISP)",
         "Monitor for neutropenic fever and avoid IM injections if platelets drop"
@@ -535,17 +848,48 @@
         "Trimethoprim/SMX (bone marrow suppression)",
         "Loperamide (if radiation GI syndrome)"
       ],
-      "search_text": "CPG-09 Acute Radiation Syndrome ARS SPE Solar Particle Event V1 4030 Table 4.8-1 BFO 250 mGy-Eq C2M2 ALC thrombocytopenia Ondansetron."
+      "search_text": "CPG-09 Acute Radiation Syndrome ARS SPE Solar Particle Event local dosimetry acute exposure C2M2 ALC thrombocytopenia Ondansetron.",
+      "verified_rule_ids": [
+        "V1 4029",
+        "V1 4031"
+      ],
+      "source_audit": {
+        "clinical_status": "unverified_project_simulation",
+        "unverified_fields": [
+          "diagnostic_criteria",
+          "autonomous_checklist",
+          "prescribed_meds",
+          "drug_lockouts"
+        ],
+        "references": [
+          {
+            "citation": "NASA-STD-3001 Vol 1 Rev C, 4.8.1 [V1 4029]",
+            "url": "https://standards.nasa.gov/sites/default/files/standards/NASA/C/nasa-std-3001-vol-1-rev-c-signature.pdf",
+            "supports": "Crew radiation protection uses the ALARA principle."
+          },
+          {
+            "citation": "NASA-STD-3001 Vol 1 Rev C, 4.8.3 [V1 4031]",
+            "url": "https://standards.nasa.gov/sites/default/files/standards/NASA/C/nasa-std-3001-vol-1-rev-c-signature.pdf",
+            "supports": "The system design must protect the crew against a specified solar particle reference event."
+          },
+          {
+            "citation": "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2",
+            "url": "https://www.nasa.gov/reference/appendix-e-health-and-medical-care-technical-requirements/",
+            "supports": "Mission planning considers acute radiation syndrome."
+          }
+        ]
+      }
     },
     {
       "protocol_id": "CPG-10",
       "category": "Toxicology / Environmental",
       "title": "Ammonia (NH3) Toxic Inhalation / Coolant Leak",
       "nasa_citations": [
-        "JSC 20584 SMAC (NH3: 30 ppm 1h, 20 ppm 24h)"
+        "JSC 20584 Rev D, February 2026, Ammonia, p. 9 (Spacecraft air exposure limits for ammonia are 30 ppm over one hour and 20 ppm over 24 hours).",
+        "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2 (Mission planning considers toxic inhalation)."
       ],
       "diagnostic_criteria": [
-        "Cabin NH3 > 30 ppm (1-hour SMAC)",
+        "Environmental evidence: Coolant leak; compare the measured one-hour ammonia exposure to the 30 ppm SMAC",
         "Severe ocular burning, lacrimation, cough, wheezing, laryngospasm"
       ],
       "autonomous_checklist": [
@@ -561,17 +905,43 @@
       "drug_lockouts": [
         "Avoid topical ocular steroids if chemical corneal epithelial defect exists"
       ],
-      "search_text": "CPG-10 Ammonia NH3 toxic inhalation coolant leak JSC 20584 SMAC 30 ppm 1h Albuterol Fluticasone Salmeterol eye irrigation."
+      "search_text": "CPG-10 Ammonia NH3 toxic inhalation coolant leak JSC 20584 SMAC 30 ppm 1h Albuterol Fluticasone Salmeterol eye irrigation.",
+      "verified_rule_ids": [
+        "JSC 20584 (NH3 - 1h)",
+        "JSC 20584 (NH3 - 24h/Long)"
+      ],
+      "source_audit": {
+        "clinical_status": "unverified_project_simulation",
+        "unverified_fields": [
+          "diagnostic_criteria",
+          "autonomous_checklist",
+          "prescribed_meds",
+          "drug_lockouts"
+        ],
+        "references": [
+          {
+            "citation": "JSC 20584 Rev D, February 2026, Ammonia, p. 9",
+            "url": "https://www.nasa.gov/wp-content/uploads/2026/02/jsc-20584-smacs-rev-d.pdf",
+            "supports": "Spacecraft air exposure limits for ammonia are 30 ppm over one hour and 20 ppm over 24 hours."
+          },
+          {
+            "citation": "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2",
+            "url": "https://www.nasa.gov/reference/appendix-e-health-and-medical-care-technical-requirements/",
+            "supports": "Mission planning considers toxic inhalation."
+          }
+        ]
+      }
     },
     {
       "protocol_id": "CPG-11",
       "category": "Toxicology / Environmental",
       "title": "Hydrazine (N2H4) Propellant Exposure",
       "nasa_citations": [
-        "JSC 20584 SMAC (N2H4: 4 ppm 1h, 0.3 ppm 24h)"
+        "JSC 20584 Rev D, February 2026, Hydrazine, p. 13 (Spacecraft air exposure limits for hydrazine are 4 ppm over one hour and 0.3 ppm over 24 hours).",
+        "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2 (Mission planning considers toxic inhalation)."
       ],
       "diagnostic_criteria": [
-        "Post-EVA suit propellant contamination; cabin N2H4 > 4 ppm (1-hour SMAC)",
+        "Environmental evidence: Post-EVA suit propellant contamination; compare the measured one-hour hydrazine exposure to the 4 ppm SMAC",
         "Airway irritation, bronchospasm, dizziness, hepatic injury, or seizures"
       ],
       "autonomous_checklist": [
@@ -586,17 +956,42 @@
       "drug_lockouts": [
         "Acetaminophen, Fluconazole, Atorvastatin if hydrazine-induced hepatotoxicity occurs"
       ],
-      "search_text": "CPG-11 Hydrazine N2H4 propellant exposure post-EVA JSC 20584 SMAC 4 ppm 1h Albuterol hepatotoxicity."
+      "search_text": "CPG-11 Hydrazine N2H4 propellant exposure post-EVA JSC 20584 SMAC 4 ppm 1h Albuterol hepatotoxicity.",
+      "verified_rule_ids": [
+        "JSC 20584 (N2H4)"
+      ],
+      "source_audit": {
+        "clinical_status": "unverified_project_simulation",
+        "unverified_fields": [
+          "diagnostic_criteria",
+          "autonomous_checklist",
+          "prescribed_meds",
+          "drug_lockouts"
+        ],
+        "references": [
+          {
+            "citation": "JSC 20584 Rev D, February 2026, Hydrazine, p. 13",
+            "url": "https://www.nasa.gov/wp-content/uploads/2026/02/jsc-20584-smacs-rev-d.pdf",
+            "supports": "Spacecraft air exposure limits for hydrazine are 4 ppm over one hour and 0.3 ppm over 24 hours."
+          },
+          {
+            "citation": "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2",
+            "url": "https://www.nasa.gov/reference/appendix-e-health-and-medical-care-technical-requirements/",
+            "supports": "Mission planning considers toxic inhalation."
+          }
+        ]
+      }
     },
     {
       "protocol_id": "CPG-12",
       "category": "Toxicology / Environmental",
       "title": "Carbon Monoxide (CO) / Spacecraft Fire Smoke Inhalation",
       "nasa_citations": [
-        "JSC 20584 SMAC (CO: 425 ppm 1h, 100 ppm 24h)"
+        "JSC 20584 Rev D, February 2026, Carbon monoxide, p. 10 (Spacecraft air exposure limits for carbon monoxide are 425 ppm over one hour and 100 ppm over 24 hours).",
+        "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2 (Mission planning considers smoke inhalation)."
       ],
       "diagnostic_criteria": [
-        "Cabin fire/pyrolysis event; CO > 425 ppm (1-hour SMAC)",
+        "Environmental evidence: Cabin fire or pyrolysis; compare the measured one-hour carbon monoxide exposure to the 425 ppm SMAC",
         "Headache, confusion, tachypnea, soot in airway (Note: standard SpO2 may read falsely normal)"
       ],
       "autonomous_checklist": [
@@ -612,15 +1007,38 @@
       "drug_lockouts": [
         "Sedatives or opioids that depress ventilation"
       ],
-      "search_text": "CPG-12 Carbon Monoxide CO spacecraft fire smoke inhalation JSC 20584 SMAC 425 ppm 1h 100% O2 Albuterol."
+      "search_text": "CPG-12 Carbon Monoxide CO spacecraft fire smoke inhalation JSC 20584 SMAC 425 ppm 1h 100% O2 Albuterol.",
+      "verified_rule_ids": [
+        "JSC 20584 (CO)"
+      ],
+      "source_audit": {
+        "clinical_status": "unverified_project_simulation",
+        "unverified_fields": [
+          "diagnostic_criteria",
+          "autonomous_checklist",
+          "prescribed_meds",
+          "drug_lockouts"
+        ],
+        "references": [
+          {
+            "citation": "JSC 20584 Rev D, February 2026, Carbon monoxide, p. 10",
+            "url": "https://www.nasa.gov/wp-content/uploads/2026/02/jsc-20584-smacs-rev-d.pdf",
+            "supports": "Spacecraft air exposure limits for carbon monoxide are 425 ppm over one hour and 100 ppm over 24 hours."
+          },
+          {
+            "citation": "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2",
+            "url": "https://www.nasa.gov/reference/appendix-e-health-and-medical-care-technical-requirements/",
+            "supports": "Mission planning considers smoke inhalation."
+          }
+        ]
+      }
     },
     {
       "protocol_id": "CPG-13",
       "category": "Vestibular / Neuro",
       "title": "Space Motion Sickness (SMS) / Space Adaptation Syndrome",
       "nasa_citations": [
-        "NASA-STD-3001 Level I-V",
-        "ISS Medical Checklist"
+        "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2 (Mission planning considers space motion sickness)."
       ],
       "diagnostic_criteria": [
         "First 24-72 hours of microgravity or G-transition",
@@ -639,15 +1057,32 @@
       "drug_lockouts": [
         "Promethazine / Meclizine during EVA, docking, or robotics (severe sedation); avoid IM Promethazine if IV available"
       ],
-      "search_text": "CPG-13 Space Motion Sickness SMS Space Adaptation Syndrome SAS nausea vomiting Ondansetron ODT Meclizine Promethazine."
+      "search_text": "CPG-13 Space Motion Sickness SMS Space Adaptation Syndrome SAS nausea vomiting Ondansetron ODT Meclizine Promethazine.",
+      "verified_rule_ids": [],
+      "source_audit": {
+        "clinical_status": "unverified_project_simulation",
+        "unverified_fields": [
+          "diagnostic_criteria",
+          "autonomous_checklist",
+          "prescribed_meds",
+          "drug_lockouts"
+        ],
+        "references": [
+          {
+            "citation": "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2",
+            "url": "https://www.nasa.gov/reference/appendix-e-health-and-medical-care-technical-requirements/",
+            "supports": "Mission planning considers space motion sickness."
+          }
+        ]
+      }
     },
     {
       "protocol_id": "CPG-14",
       "category": "Cardiovascular / Reentry",
       "title": "Orthostatic Intolerance (Post-Landing / G-Transition)",
       "nasa_citations": [
-        "NASA-STD-3001 Vol 2",
-        "ISS Return Fluid-Loading Protocol"
+        "NASA-STD-3001 Vol 2 Rev F, 7.4.3 [V2 7042] (The vehicle must provide countermeasures for orthostatic intolerance on return to gravity and during specified head-to-foot acceleration).",
+        "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2 (Mission planning considers orthostatic intolerance during gravity transitions)."
       ],
       "diagnostic_criteria": [
         "Reentry / landing or planetary surface gravity transition",
@@ -664,21 +1099,46 @@
       "drug_lockouts": [
         "Metoprolol, Lisinopril, Nitroglycerin (worsen orthostatic collapse)"
       ],
-      "search_text": "CPG-14 Orthostatic Intolerance post-landing reentry G-transition presyncope fluid loading compression garments lockout Metoprolol Lisinopril."
+      "search_text": "CPG-14 Orthostatic Intolerance post-landing reentry G-transition presyncope fluid loading compression garments lockout Metoprolol Lisinopril.",
+      "verified_rule_ids": [
+        "V2 7042"
+      ],
+      "source_audit": {
+        "clinical_status": "unverified_project_simulation",
+        "unverified_fields": [
+          "diagnostic_criteria",
+          "autonomous_checklist",
+          "prescribed_meds",
+          "drug_lockouts"
+        ],
+        "references": [
+          {
+            "citation": "NASA-STD-3001 Vol 2 Rev F, 7.4.3 [V2 7042]",
+            "url": "https://standards.nasa.gov/system/files/tmp/NASA-STD-3001%20Vol%202%20Rev%20F.pdf",
+            "supports": "The vehicle must provide countermeasures for orthostatic intolerance on return to gravity and during specified head-to-foot acceleration."
+          },
+          {
+            "citation": "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2",
+            "url": "https://www.nasa.gov/reference/appendix-e-health-and-medical-care-technical-requirements/",
+            "supports": "Mission planning considers orthostatic intolerance during gravity transitions."
+          }
+        ]
+      }
     },
     {
       "protocol_id": "CPG-15",
       "category": "Environmental / Thermal",
       "title": "EVA Thermal Heat Strain / Hyperthermia",
       "nasa_citations": [
-        "NASA-STD-3001 [V2 11032]"
+        "NASA-STD-3001 Vol 2 Rev F, 11.1.4.5 [V2 11011] (The spacesuit design must limit modeled crewmember heat storage during nominal suited activity).",
+        "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2 (Mission planning considers heat illness)."
       ],
       "diagnostic_criteria": [
-        "LCVG cooling failure or metabolic rate > 470 W during EVA",
-        "Core body temperature >= 38.5 C (caution) or >= 39.0 C (mandatory EVA abort), tachycardia, confusion"
+        "Simulated LCVG cooling failure or EVA workload above the exercise setting of 470 W",
+        "Simulated temperature flags: core temperature >= 38.5 C for caution or >= 39.0 C for abort, with tachycardia or confusion"
       ],
       "autonomous_checklist": [
-        "Abort EVA immediately if core temp >= 39.0 C or neurological signs appear",
+        "Trigger the exercise abort at a simulated core temperature >= 39.0 C or if neurological signs appear",
         "Remove suit in airlock, apply active surface cooling, and measure i-STAT Chem8+ electrolytes",
         "Rehydrate aggressively with chilled oral/IV fluids (ISP)"
       ],
@@ -688,15 +1148,38 @@
       "drug_lockouts": [
         "Caffeine, Modafinil, Pseudoephedrine (worsen tachycardia/dehydration)"
       ],
-      "search_text": "CPG-15 EVA Thermal Heat Strain Hyperthermia V2 11032 LCVG failure core temp 38.5 39.0 C abort cooling hydration."
+      "search_text": "CPG-15 EVA Thermal Heat Strain Hyperthermia V2 11011 modeled suit heat storage LCVG failure core temp 38.5 39.0 C abort cooling hydration.",
+      "verified_rule_ids": [
+        "V2 11011"
+      ],
+      "source_audit": {
+        "clinical_status": "unverified_project_simulation",
+        "unverified_fields": [
+          "diagnostic_criteria",
+          "autonomous_checklist",
+          "prescribed_meds",
+          "drug_lockouts"
+        ],
+        "references": [
+          {
+            "citation": "NASA-STD-3001 Vol 2 Rev F, 11.1.4.5 [V2 11011]",
+            "url": "https://standards.nasa.gov/system/files/tmp/NASA-STD-3001%20Vol%202%20Rev%20F.pdf",
+            "supports": "The spacesuit design must limit modeled crewmember heat storage during nominal suited activity."
+          },
+          {
+            "citation": "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2",
+            "url": "https://www.nasa.gov/reference/appendix-e-health-and-medical-care-technical-requirements/",
+            "supports": "Mission planning considers heat illness."
+          }
+        ]
+      }
     },
     {
       "protocol_id": "CPG-16",
       "category": "Renal / Urologic",
       "title": "Nephrolithiasis (Renal Colic / Kidney Stones)",
       "nasa_citations": [
-        "ISS Medical Checklist",
-        "NASA Microgravity Bone/Renal Risk"
+        "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2 (Mission planning considers kidney stones)."
       ],
       "diagnostic_criteria": [
         "Acute severe unilateral flank pain radiating to groin, hematuria, nausea",
@@ -717,14 +1200,31 @@
         "Ketorolac / Ibuprofen if i-STAT creatinine elevated",
         "Hydromorphone if hypercapnia present"
       ],
-      "search_text": "CPG-16 Nephrolithiasis Renal Colic kidney stone flank pain Ultrasound-2 hydronephrosis Ketorolac i-STAT creatinine hydration."
+      "search_text": "CPG-16 Nephrolithiasis Renal Colic kidney stone flank pain Ultrasound-2 hydronephrosis Ketorolac i-STAT creatinine hydration.",
+      "verified_rule_ids": [],
+      "source_audit": {
+        "clinical_status": "unverified_project_simulation",
+        "unverified_fields": [
+          "diagnostic_criteria",
+          "autonomous_checklist",
+          "prescribed_meds",
+          "drug_lockouts"
+        ],
+        "references": [
+          {
+            "citation": "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2",
+            "url": "https://www.nasa.gov/reference/appendix-e-health-and-medical-care-technical-requirements/",
+            "supports": "Mission planning considers kidney stones."
+          }
+        ]
+      }
     },
     {
       "protocol_id": "CPG-17",
       "category": "Renal / Urologic",
       "title": "Urinary Retention (Microgravity Detrusor Stasis)",
       "nasa_citations": [
-        "ISS Medical Checklist"
+        "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2 (Mission planning considers urinary retention)."
       ],
       "diagnostic_criteria": [
         "Inability to void, suprapubic fullness/pain",
@@ -741,14 +1241,31 @@
       "drug_lockouts": [
         "Diphenhydramine, Pseudoephedrine, Hydrocodone, Hydromorphone (worsen urinary retention)"
       ],
-      "search_text": "CPG-17 Urinary Retention microgravity detrusor stasis Ultrasound-2 bladder scan catheterization lockout Diphenhydramine Pseudoephedrine."
+      "search_text": "CPG-17 Urinary Retention microgravity detrusor stasis Ultrasound-2 bladder scan catheterization lockout Diphenhydramine Pseudoephedrine.",
+      "verified_rule_ids": [],
+      "source_audit": {
+        "clinical_status": "unverified_project_simulation",
+        "unverified_fields": [
+          "diagnostic_criteria",
+          "autonomous_checklist",
+          "prescribed_meds",
+          "drug_lockouts"
+        ],
+        "references": [
+          {
+            "citation": "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2",
+            "url": "https://www.nasa.gov/reference/appendix-e-health-and-medical-care-technical-requirements/",
+            "supports": "Mission planning considers urinary retention."
+          }
+        ]
+      }
     },
     {
       "protocol_id": "CPG-18",
       "category": "Infectious Disease / Urologic",
       "title": "Urinary Tract Infection (Cystitis & Pyelonephritis)",
       "nasa_citations": [
-        "ISS Medical Checklist / CHeCS"
+        "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2 (Mission planning considers urinary tract infection)."
       ],
       "diagnostic_criteria": [
         "Dysuria, urgency, frequency (cystitis); flank pain, fever, C2M2 leukocytosis (pyelonephritis)"
@@ -767,15 +1284,31 @@
         "Nitrofurantoin for pyelonephritis",
         "Levofloxacin during heavy EVA/ARED loading (Achilles tendon rupture risk)"
       ],
-      "search_text": "CPG-18 UTI Urinary Tract Infection cystitis pyelonephritis Nitrofurantoin Levofloxacin Ceftriaxone GFR Achilles tendon."
+      "search_text": "CPG-18 UTI Urinary Tract Infection cystitis pyelonephritis Nitrofurantoin Levofloxacin Ceftriaxone GFR Achilles tendon.",
+      "verified_rule_ids": [],
+      "source_audit": {
+        "clinical_status": "unverified_project_simulation",
+        "unverified_fields": [
+          "diagnostic_criteria",
+          "autonomous_checklist",
+          "prescribed_meds",
+          "drug_lockouts"
+        ],
+        "references": [
+          {
+            "citation": "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2",
+            "url": "https://www.nasa.gov/reference/appendix-e-health-and-medical-care-technical-requirements/",
+            "supports": "Mission planning considers urinary tract infection."
+          }
+        ]
+      }
     },
     {
       "protocol_id": "CPG-19",
       "category": "Infectious Disease / Respiratory",
       "title": "Pneumonia & Systemic Sepsis",
       "nasa_citations": [
-        "NASA-STD-3001 Level III-V",
-        "ISS Medical Checklist"
+        "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2 (Mission planning considers lower respiratory infection and sepsis)."
       ],
       "diagnostic_criteria": [
         "Fever, productive cough, tachypnea, SpO2 < 94%, hypotension",
@@ -796,14 +1329,31 @@
         "Azithromycin if QTc > 470 ms on Tempus Pro",
         "Levofloxacin if heavy EVA/ARED"
       ],
-      "search_text": "CPG-19 Pneumonia Sepsis fever hypoxia C2M2 leukocytosis i-STAT CG4+ lactate Ceftriaxone Azithromycin QTc Tempus Pro."
+      "search_text": "CPG-19 Pneumonia Sepsis fever hypoxia C2M2 leukocytosis i-STAT CG4+ lactate Ceftriaxone Azithromycin QTc Tempus Pro.",
+      "verified_rule_ids": [],
+      "source_audit": {
+        "clinical_status": "unverified_project_simulation",
+        "unverified_fields": [
+          "diagnostic_criteria",
+          "autonomous_checklist",
+          "prescribed_meds",
+          "drug_lockouts"
+        ],
+        "references": [
+          {
+            "citation": "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2",
+            "url": "https://www.nasa.gov/reference/appendix-e-health-and-medical-care-technical-requirements/",
+            "supports": "Mission planning considers lower respiratory infection and sepsis."
+          }
+        ]
+      }
     },
     {
       "protocol_id": "CPG-20",
       "category": "Allergy / Resuscitation",
       "title": "Anaphylaxis / Severe Allergic Reaction",
       "nasa_citations": [
-        "ISS Medical Checklist / EMTP"
+        "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2 (Mission planning considers anaphylaxis)."
       ],
       "diagnostic_criteria": [
         "Acute urticaria, angioedema, stridor, wheezing, hypotension after allergen/drug exposure"
@@ -822,15 +1372,31 @@
       "drug_lockouts": [
         "No contraindication to Epinephrine in anaphylaxis"
       ],
-      "search_text": "CPG-20 Anaphylaxis severe allergic reaction Epinephrine 0.3 mg IM Diphenhydramine Albuterol Tempus Pro."
+      "search_text": "CPG-20 Anaphylaxis severe allergic reaction Epinephrine 0.3 mg IM Diphenhydramine Albuterol Tempus Pro.",
+      "verified_rule_ids": [],
+      "source_audit": {
+        "clinical_status": "unverified_project_simulation",
+        "unverified_fields": [
+          "diagnostic_criteria",
+          "autonomous_checklist",
+          "prescribed_meds",
+          "drug_lockouts"
+        ],
+        "references": [
+          {
+            "citation": "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2",
+            "url": "https://www.nasa.gov/reference/appendix-e-health-and-medical-care-technical-requirements/",
+            "supports": "Mission planning considers anaphylaxis."
+          }
+        ]
+      }
     },
     {
       "protocol_id": "CPG-21",
       "category": "Ophthalmic / Environmental",
       "title": "Regolith Dust Conjunctivitis & Airway Irritation",
       "nasa_citations": [
-        "NASA Lunar/Mars Dust Toxicity Protocol",
-        "ISS Medical Checklist"
+        "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2 (Mission planning considers celestial dust exposure)."
       ],
       "diagnostic_criteria": [
         "Post-EVA cabin dust exposure; ocular redness, itching, sneezing, mild wheezing"
@@ -850,14 +1416,31 @@
         "Olopatadine if corneal abrasion detected",
         "Diphenhydramine pre-EVA (sedation)"
       ],
-      "search_text": "CPG-21 Regolith dust conjunctivitis airway irritation PanOptic fluorescein Olopatadine Carboxymethylcellulose Fexofenadine Albuterol."
+      "search_text": "CPG-21 Regolith dust conjunctivitis airway irritation PanOptic fluorescein Olopatadine Carboxymethylcellulose Fexofenadine Albuterol.",
+      "verified_rule_ids": [],
+      "source_audit": {
+        "clinical_status": "unverified_project_simulation",
+        "unverified_fields": [
+          "diagnostic_criteria",
+          "autonomous_checklist",
+          "prescribed_meds",
+          "drug_lockouts"
+        ],
+        "references": [
+          {
+            "citation": "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2",
+            "url": "https://www.nasa.gov/reference/appendix-e-health-and-medical-care-technical-requirements/",
+            "supports": "Mission planning considers celestial dust exposure."
+          }
+        ]
+      }
     },
     {
       "protocol_id": "CPG-22",
       "category": "Ophthalmic",
       "title": "Corneal Abrasion / Particulate Eye Trauma",
       "nasa_citations": [
-        "ISS Medical Checklist"
+        "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2 (Mission planning considers corneal abrasion)."
       ],
       "diagnostic_criteria": [
         "Acute foreign-body eye pain, photophobia, tearing",
@@ -876,15 +1459,31 @@
       "drug_lockouts": [
         "Olopatadine, topical corticosteroid eye drops (impair corneal healing)"
       ],
-      "search_text": "CPG-22 Corneal Abrasion foreign body eye pain PanOptic fluorescein Mineral Oil Petrolatum ointment lockout Olopatadine."
+      "search_text": "CPG-22 Corneal Abrasion foreign body eye pain PanOptic fluorescein Mineral Oil Petrolatum ointment lockout Olopatadine.",
+      "verified_rule_ids": [],
+      "source_audit": {
+        "clinical_status": "unverified_project_simulation",
+        "unverified_fields": [
+          "diagnostic_criteria",
+          "autonomous_checklist",
+          "prescribed_meds",
+          "drug_lockouts"
+        ],
+        "references": [
+          {
+            "citation": "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2",
+            "url": "https://www.nasa.gov/reference/appendix-e-health-and-medical-care-technical-requirements/",
+            "supports": "Mission planning considers corneal abrasion."
+          }
+        ]
+      }
     },
     {
       "protocol_id": "CPG-23",
       "category": "Dental",
       "title": "Odontogenic Abscess & Barodontalgia",
       "nasa_citations": [
-        "NASA-STD-3001 Level III-V",
-        "ISS Dental Kit Protocol"
+        "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2 (Mission planning considers dental abscess)."
       ],
       "diagnostic_criteria": [
         "Severe localized toothache, gingival swelling, percussion tenderness, fever, or pressure-change pain"
@@ -903,14 +1502,31 @@
         "Amoxicillin/Clavulanate if PCN allergy",
         "Ibuprofen if renal calculi history"
       ],
-      "search_text": "CPG-23 Odontogenic dental abscess barodontalgia tooth pain Amoxicillin Clavulanate API degradation discoloration Acetaminophen."
+      "search_text": "CPG-23 Odontogenic dental abscess barodontalgia tooth pain Amoxicillin Clavulanate API degradation discoloration Acetaminophen.",
+      "verified_rule_ids": [],
+      "source_audit": {
+        "clinical_status": "unverified_project_simulation",
+        "unverified_fields": [
+          "diagnostic_criteria",
+          "autonomous_checklist",
+          "prescribed_meds",
+          "drug_lockouts"
+        ],
+        "references": [
+          {
+            "citation": "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2",
+            "url": "https://www.nasa.gov/reference/appendix-e-health-and-medical-care-technical-requirements/",
+            "supports": "Mission planning considers dental abscess."
+          }
+        ]
+      }
     },
     {
       "protocol_id": "CPG-24",
       "category": "Dermatology / Infectious Disease",
       "title": "Skin & Soft Tissue Infection (Cellulitis / Abscess)",
       "nasa_citations": [
-        "ISS Medical Checklist / CHeCS"
+        "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2 (Mission planning considers cellulitis)."
       ],
       "diagnostic_criteria": [
         "Expanding erythema, warmth, tenderness, induration, or purulent fluctuance"
@@ -929,14 +1545,31 @@
         "Trimethoprim/SMX if ARS / BFO radiation risk or hyperkalemia",
         "Doxycycline during high UV exposure (photosensitivity)"
       ],
-      "search_text": "CPG-24 Skin Soft Tissue Infection Cellulitis Abscess MRSA Doxycycline Trimethoprim SMX Bacitracin."
+      "search_text": "CPG-24 Skin Soft Tissue Infection Cellulitis Abscess MRSA Doxycycline Trimethoprim SMX Bacitracin.",
+      "verified_rule_ids": [],
+      "source_audit": {
+        "clinical_status": "unverified_project_simulation",
+        "unverified_fields": [
+          "diagnostic_criteria",
+          "autonomous_checklist",
+          "prescribed_meds",
+          "drug_lockouts"
+        ],
+        "references": [
+          {
+            "citation": "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2",
+            "url": "https://www.nasa.gov/reference/appendix-e-health-and-medical-care-technical-requirements/",
+            "supports": "Mission planning considers cellulitis."
+          }
+        ]
+      }
     },
     {
       "protocol_id": "CPG-25",
       "category": "Infectious Disease / Dermatology",
       "title": "Herpes Zoster (Shingles) / Latent Viral Reactivation",
       "nasa_citations": [
-        "NASA Spaceflight Immune Dysregulation Guidelines"
+        "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2 (Mission planning considers shingles)."
       ],
       "diagnostic_criteria": [
         "Painful unilateral dermatomal vesicular rash, prodromal burning/tingling"
@@ -953,14 +1586,31 @@
       "drug_lockouts": [
         "Unadjusted Valacyclovir in severe dehydration / renal impairment"
       ],
-      "search_text": "CPG-25 Herpes Zoster shingles latent viral reactivation VZV Valacyclovir 1 g PO TID hydration."
+      "search_text": "CPG-25 Herpes Zoster shingles latent viral reactivation VZV Valacyclovir 1 g PO TID hydration.",
+      "verified_rule_ids": [],
+      "source_audit": {
+        "clinical_status": "unverified_project_simulation",
+        "unverified_fields": [
+          "diagnostic_criteria",
+          "autonomous_checklist",
+          "prescribed_meds",
+          "drug_lockouts"
+        ],
+        "references": [
+          {
+            "citation": "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2",
+            "url": "https://www.nasa.gov/reference/appendix-e-health-and-medical-care-technical-requirements/",
+            "supports": "Mission planning considers shingles."
+          }
+        ]
+      }
     },
     {
       "protocol_id": "CPG-26",
       "category": "Dermatology",
       "title": "Cutaneous Fungal Dermatitis (Tinea / Candidiasis)",
       "nasa_citations": [
-        "ISS Medical Checklist"
+        "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2 (Mission planning considers fungal skin infection)."
       ],
       "diagnostic_criteria": [
         "Pruritic annular scaly plaques or intertriginous macerated rash"
@@ -977,14 +1627,31 @@
         "Hydrocortisone 1% cream (worsens fungal infection)",
         "Fluconazole if elevated AST/ALT or QTc > 470 ms"
       ],
-      "search_text": "CPG-26 Cutaneous Fungal Dermatitis Tinea Candidiasis Clotrimazole 1% phase separation >880d Fluconazole lockout Hydrocortisone."
+      "search_text": "CPG-26 Cutaneous Fungal Dermatitis Tinea Candidiasis Clotrimazole 1% phase separation >880d Fluconazole lockout Hydrocortisone.",
+      "verified_rule_ids": [],
+      "source_audit": {
+        "clinical_status": "unverified_project_simulation",
+        "unverified_fields": [
+          "diagnostic_criteria",
+          "autonomous_checklist",
+          "prescribed_meds",
+          "drug_lockouts"
+        ],
+        "references": [
+          {
+            "citation": "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2",
+            "url": "https://www.nasa.gov/reference/appendix-e-health-and-medical-care-technical-requirements/",
+            "supports": "Mission planning considers fungal skin infection."
+          }
+        ]
+      }
     },
     {
       "protocol_id": "CPG-27",
       "category": "Musculoskeletal",
       "title": "EVA Musculoskeletal Strain / Suit Shoulder Injury",
       "nasa_citations": [
-        "ISS EVA & ARED Injury Protocol"
+        "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2 (Mission planning considers shoulder strain and EVA suit contact injuries)."
       ],
       "diagnostic_criteria": [
         "Localized shoulder, wrist, or lumbar strain following EVA or ARED resistive exercise without neurovascular deficit"
@@ -1001,15 +1668,31 @@
       "drug_lockouts": [
         "Ibuprofen if renal calculi history or dehydration"
       ],
-      "search_text": "CPG-27 EVA Musculoskeletal Strain shoulder ARED injury Ibuprofen Acetaminophen renal calculi lockout."
+      "search_text": "CPG-27 EVA Musculoskeletal Strain shoulder ARED injury Ibuprofen Acetaminophen renal calculi lockout.",
+      "verified_rule_ids": [],
+      "source_audit": {
+        "clinical_status": "unverified_project_simulation",
+        "unverified_fields": [
+          "diagnostic_criteria",
+          "autonomous_checklist",
+          "prescribed_meds",
+          "drug_lockouts"
+        ],
+        "references": [
+          {
+            "citation": "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2",
+            "url": "https://www.nasa.gov/reference/appendix-e-health-and-medical-care-technical-requirements/",
+            "supports": "Mission planning considers shoulder strain and EVA suit contact injuries."
+          }
+        ]
+      }
     },
     {
       "protocol_id": "CPG-28",
       "category": "Trauma",
       "title": "Blunt Trauma & Hemorrhage Control (eFAST Protocol)",
       "nasa_citations": [
-        "NASA-STD-3001 Level IV-V",
-        "ISS Ultrasound-2 eFAST"
+        "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2 (Mission planning considers blunt abdominal injury and hypovolemic shock)."
       ],
       "diagnostic_criteria": [
         "High-energy impact or crush injury",
@@ -1028,14 +1711,31 @@
       "drug_lockouts": [
         "Aspirin, Ibuprofen, Ketorolac, Apixaban, Enoxaparin, Clopidogrel (hemorrhage)"
       ],
-      "search_text": "CPG-28 Blunt Trauma Hemorrhage Control Ultrasound-2 eFAST free fluid i-STAT CG4+ lactate Hydromorphone IV fluids."
+      "search_text": "CPG-28 Blunt Trauma Hemorrhage Control Ultrasound-2 eFAST free fluid i-STAT CG4+ lactate Hydromorphone IV fluids.",
+      "verified_rule_ids": [],
+      "source_audit": {
+        "clinical_status": "unverified_project_simulation",
+        "unverified_fields": [
+          "diagnostic_criteria",
+          "autonomous_checklist",
+          "prescribed_meds",
+          "drug_lockouts"
+        ],
+        "references": [
+          {
+            "citation": "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2",
+            "url": "https://www.nasa.gov/reference/appendix-e-health-and-medical-care-technical-requirements/",
+            "supports": "Mission planning considers blunt abdominal injury and hypovolemic shock."
+          }
+        ]
+      }
     },
     {
       "protocol_id": "CPG-29",
       "category": "Gastrointestinal",
       "title": "Acute Gastroenteritis / Infectious Diarrhea",
       "nasa_citations": [
-        "ISS Medical Checklist"
+        "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2 (Mission planning considers gastroenteritis and diarrhea)."
       ],
       "diagnostic_criteria": [
         "Acute watery diarrhea, abdominal cramping, nausea"
@@ -1053,14 +1753,31 @@
       "drug_lockouts": [
         "Loperamide if ARS GI syndrome, bloody stool, high fever, or suspected SBO"
       ],
-      "search_text": "CPG-29 Acute Gastroenteritis diarrhea nausea Ondansetron ODT Loperamide rehydration lockout ARS GI syndrome."
+      "search_text": "CPG-29 Acute Gastroenteritis diarrhea nausea Ondansetron ODT Loperamide rehydration lockout ARS GI syndrome.",
+      "verified_rule_ids": [],
+      "source_audit": {
+        "clinical_status": "unverified_project_simulation",
+        "unverified_fields": [
+          "diagnostic_criteria",
+          "autonomous_checklist",
+          "prescribed_meds",
+          "drug_lockouts"
+        ],
+        "references": [
+          {
+            "citation": "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2",
+            "url": "https://www.nasa.gov/reference/appendix-e-health-and-medical-care-technical-requirements/",
+            "supports": "Mission planning considers gastroenteritis and diarrhea."
+          }
+        ]
+      }
     },
     {
       "protocol_id": "CPG-30",
       "category": "Gastrointestinal",
       "title": "Spaceflight Constipation / Bowel Dysmotility",
       "nasa_citations": [
-        "ISS Medical Checklist"
+        "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2 (Mission planning considers constipation)."
       ],
       "diagnostic_criteria": [
         "Reduced bowel movement frequency, mild bloating without rebound tenderness or fever"
@@ -1075,22 +1792,39 @@
       "drug_lockouts": [
         "Bisacodyl if acute surgical abdomen or SBO suspected"
       ],
-      "search_text": "CPG-30 Spaceflight Constipation bowel dysmotility Bisacodyl 5 mg PO hydration lockout SBO acute abdomen."
+      "search_text": "CPG-30 Spaceflight Constipation bowel dysmotility Bisacodyl 5 mg PO hydration lockout SBO acute abdomen.",
+      "verified_rule_ids": [],
+      "source_audit": {
+        "clinical_status": "unverified_project_simulation",
+        "unverified_fields": [
+          "diagnostic_criteria",
+          "autonomous_checklist",
+          "prescribed_meds",
+          "drug_lockouts"
+        ],
+        "references": [
+          {
+            "citation": "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2",
+            "url": "https://www.nasa.gov/reference/appendix-e-health-and-medical-care-technical-requirements/",
+            "supports": "Mission planning considers constipation."
+          }
+        ]
+      }
     },
     {
       "protocol_id": "CPG-31",
       "category": "Behavioral / Circadian",
       "title": "Circadian Misalignment & Acute Insomnia",
       "nasa_citations": [
-        "NASA-STD-3001 [V2 6115]",
-        "ISS Sleep Countermeasures"
+        "NASA-STD-3001 Vol 2 Rev F, 6.6.1.8 [V2 6079] (For missions longer than 30 days, the sleep-area acoustic requirement uses the NC-40 octave-band curve).",
+        "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2 (Mission planning considers circadian and sleep disturbances)."
       ],
       "diagnostic_criteria": [
         "90-minute orbital light/dark cycle disruption or slam-shift schedule",
-        "Sleep latency > 30 min or total sleep < 6 hours; sleep-quarter noise > 48 dBA (NC-40)"
+        "Simulated sleep latency > 30 min or total sleep < 6 hours; record sleep-quarter noise as environmental context"
       ],
       "autonomous_checklist": [
-        "Enforce acoustic limit <= 48 dBA (NC-40) and block blue light pre-sleep",
+        "Review sleep-area octave-band noise measurements and pre-sleep light exposure",
         "Administer Melatonin 3 mg PO 30-60 min before target sleep",
         "For refractory insomnia: Zaleplon 10 mg PO (short window) or Zolpidem 5 mg PO (>=6-8h protected window)"
       ],
@@ -1102,14 +1836,38 @@
       "drug_lockouts": [
         "Zolpidem if EVA or critical alarm response required within 6-8 hours, or if ppCO2 elevated"
       ],
-      "search_text": "CPG-31 Circadian Misalignment Acute Insomnia V2 6115 NC-40 48 dBA Melatonin Zaleplon Zolpidem lockout EVA alarm."
+      "search_text": "CPG-31 Circadian Misalignment Acute Insomnia V2 6079 sleep area octave-band noise NC-40 Melatonin Zaleplon Zolpidem lockout EVA alarm.",
+      "verified_rule_ids": [
+        "V2 6079"
+      ],
+      "source_audit": {
+        "clinical_status": "unverified_project_simulation",
+        "unverified_fields": [
+          "diagnostic_criteria",
+          "autonomous_checklist",
+          "prescribed_meds",
+          "drug_lockouts"
+        ],
+        "references": [
+          {
+            "citation": "NASA-STD-3001 Vol 2 Rev F, 6.6.1.8 [V2 6079]",
+            "url": "https://standards.nasa.gov/system/files/tmp/NASA-STD-3001%20Vol%202%20Rev%20F.pdf",
+            "supports": "For missions longer than 30 days, the sleep-area acoustic requirement uses the NC-40 octave-band curve."
+          },
+          {
+            "citation": "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2",
+            "url": "https://www.nasa.gov/reference/appendix-e-health-and-medical-care-technical-requirements/",
+            "supports": "Mission planning considers circadian and sleep disturbances."
+          }
+        ]
+      }
     },
     {
       "protocol_id": "CPG-32",
       "category": "Behavioral / Operational",
       "title": "Mission Fatigue & Cognitive Sustainment",
       "nasa_citations": [
-        "ISS Fatigue Risk Management"
+        "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2 (Mission planning considers work overload and exhaustion)."
       ],
       "diagnostic_criteria": [
         "Extended contingency shift, acute sleep deprivation, declining reaction time"
@@ -1125,7 +1883,24 @@
       "drug_lockouts": [
         "Tachyarrhythmias (Afib/SVT), severe dehydration, uncontrolled hypertension"
       ],
-      "search_text": "CPG-32 Mission Fatigue Cognitive Sustainment Modafinil 200 mg PO Caffeine 200 mg PO alertness lockout tachyarrhythmia dehydration."
+      "search_text": "CPG-32 Mission Fatigue Cognitive Sustainment Modafinil 200 mg PO Caffeine 200 mg PO alertness lockout tachyarrhythmia dehydration.",
+      "verified_rule_ids": [],
+      "source_audit": {
+        "clinical_status": "unverified_project_simulation",
+        "unverified_fields": [
+          "diagnostic_criteria",
+          "autonomous_checklist",
+          "prescribed_meds",
+          "drug_lockouts"
+        ],
+        "references": [
+          {
+            "citation": "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2",
+            "url": "https://www.nasa.gov/reference/appendix-e-health-and-medical-care-technical-requirements/",
+            "supports": "Mission planning considers work overload and exhaustion."
+          }
+        ]
+      }
     }
   ]
 }

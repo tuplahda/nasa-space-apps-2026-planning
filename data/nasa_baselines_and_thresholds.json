@@ -12,7 +12,9 @@
       "literature_derived",
       "device_or_institution_specific",
       "synthetic"
-    ]
+    ],
+    "evidence_class": "project simulation thresholds with mapped NASA engineering context",
+    "description": "Project physiology and alert thresholds are simulation values unless an individual entry identifies a verified primary source. NASA design requirements do not automatically establish clinical diagnostic limits."
   },
   "physiological_baselines": {
     "hr_bpm": {

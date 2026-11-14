@@ -3,9 +3,8 @@
     "scenario_id": "SCENARIO_1_HYPERCAPNIA",
     "title": "Acute and Chronic Hypercapnia (CO2 Toxicity & ECLSS Scrubbing Degradation)",
     "nasa_citations": [
-      "NASA-STD-3001 Vol 2 Rev D [V2 6004]",
-      "OCHMO-TB-004 (Carbon Dioxide)",
-      "ISS Medical Checklist JSC-48522-E4"
+      "NASA-STD-3001 Vol 2 Rev F, 6.2.1.3 [V2 6004] (The habitable system must limit average cabin CO2 partial pressure to 3 mmHg over one hour).",
+      "OCHMO-TB-004 Rev D, pp. 8-9 (The technical brief describes ISS carbon dioxide removal systems)."
     ],
     "layer1_equations": {
       "delta_CO2": "max(0, ppCO2(t) - 2.0)",
@@ -35,15 +34,37 @@
       "If ppCO2 > 5.0 mmHg or trigeminal symptoms: deploy 100% O2 via demand mask (RSP) and run i-STAT venous blood gas (MDP).",
       "Administer Ibuprofen 400 mg PO or Acetaminophen 650 mg PO from CMP (avoid opioids).",
       "Suspend 75% VO2max ARED exercise and shift crew diet toward higher fat (RQ -> 0.85) to cut metabolic CO2 production by 20%."
-    ]
+    ],
+    "verified_rule_ids": [
+      "V2 6004"
+    ],
+    "source_audit": {
+      "clinical_status": "unverified_project_simulation",
+      "unverified_fields": [
+        "layer1_equations",
+        "symptoms_by_severity",
+        "checs_medications",
+        "autonomous_checklist"
+      ],
+      "references": [
+        {
+          "citation": "NASA-STD-3001 Vol 2 Rev F, 6.2.1.3 [V2 6004]",
+          "url": "https://standards.nasa.gov/system/files/tmp/NASA-STD-3001%20Vol%202%20Rev%20F.pdf",
+          "supports": "The habitable system must limit average cabin CO2 partial pressure to 3 mmHg over one hour."
+        },
+        {
+          "citation": "OCHMO-TB-004 Rev D, pp. 8-9",
+          "url": "https://www.nasa.gov/wp-content/uploads/2023/12/ochmo-tb-004-carbon-dioxide.pdf",
+          "supports": "The technical brief describes ISS carbon dioxide removal systems."
+        }
+      ]
+    }
   },
   {
     "scenario_id": "SCENARIO_2_SANS",
     "title": "Spaceflight-Associated Neuro-Ocular Syndrome (SANS)",
     "nasa_citations": [
-      "NASA HRP Evidence Book: SANS",
-      "NASA SANS Clinical Practice Guideline (CPG)",
-      "ISS Medical Checklist JSC-48522"
+      "OCHMO-MTB-001, February 2024, p. 10, Figure 1 (NASA's SANS medical technical brief provides a reference overview of ophthalmic testing)."
     ],
     "layer1_equations": {
       "rnfl_um": "95 + 18 * ln(1 + max(0, flight_day - 15) / 30)",
@@ -72,14 +93,30 @@
       "Prescribe adjustable Space Anticipation Glasses calibrated to +0.75 to +1.50 D hyperopic shift.",
       "Initiate nightly Lower Body Negative Pressure (LBNP) therapy (reduces CVP to 1.2 mmHg and choroidal area expansion by 74%).",
       "Apply Venoconstrictive Thigh Cuffs (VTCs), clamp cabin ppCO2 < 2.5 mmHg, and moderate peak ARED Valsalva loads."
-    ]
+    ],
+    "verified_rule_ids": [],
+    "source_audit": {
+      "clinical_status": "unverified_project_simulation",
+      "unverified_fields": [
+        "layer1_equations",
+        "symptoms_by_severity",
+        "checs_medications",
+        "autonomous_checklist"
+      ],
+      "references": [
+        {
+          "citation": "OCHMO-MTB-001, February 2024, p. 10, Figure 1",
+          "url": "https://www.nasa.gov/wp-content/uploads/2024/02/ochmo-mtb-001-sans.pdf",
+          "supports": "NASA's SANS medical technical brief provides a reference overview of ophthalmic testing."
+        }
+      ]
+    }
   },
   {
     "scenario_id": "SCENARIO_3_ORTHOSTATIC_INTOLERANCE",
     "title": "Orthostatic Intolerance and Gravitational Transition Pre-Syncope",
     "nasa_citations": [
-      "NASA-STD-3001 Fitness-for-Duty Orthostatic Hypotension Standard (4.2.11)",
-      "ISS Medical Checklist JSC-48522"
+      "NASA-STD-3001 Vol 2 Rev F, 7.4.3 [V2 7042] (The vehicle must provide countermeasures for orthostatic intolerance on return to gravity and during specified head-to-foot acceleration)."
     ],
     "layer1_equations": {
       "sbp_mmHg": "112 - 28 * (1 - exp(-t / 1.8)) - step(t - 4) * 18 * (t - 4)",
@@ -105,17 +142,36 @@
     "autonomous_checklist": [
       "Command crewmember into immediate supine, legs-elevated (Trendelenburg) posture to restore venous return.",
       "Attach Inspiratory Threshold Valve (ITV / ITD) to facemask (RSP) — boosts stroke volume to 138 mL and cardiac output to 8.9 L/min.",
-      "Don lower-body compression garments and execute NASA Fluid Loading Protocol (1.0-1.5 L isotonic fluid).",
+      "Don lower-body compression garments and model a fluid-loading exercise (1.0-1.5 L isotonic fluid).",
       "If severe post-landing hypotension persists: infuse 500-1,000 mL 0.9% Normal Saline via CHeCS IV pump (ISP)."
-    ]
+    ],
+    "verified_rule_ids": [
+      "V2 7042"
+    ],
+    "source_audit": {
+      "clinical_status": "unverified_project_simulation",
+      "unverified_fields": [
+        "layer1_equations",
+        "symptoms_by_severity",
+        "checs_medications",
+        "autonomous_checklist"
+      ],
+      "references": [
+        {
+          "citation": "NASA-STD-3001 Vol 2 Rev F, 7.4.3 [V2 7042]",
+          "url": "https://standards.nasa.gov/system/files/tmp/NASA-STD-3001%20Vol%202%20Rev%20F.pdf",
+          "supports": "The vehicle must provide countermeasures for orthostatic intolerance on return to gravity and during specified head-to-foot acceleration."
+        }
+      ]
+    }
   },
   {
     "scenario_id": "SCENARIO_4_SOLAR_RADIATION_ARS",
     "title": "Acute Radiation Syndrome (ARS) from Solar Particle Event (SPE)",
     "nasa_citations": [
-      "NASA-STD-3001 Vol 1 Rev C [V1 4030] Space Permissible Exposure Limits",
-      "NASA DONKI API (/DONKI/SEP & /DONKI/FLR)",
-      "ISS Medical Checklist JSC-48522"
+      "NASA-STD-3001 Vol 1 Rev C, 4.8.1 [V1 4029] (Crew radiation protection uses the ALARA principle).",
+      "NASA-STD-3001 Vol 1 Rev C, 4.8.3 [V1 4031] (The system design must protect the crew against a specified solar particle reference event).",
+      "NASA CCMC DONKI, About and Catalogs (The research catalog records solar flares and solar energetic particle events)."
     ],
     "layer1_equations": {
       "bfo_dose_rate_mGy_hr": "0.054 + A_SPE * ((t - t0)/tau)^(k-1) * exp(-((t - t0)/tau)^k)",
@@ -136,19 +192,48 @@
       }
     ],
     "autonomous_checklist": [
-      "ALARA Protocol: Abort EVA immediately upon DONKI /FLR or /SEP notification; retreat to high-hydrogen Storm Shelter.",
+      "In this exercise, simulate EVA termination and shelter entry when the scenario injects a solar event and local dosimetry alert.",
       "Administer Ondansetron 4-8 mg ODT/IV (OMP/TIMP) and initiate 0.9% Normal Saline IV rehydration (ISP) with i-STAT electrolytes.",
       "Perform serial C2M2 offline Complete Blood Count (CBC) assays every 6 hours to track Andrews lymphocyte depletion kinetics.",
       "Initiate prophylactic antimicrobials (Levofloxacin, Valacyclovir, Fluconazole) and use Acetaminophen (NO NSAIDs/Aspirin) for fever."
-    ]
+    ],
+    "verified_rule_ids": [
+      "V1 4029",
+      "V1 4031"
+    ],
+    "source_audit": {
+      "clinical_status": "unverified_project_simulation",
+      "unverified_fields": [
+        "layer1_equations",
+        "symptoms_by_severity",
+        "checs_medications",
+        "autonomous_checklist"
+      ],
+      "references": [
+        {
+          "citation": "NASA-STD-3001 Vol 1 Rev C, 4.8.1 [V1 4029]",
+          "url": "https://standards.nasa.gov/sites/default/files/standards/NASA/C/nasa-std-3001-vol-1-rev-c-signature.pdf",
+          "supports": "Crew radiation protection uses the ALARA principle."
+        },
+        {
+          "citation": "NASA-STD-3001 Vol 1 Rev C, 4.8.3 [V1 4031]",
+          "url": "https://standards.nasa.gov/sites/default/files/standards/NASA/C/nasa-std-3001-vol-1-rev-c-signature.pdf",
+          "supports": "The system design must protect the crew against a specified solar particle reference event."
+        },
+        {
+          "citation": "NASA CCMC DONKI, About and Catalogs",
+          "url": "https://ccmc.gsfc.nasa.gov/tools/DONKI/",
+          "supports": "The research catalog records solar flares and solar energetic particle events."
+        }
+      ]
+    }
   },
   {
     "scenario_id": "SCENARIO_5_EVA_THERMAL_DCS",
     "title": "EVA Thermal Strain ('Space Fever'), Dehydration, and Decompression Sickness (DCS)",
     "nasa_citations": [
-      "NASA-STD-3001 Vol 1 & Vol 2 [V2 6006]",
-      "NASA EVA Probabilistic Risk Assessment (PRA)",
-      "ISS Medical Checklist JSC-48522"
+      "NASA-STD-3001 Vol 2 Rev F, 6.2.2.4 [V2 6008] (The program must establish mission-specific decompression sickness mitigation and demonstrate its performance in ground testing).",
+      "NASA-STD-3001 Vol 2 Rev F, 11.1.4.5 [V2 11011] (The spacesuit design must limit modeled crewmember heat storage during nominal suited activity)."
     ],
     "layer1_equations": {
       "cbt_C": "37.8 + 2.6 * (1 - exp(-t / 45))",
@@ -172,15 +257,38 @@
       "Abort EVA, ingress airlock, and repressurize to 101.3 kPa (14.7 psia) to compress nitrogen microbubbles.",
       "Doff spacesuit and apply active surface cooling packs (neck, axillae, groin) until CBT < 38.0 °C.",
       "Place astronaut on 100% O2 via tight-fitting mask (RSP), infuse 1.0-2.0 L Normal Saline IV (ISP), and run i-STAT panel."
-    ]
+    ],
+    "verified_rule_ids": [
+      "V2 6008",
+      "V2 11011"
+    ],
+    "source_audit": {
+      "clinical_status": "unverified_project_simulation",
+      "unverified_fields": [
+        "layer1_equations",
+        "symptoms_by_severity",
+        "checs_medications",
+        "autonomous_checklist"
+      ],
+      "references": [
+        {
+          "citation": "NASA-STD-3001 Vol 2 Rev F, 6.2.2.4 [V2 6008]",
+          "url": "https://standards.nasa.gov/system/files/tmp/NASA-STD-3001%20Vol%202%20Rev%20F.pdf",
+          "supports": "The program must establish mission-specific decompression sickness mitigation and demonstrate its performance in ground testing."
+        },
+        {
+          "citation": "NASA-STD-3001 Vol 2 Rev F, 11.1.4.5 [V2 11011]",
+          "url": "https://standards.nasa.gov/system/files/tmp/NASA-STD-3001%20Vol%202%20Rev%20F.pdf",
+          "supports": "The spacesuit design must limit modeled crewmember heat storage during nominal suited activity."
+        }
+      ]
+    }
   },
   {
     "scenario_id": "SCENARIO_6_CIRCADIAN_SLEEP",
     "title": "Circadian Desynchrony, Sleep Architecture Fragmentation, and Behavioral Asthenia",
     "nasa_citations": [
-      "NASA Spaceflight Standard Measures (SSM) — Sleep & Cognition Test Battery (CTB)",
-      "NASA-STD-3001 [V2 6012] Thermal Comfort",
-      "ISS CHeCS Formulary"
+      "NASA-STD-3001 Vol 2 Rev F, 6.6.1.8 [V2 6079] (For missions longer than 30 days, the sleep-area acoustic requirement uses the NC-40 octave-band curve)."
     ],
     "layer1_equations": {
       "sleep_onset_latency_min": "65",
@@ -203,17 +311,35 @@
     ],
     "autonomous_checklist": [
       "Configure dynamic solid-state lighting: 480 nm blue-enriched light upon waking; blue-depleted dim light 2 hours pre-sleep.",
-      "Cool Crew Quarters to 18-20 °C ([V2 6012]) and verify local sleep-station fan & ppCO2 < 2.5 mmHg.",
+      "Check sleep-station temperature, ventilation and local cabin CO2 in the simulation.",
       "Administer Melatonin 3 mg PO or Zaleplon 5-10 mg PO at bedtime (OMP); use Caffeine/Modafinil prior to critical EVA/docking.",
       "Activate C2M2 offline VR relaxation, CBT modules, and asynchronous Private Psychological Conference."
-    ]
+    ],
+    "verified_rule_ids": [
+      "V2 6079"
+    ],
+    "source_audit": {
+      "clinical_status": "unverified_project_simulation",
+      "unverified_fields": [
+        "layer1_equations",
+        "symptoms_by_severity",
+        "checs_medications",
+        "autonomous_checklist"
+      ],
+      "references": [
+        {
+          "citation": "NASA-STD-3001 Vol 2 Rev F, 6.6.1.8 [V2 6079]",
+          "url": "https://standards.nasa.gov/system/files/tmp/NASA-STD-3001%20Vol%202%20Rev%20F.pdf",
+          "supports": "For missions longer than 30 days, the sleep-area acoustic requirement uses the NC-40 octave-band curve."
+        }
+      ]
+    }
   },
   {
     "scenario_id": "SCENARIO_7_IJV_THROMBOSIS_ARRHYTHMIA",
     "title": "Spaceflight Venous Thromboembolism (IJV Thrombosis) and Cardiac Arrhythmia",
     "nasa_citations": [
-      "ISS Vascular Contingency Pack Protocol",
-      "ISS Medical Checklist JSC-48522 (ACLS / CMRS)"
+      "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2 (Mission planning considers venous thromboembolism and atrial arrhythmias)."
     ],
     "layer1_equations": {
       "ijv_uncomplicated_hr_bpm": "84",
@@ -237,14 +363,30 @@
       "Initiate subcutaneous Enoxaparin followed by oral Apixaban from the Vascular Contingency Pack (VCP).",
       "Lock out crewmember from EVA and high-load ARED resistive exercise; stage Protamine and PCC reversal agents.",
       "If VT/VF cardiac arrest occurs: secure crewmember to electrically isolated CMRS, defibrillate via AED/Zoll, place ILMA airway (RSP), and administer Epinephrine 0.1 mg/mL (EMTP)."
-    ]
+    ],
+    "verified_rule_ids": [],
+    "source_audit": {
+      "clinical_status": "unverified_project_simulation",
+      "unverified_fields": [
+        "layer1_equations",
+        "symptoms_by_severity",
+        "checs_medications",
+        "autonomous_checklist"
+      ],
+      "references": [
+        {
+          "citation": "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2",
+          "url": "https://www.nasa.gov/reference/appendix-e-health-and-medical-care-technical-requirements/",
+          "supports": "Mission planning considers venous thromboembolism and atrial arrhythmias."
+        }
+      ]
+    }
   },
   {
     "scenario_id": "SCENARIO_8_SAS_URINARY_RETENTION",
     "title": "Early-Mission Space Adaptation Syndrome (SAS), Rhinosinusitis, and Acute Urinary Retention",
     "nasa_citations": [
-      "ISS Medical Checklist JSC-48522 (SAS & Bladder Catheterization)",
-      "NASA IMM Clinical Finding Forms (CLIFFs)"
+      "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2 (Mission planning considers space motion sickness, congestion and urinary retention)."
     ],
     "layer1_equations": {
       "sas_vagal_hr_bpm": "48",
@@ -267,7 +409,24 @@
       "For SAS: Minimize head pitch/roll movements; administer Ondansetron 4 mg ODT or Promethazine 25 mg + Caffeine 100-200 mg (CMP/TIMP).",
       "For Cephalad Rhinosinusitis: Administer Pseudoephedrine PO and Oxymetazoline nasal spray (limit <= 3 days).",
       "If unable to void >8 hours: Perform AI-guided bladder ultrasound (MDP) and administer Tamsulosin 0.4 mg PO (OMP).",
-      "If bladder volume >500 mL: Perform sterile urethral catheterization per JSC-48522 using Lidocaine Jelly and MTP catheter kit."
-    ]
+      "If bladder volume >500 mL: Perform sterile urethral catheterization using Lidocaine Jelly and MTP catheter kit."
+    ],
+    "verified_rule_ids": [],
+    "source_audit": {
+      "clinical_status": "unverified_project_simulation",
+      "unverified_fields": [
+        "layer1_equations",
+        "symptoms_by_severity",
+        "checs_medications",
+        "autonomous_checklist"
+      ],
+      "references": [
+        {
+          "citation": "NASA-STD-3001 Vol 1 Rev C, Appendix E, Table E.2-2",
+          "url": "https://www.nasa.gov/reference/appendix-e-health-and-medical-care-technical-requirements/",
+          "supports": "Mission planning considers space motion sickness, congestion and urinary retention."
+        }
+      ]
+    }
   }
 ]

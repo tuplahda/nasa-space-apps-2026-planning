@@ -16,11 +16,11 @@ This document defines the clinical decision-support logic for **A.R.E.S. Med** (
 
 ## 🟢 MODE A: KNOWN CONDITION (Confidence $\ge 0.75$)
 
-Triggered when telemetry and symptom patterns cleanly match a verified spaceflight medical condition in the NASA knowledge base.
+Triggered when project retrieval confidence reaches the configured threshold. This does not establish clinical validation.
 
 ### Requirements:
-1. **Grounded Diagnosis:** Diagnose the condition strictly using the matched NASA protocol.
-2. **NASA Standard Citation:** Quote the exact standard code and verbatim rule in `nasa_direct_quote` (e.g. `NASA-STD-3001 [V2 6004]`).
+1. **Grounded Diagnosis:** Return the matched project scenario. Identify which mapped NASA requirements are verified, if any.
+2. **NASA Standard Citation:** Populate `nasa_direct_quote` only from a verified, mapped primary-source excerpt. Leave it empty when none is mapped.
 3. **CHeCS Physical Formulary Enforcement:** Prescribe ONLY medications physically stocked in the 2023 ISS Crew Health Care System (`CHeCS`) subpacks:
    * `CMP` — Crew Medical Pack (Oral/Topical)
    * `OMP` — Oral Medication Pack
@@ -38,8 +38,8 @@ Triggered when telemetry and symptom patterns cleanly match a verified spaceflig
   "confidence": 0.94,
   "diagnosis": "Acute Cabin Hypercapnia (Carbon Dioxide Toxicity)",
   "severity": "CLASS_1_EMERGENCY",
-  "nasa_direct_quote": "NASA-STD-3001 V2 [6004]: Inspired pCO2 shall be maintained below 3.0 mmHg (0.4 kPa). Emergency response required if pCO2 exceeds 5.0 mmHg.",
-  "source_document": "NASA-STD-3001 Vol 1 / ISS Medical Ops Checklist JSC-48522",
+  "nasa_direct_quote": "",
+  "source_document": "Project simulation protocol",
   "checs_subpack": "TIMP / CMP",
   "prescriptions": [
     {

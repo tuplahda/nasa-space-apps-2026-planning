@@ -15,7 +15,7 @@ On deep-space missions to the Moon or Mars, radio communication suffers a **20-m
 1. **Autonomous Astronaut Agent (Digital Twin) — *Dheer*:** Generates dynamic, non-hardcoded microgravity vitals (`HR`, `BP`, `SpO2`, `HRV`, `Core Temp`), activity states (`SLEEP`, `RESTING`, `EXERCISE`, `EVA`), and first-person symptom logs, modulated by live NASA space weather (`DONKI API`).
 2. **60-Second Sliding Ring Buffer & SEU Filter — *Yohan*:** Evaluates incoming telemetry against spaceflight-adapted baselines using JPL Power-of-Ten safety rules and a 3-tick persistence debounce to filter cosmic ray bit-flips.
 3. **NASA Level V RAG Medical Officer — *Yohan*:** An onboard AI doctor executing our strict **2-Mode Clinical Protocol**:
-   - **Mode A (Known Condition $\ge 75\%$):** Diagnoses from NASA protocols, quotes verbatim standards (`NASA-STD-3001`), prescribes from physical ISS `CHeCS` medical packs (`CMP`, `TIMP`), and locks out contraindications (e.g. no opioids during hypercapnia).
+   - **Mode A (Known Condition $\ge 75\%$):** Matches project scenarios and displays a verified NASA requirement only when one is mapped. Clinical steps, medication entries and lockouts are unverified project simulation content.
    - **Mode B (Novel Zero-Day Anomaly $< 75\%$):** Triggers **Certified Abstention** (no hallucinations) + 4-step stabilization (ABC vitals, Point-of-Care `i-STAT`/`C2M2` labs, High-Risk Drug Lockout, In-Flight Learning).
 4. **Mission Control Console & 3D Body HUD — *Tivesh*:** A dark-mode HTML/CSS/JS dashboard featuring real-time `Chart.js` line graphs, an interactive **3D Holographic Anatomical Body HUD** with glowing organ pins (`SANS-01`, `CV-02`, `ECLSS-03`, `RAD-04`), and a **Daily Routine Prevention Schedule** (`94% Readiness Meter`).
 5. **System Integrator & Pitch Lead — *Roy*:** Connects the closed-loop recovery (applying treatments heals astronaut vitals back to normal tick-by-tick) and leads the **Official 7-Slide Deck** and **4-Minute Timed Presentation**.
@@ -109,7 +109,7 @@ NASA's official private challenge dataset is expected to be released within ~24 
 │   ├── lab_reference_intervals.json            <-- Specimen-aware i-STAT CG8+/CG4+ & CBC warning/critical bands
 │   ├── rag_protocols_expanded.json             <-- Yohan's 8 legacy scenarios + 32 NASA CPGs (CPG-01..32)
 │   ├── checs_formulary.json                    <-- 54 pre-processed ISS CHeCS meds & lockouts
-│   ├── nasa_std_3001_rules.json                <-- 26 verbatim NASA-STD-3001 & SMAC rules
+│   ├── nasa_std_3001_rules.json                <-- Source-traced requirements and SMAC limits
 │   ├── onboard_hardware_specs.json             <-- 5 onboard diagnostic device specs (i-STAT, Ultrasound-2, C2M2, OCT, Tempus Pro)
 │   ├── rag_protocols_8_scenarios.json          <-- Original 8 scenarios (preserved for compatibility)
 │   ├── nasa_space_medicine_research.md         <-- Space medicine notes & CHeCS formulary

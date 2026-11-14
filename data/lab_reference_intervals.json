@@ -3,12 +3,17 @@
     "name": "ARES-MED Specimen-Aware Point-of-Care Lab Reference Intervals & Alert Bands",
     "version": "1.0.0",
     "source": "Abbott i-STAT CG8+/CG4+ IFUs, ARUP Critical Values (Rev 47), Michigan Medicine, University Hospitals Dorset",
-    "evidence_class": "device_or_institution_specific",
+    "evidence_class": "institution-specific, mixed evidence",
     "offline_ready": true,
-    "description": "Specimen-aware reference intervals, ARES warning bands, and institution-specific critical limits for Mode B lab orders and Dheer's diagnostic simulator. Never silently merge institution policies."
+    "description": "Institution and device-specific intervals. These are not universal astronaut reference intervals or NASA clinical rules. Preserve specimen and device context."
   },
   "comparison_logic": {
-    "precedence": ["unreliable", "critical", "warning", "within_reference"],
+    "precedence": [
+      "unreliable",
+      "critical",
+      "warning",
+      "within_reference"
+    ],
     "pseudocode": "if invalid_sample: status = 'unreliable' elif value meets critical_policy: status = 'critical' elif value outside specimen_reference: status = 'warning' else: status = 'within_reference'",
     "mandatory_metadata_fields": [
       "specimen_type",
@@ -30,15 +35,26 @@
     {
       "analyte": "pH",
       "unit": "pH units",
-      "cartridges": ["i-STAT CG4+", "i-STAT CG8+"],
+      "cartridges": [
+        "i-STAT CG4+",
+        "i-STAT CG8+"
+      ],
       "reference_intervals": {
-        "arterial": { "min": 7.35, "max": 7.45, "source": "Abbott i-STAT IFU" },
-        "venous": { "min": 7.31, "max": 7.41, "source": "Abbott i-STAT IFU" }
+        "arterial": {
+          "min": 7.35,
+          "max": 7.45,
+          "source": "Abbott i-STAT IFU"
+        },
+        "venous": {
+          "min": 7.31,
+          "max": 7.41,
+          "source": "Abbott i-STAT IFU"
+        }
       },
       "ares_warning_rule": "Outside selected specimen reference interval before critical limit",
       "critical_limits": {
-        "low": 7.20,
-        "high": 7.60,
+        "low": 7.2,
+        "high": 7.6,
         "policy_source": "Michigan Medicine"
       },
       "search_text": "Lab pH i-STAT CG4+ CG8+ arterial 7.35-7.45 venous 7.31-7.41 critical <7.20 >7.60."
@@ -46,10 +62,21 @@
     {
       "analyte": "pCO2",
       "unit": "mmHg",
-      "cartridges": ["i-STAT CG4+", "i-STAT CG8+"],
+      "cartridges": [
+        "i-STAT CG4+",
+        "i-STAT CG8+"
+      ],
       "reference_intervals": {
-        "arterial": { "min": 35, "max": 45, "source": "Abbott i-STAT IFU" },
-        "venous": { "min": 41, "max": 51, "source": "Abbott i-STAT IFU" }
+        "arterial": {
+          "min": 35,
+          "max": 45,
+          "source": "Abbott i-STAT IFU"
+        },
+        "venous": {
+          "min": 41,
+          "max": 51,
+          "source": "Abbott i-STAT IFU"
+        }
       },
       "ares_warning_rule": "Outside selected specimen reference interval before critical limit",
       "critical_limits": {
@@ -62,11 +89,22 @@
     {
       "analyte": "HCO3-",
       "unit": "mmol/L",
-      "cartridges": ["i-STAT CG4+ (calculated)", "i-STAT CG8+ (calculated)"],
+      "cartridges": [
+        "i-STAT CG4+ (calculated)",
+        "i-STAT CG8+ (calculated)"
+      ],
       "provenance_note": "Calculated on i-STAT from measured acid-base variables; treat calculated and measured values as distinct provenance types.",
       "reference_intervals": {
-        "arterial": { "min": 22, "max": 26, "source": "Abbott i-STAT IFU" },
-        "venous": { "min": 23, "max": 28, "source": "Abbott i-STAT IFU" }
+        "arterial": {
+          "min": 22,
+          "max": 26,
+          "source": "Abbott i-STAT IFU"
+        },
+        "venous": {
+          "min": 23,
+          "max": 28,
+          "source": "Abbott i-STAT IFU"
+        }
       },
       "ares_warning_rule": "Outside selected specimen reference interval",
       "critical_limits": {
@@ -79,13 +117,26 @@
     {
       "analyte": "Lactate",
       "unit": "mmol/L",
-      "cartridges": ["i-STAT CG4+"],
+      "cartridges": [
+        "i-STAT CG4+"
+      ],
       "reference_intervals": {
-        "arterial": { "min": 0.36, "max": 1.25, "source": "Abbott CG4+ IFU" },
-        "venous": { "min": 0.90, "max": 1.70, "source": "Abbott CG4+ IFU" }
+        "arterial": {
+          "min": 0.36,
+          "max": 1.25,
+          "source": "Abbott CG4+ IFU"
+        },
+        "venous": {
+          "min": 0.9,
+          "max": 1.7,
+          "source": "Abbott CG4+ IFU"
+        }
       },
       "ares_warning_band": {
-        "venous_high_warning": { "min_exclusive": 1.70, "max_exclusive": 5.0 }
+        "venous_high_warning": {
+          "min_exclusive": 1.7,
+          "max_exclusive": 5.0
+        }
       },
       "critical_limits": {
         "low": null,
@@ -100,46 +151,142 @@
     {
       "analyte": "Na+",
       "unit": "mmol/L",
-      "cartridges": ["i-STAT CG8+"],
-      "reference_interval": { "min": 138, "max": 146, "source": "Abbott CG8+ IFU" },
-      "ares_warning_band": { "low_range": [120, 138], "high_range": [146, 160] },
-      "critical_limits": { "low": 120, "high": 160, "policy_source": "ARUP" },
+      "cartridges": [
+        "i-STAT CG8+"
+      ],
+      "reference_interval": {
+        "min": 138,
+        "max": 146,
+        "source": "Abbott CG8+ IFU"
+      },
+      "ares_warning_band": {
+        "low_range": [
+          120,
+          138
+        ],
+        "high_range": [
+          146,
+          160
+        ]
+      },
+      "critical_limits": {
+        "low": 120,
+        "high": 160,
+        "policy_source": "ARUP"
+      },
       "search_text": "Lab Na+ sodium i-STAT CG8+ 138-146 mmol/L warning 120-<138 >146-160 critical <120 >160."
     },
     {
       "analyte": "K+",
       "unit": "mmol/L",
-      "cartridges": ["i-STAT CG8+"],
-      "reference_interval": { "min": 3.5, "max": 4.9, "source": "Abbott CG8+ IFU" },
-      "ares_warning_band": { "low_range": [3.0, 3.5], "high_range": [4.9, 6.1] },
-      "critical_limits": { "low": 3.0, "high": 6.1, "policy_source": "ARUP" },
+      "cartridges": [
+        "i-STAT CG8+"
+      ],
+      "reference_interval": {
+        "min": 3.5,
+        "max": 4.9,
+        "source": "Abbott CG8+ IFU"
+      },
+      "ares_warning_band": {
+        "low_range": [
+          3.0,
+          3.5
+        ],
+        "high_range": [
+          4.9,
+          6.1
+        ]
+      },
+      "critical_limits": {
+        "low": 3.0,
+        "high": 6.1,
+        "policy_source": "ARUP"
+      },
       "search_text": "Lab K+ potassium i-STAT CG8+ 3.5-4.9 mmol/L warning 3.0-<3.5 >4.9-6.1 critical <3.0 >6.1."
     },
     {
       "analyte": "Cl-",
       "unit": "mmol/L",
-      "cartridges": ["Separate Chemistry Panel (NOT on i-STAT CG8+)"],
-      "reference_interval": { "min": 98, "max": 108, "source": "Michigan Medicine" },
-      "ares_warning_band": { "low_range": [80, 98], "high_range": [108, 130] },
-      "critical_limits": { "low": 80, "high": 130, "policy_source": "Michigan Medicine" },
+      "cartridges": [
+        "Separate Chemistry Panel (NOT on i-STAT CG8+)"
+      ],
+      "reference_interval": {
+        "min": 98,
+        "max": 108,
+        "source": "Michigan Medicine"
+      },
+      "ares_warning_band": {
+        "low_range": [
+          80,
+          98
+        ],
+        "high_range": [
+          108,
+          130
+        ]
+      },
+      "critical_limits": {
+        "low": 80,
+        "high": 130,
+        "policy_source": "Michigan Medicine"
+      },
       "search_text": "Lab Cl- chloride 98-108 mmol/L warning 80-<98 >108-130 critical <80 >130 not on CG8+."
     },
     {
       "analyte": "iCa",
       "unit": "mmol/L",
-      "cartridges": ["i-STAT CG8+"],
-      "reference_interval": { "min": 1.12, "max": 1.32, "source": "Abbott CG8+ IFU" },
-      "ares_warning_band": { "low_range": [0.78, 1.12], "high_range": [1.32, 1.58] },
-      "critical_limits": { "low": 0.78, "high": 1.58, "inclusive": true, "policy_source": "ARUP" },
+      "cartridges": [
+        "i-STAT CG8+"
+      ],
+      "reference_interval": {
+        "min": 1.12,
+        "max": 1.32,
+        "source": "Abbott CG8+ IFU"
+      },
+      "ares_warning_band": {
+        "low_range": [
+          0.78,
+          1.12
+        ],
+        "high_range": [
+          1.32,
+          1.58
+        ]
+      },
+      "critical_limits": {
+        "low": 0.78,
+        "high": 1.58,
+        "inclusive": true,
+        "policy_source": "ARUP"
+      },
       "search_text": "Lab iCa ionized calcium i-STAT CG8+ 1.12-1.32 mmol/L critical <=0.78 >=1.58."
     },
     {
       "analyte": "Glucose",
       "unit": "mg/dL",
-      "cartridges": ["i-STAT CG8+"],
-      "reference_interval": { "min": 70, "max": 105, "source": "Abbott CG8+ IFU" },
-      "ares_warning_band": { "low_range": [55, 70], "high_range": [105, 450] },
-      "critical_limits": { "low": 55, "high": 450, "policy_source": "ARUP" },
+      "cartridges": [
+        "i-STAT CG8+"
+      ],
+      "reference_interval": {
+        "min": 70,
+        "max": 105,
+        "source": "Abbott CG8+ IFU"
+      },
+      "ares_warning_band": {
+        "low_range": [
+          55,
+          70
+        ],
+        "high_range": [
+          105,
+          450
+        ]
+      },
+      "critical_limits": {
+        "low": 55,
+        "high": 450,
+        "policy_source": "ARUP"
+      },
       "search_text": "Lab Glucose i-STAT CG8+ 70-105 mg/dL warning 55-<70 >105-450 critical <55 >450."
     }
   ],
@@ -148,18 +295,36 @@
       "analyte": "WBC",
       "unit": "x10^9/L",
       "instrument_note": "Requires validated hematology analyzer (NOT supplied by i-STAT CG8+)",
-      "reference_interval": { "min": 4.0, "max": 10.0, "source": "University Hospitals Dorset" },
+      "reference_interval": {
+        "min": 4.0,
+        "max": 10.0,
+        "source": "University Hospitals Dorset"
+      },
       "ares_warning_rule": ">2.0 to <4.0 or >10.0 to <40.0",
-      "critical_limits": { "low": 2.0, "high": 40.0, "inclusive": true, "policy_source": "ARUP" },
+      "critical_limits": {
+        "low": 2.0,
+        "high": 40.0,
+        "inclusive": true,
+        "policy_source": "ARUP"
+      },
       "search_text": "Lab WBC white blood cell count 4.0-10.0 x10^9/L critical <=2.0 >=40.0 infection sepsis appendicitis."
     },
     {
       "analyte": "Platelets",
       "unit": "x10^9/L",
       "instrument_note": "Requires validated hematology analyzer (NOT supplied by i-STAT CG8+)",
-      "reference_interval": { "min": 150, "max": 410, "source": "University Hospitals Dorset" },
+      "reference_interval": {
+        "min": 150,
+        "max": 410,
+        "source": "University Hospitals Dorset"
+      },
       "ares_warning_rule": ">20 to <150 or >410 to <1000",
-      "critical_limits": { "low": 20, "high": 1000, "inclusive": true, "policy_source": "ARUP" },
+      "critical_limits": {
+        "low": 20,
+        "high": 1000,
+        "inclusive": true,
+        "policy_source": "ARUP"
+      },
       "search_text": "Lab Platelets 150-410 x10^9/L critical <=20 >=1000 ARS thrombocytopenia hemorrhage lockout."
     },
     {
@@ -167,11 +332,23 @@
       "unit": "g/dL",
       "instrument_note": "Calculated from Hematocrit on i-STAT CG8+, or measured directly on hematology analyzer. Acute hemorrhage may lag.",
       "reference_intervals": {
-        "male": { "min": 13.0, "max": 17.0, "source": "NHS example" },
-        "female": { "min": 12.0, "max": 15.0, "source": "NHS example" }
+        "male": {
+          "min": 13.0,
+          "max": 17.0,
+          "source": "NHS example"
+        },
+        "female": {
+          "min": 12.0,
+          "max": 15.0,
+          "source": "NHS example"
+        }
       },
       "ares_warning_rule": ">=7.0 to below sex-specific lower reference",
-      "critical_limits": { "low": 7.0, "high": null, "policy_source": "ARUP" },
+      "critical_limits": {
+        "low": 7.0,
+        "high": null,
+        "policy_source": "ARUP"
+      },
       "search_text": "Lab Hemoglobin Hb g/dL male 13-17 female 12-15 critical <7.0 hemorrhage anemia."
     },
     {
@@ -179,9 +356,17 @@
       "full_name": "Absolute Lymphocyte Count",
       "unit": "x10^9/L",
       "instrument_note": "Requires validated hematology analyzer with leukocyte differential (NOT supplied by i-STAT CG8+)",
-      "reference_interval": { "min": 1.0, "max": 3.0, "note": "Spaceflight ARS baseline 1.5-3.5 x10^9/L" },
+      "reference_interval": {
+        "min": 1.0,
+        "max": 3.0,
+        "note": "Spaceflight ARS baseline 1.5-3.5 x10^9/L"
+      },
       "ares_warning_rule": "Outside selected local interval; track serial exponential depletion N(t)=N0*exp(-k(D)*t) post-SPE",
-      "critical_limits": { "low": null, "high": null, "policy_source": "Configure mission/ARS biodosimetry policy" },
+      "critical_limits": {
+        "low": null,
+        "high": null,
+        "policy_source": "Configure mission/ARS biodosimetry policy"
+      },
       "search_text": "Lab ALC Absolute Lymphocyte Count 1.0-3.0 1.5-3.5 x10^9/L ARS biodosimetry radiation depletion."
     }
   ]

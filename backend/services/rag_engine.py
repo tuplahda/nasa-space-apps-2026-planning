@@ -32,7 +32,7 @@ import math
 from pathlib import Path
 import re
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from backend.models.telemetry import AnomalyAssessment, TelemetryPacket
 
@@ -54,9 +54,27 @@ EXPANDED_PROTOCOLS_JSON_PATH: Path = REPO_ROOT / "data" / "rag_protocols_expande
 CHECS_FORMULARY_JSON_PATH: Path = REPO_ROOT / "data" / "checs_formulary.json"
 NASA_RULES_JSON_PATH: Path = REPO_ROOT / "data" / "nasa_std_3001_rules.json"
 LAB_INTERVALS_JSON_PATH: Path = REPO_ROOT / "data" / "lab_reference_intervals.json"
+HARDWARE_SPECS_JSON_PATH: Path = REPO_ROOT / "data" / "onboard_hardware_specs.json"
 RESEARCH_MD_PATH: Path = REPO_ROOT / "data" / "nasa_space_medicine_research.md"
 ARXIV_JSON_PATH: Path = REPO_ROOT / "data" / "arxiv_literature_citations.json"
 OFFICIAL_PROTOCOLS_DIR: Path = REPO_ROOT / "data" / "nasa_official_protocols"
+
+VALID_CHECS_SUBPACKS = {"CMP", "OMP", "TIMP", "EMTP", "VCP", "RSP", "ISP", "MDP", "MTP"}
+
+FORMULARY_ALIAS_MAP: Dict[str, str] = {
+    "trimethoprim/smx": "trimethoprim/sulfamethoxazole",
+    "tmp-smx": "trimethoprim/sulfamethoxazole",
+}
+
+SUPPORT_PACK_ITEMS: Dict[str, Tuple[str, str, str]] = {
+    "100% oxygen": ("RSP", "Inhaled via RSP demand mask", "10-15 L/min 100% O2"),
+    "supplemental o2": ("RSP", "Inhaled via RSP mask/cannula", "Titrate to SpO2 >= 94%"),
+    "iv normal saline": ("ISP", "IV infusion", "500-1000 mL 0.9% NaCl IV"),
+    "iv crystalloids": ("ISP", "IV infusion", "500-1000 mL isotonic crystalloid IV"),
+    "iv/oral rehydration electrolytes": ("ISP", "IV / Oral", "500-1000 mL electrolyte rehydration"),
+    "oral/iv rehydration": ("ISP", "Oral / IV", "Oral rehydration salts or 0.9% NaCl IV"),
+    "sterile urinary catheterization kit": ("MTP", "Urethral catheterization", "Single sterile Foley/straight catheter kit"),
+}
 
 STOPWORDS = {
     "the", "and", "for", "with", "from", "that", "this", "what", "have", "has",
@@ -103,58 +121,41 @@ CLINICAL_SYNONYM_MAP: Dict[str, str] = {
     "racing heart": "arrhythmia palpitations ventricular tachycardia",
     "sharp chest pain": "pleuritic embolism ijv",
     "cant pee": "urinary retention void bladder",
+    "can't urinate": "urinary retention void bladder",
     "unable to void": "urinary retention void bladder",
     "cannot urinate": "urinary retention void bladder",
     "stuffy nose": "sas rhinosinusitis stuffies nasal",
     "motion sick": "sas adaptation nausea",
+    "tearing": "lacrimation ocular tearing",
+    "burning eyes": "ocular burning ammonia nh3",
+    "convulsion": "seizures seizure convulsion hydrazine",
+    "altered awareness": "seizures post-ictal hydrazine",
+    "airway swelling": "angioedema stridor anaphylaxis",
+    "circulatory collapse": "hypotension anaphylaxis shock",
+    "wheeze": "wheezing bronchospasm",
+    "blood loss": "hemorrhage trauma efast shock",
+    "blistering": "burn trauma deep injury fluid loss",
+    "breathlessness": "dyspnea tachypnea sepsis pneumonia",
+    "clammy": "diaphoresis sepsis orthostatic",
+    "shivering": "hypothermia thermal cold",
+    "whooshing": "pulsatile tinnitus sans",
+    "farsighted": "hyperopic sans near-vision",
+    "reading glasses": "hyperopic sans near-vision",
+    "air hunger": "dyspnea hypoxia hypercapnia",
+    "gray-out": "presyncope orthostatic tunnel vision",
+    "scrubber": "co2 hypercapnia scrubber cdra",
+    "ventilation fan": "co2 hypercapnia scrubber",
+    "pains": "pain",
+    "ache": "pain",
+    "lower right": "rlq abdominal appendicitis",
+    "right lower quadrant": "rlq abdominal appendicitis",
+    "hives": "urticaria anaphylaxis",
+    "swollen lips": "angioedema airway swelling anaphylaxis",
+    "throat closing": "stridor airway swelling anaphylaxis",
+    "sharp side pain": "flank pain renal colic nephrolithiasis",
+    "back-to-groin": "flank pain groin nephrolithiasis",
 }
 
-# Grounded NASA standard & checklist excerpts strictly from local source files
-# (`artifacts/clinical_decision_protocol_2_modes.md`, `data/rag_protocols_8_scenarios.json`,
-# and `data/nasa_space_medicine_research.md`). Note: Only Scenario 1 has an explicit
-# `nasa_direct_quote` string in `clinical_decision_protocol_2_modes.md`; Scenarios 2-8
-# use verbatim citations and protocol text from `data/rag_protocols_8_scenarios.json`.
-VERBATIM_NASA_QUOTES: Dict[str, str] = {
-    "SCENARIO_1_HYPERCAPNIA": (
-        "NASA-STD-3001 V2 [6004]: Inspired pCO2 shall be maintained below 3.0 mmHg (0.4 kPa). "
-        "Emergency response required if pCO2 exceeds 5.0 mmHg."
-    ),
-    "SCENARIO_2_SANS": (
-        "NASA HRP Evidence Book: SANS / NASA SANS Clinical Practice Guideline (CPG) / "
-        "ISS Medical Checklist JSC-48522: Perform OCT (quantify RNFL > 105 um), Optical Biometry "
-        "(axial length), Tonometry, and PanOptic Fundoscopy (MDP); initiate nightly LBNP and clamp cabin ppCO2 < 2.5 mmHg."
-    ),
-    "SCENARIO_3_ORTHOSTATIC_INTOLERANCE": (
-        "NASA-STD-3001 Fitness-for-Duty Orthostatic Hypotension Standard (4.2.11) / "
-        "ISS Medical Checklist JSC-48522: Command crewmember into immediate supine, legs-elevated "
-        "(Trendelenburg) posture to restore venous return; attach Inspiratory Threshold Valve (ITV / ITD) to facemask (RSP)."
-    ),
-    "SCENARIO_4_SOLAR_RADIATION_ARS": (
-        "NASA-STD-3001 Vol 1 Rev C [V1 4030] Space Permissible Exposure Limits / "
-        "ISS Medical Checklist JSC-48522: ALARA Protocol: Abort EVA immediately upon DONKI /FLR or /SEP "
-        "notification; retreat to high-hydrogen Storm Shelter and perform serial C2M2 offline CBC assays every 6 hours."
-    ),
-    "SCENARIO_5_EVA_THERMAL_DCS": (
-        "NASA-STD-3001 Vol 1 & Vol 2 [V2 6006] / NASA EVA Probabilistic Risk Assessment (PRA) / "
-        "ISS Medical Checklist JSC-48522: Abort EVA, ingress airlock, and repressurize to 101.3 kPa "
-        "(14.7 psia) to compress nitrogen microbubbles; place astronaut on 100% O2 via tight-fitting mask (RSP)."
-    ),
-    "SCENARIO_6_CIRCADIAN_SLEEP": (
-        "NASA Spaceflight Standard Measures (SSM) — Sleep & Cognition Test Battery (CTB) / "
-        "NASA-STD-3001 [V2 6012] Thermal Comfort: Cool Crew Quarters to 18-20 °C ([V2 6012]), verify local "
-        "sleep-station fan & ppCO2 < 2.5 mmHg, and configure 480 nm blue-enriched / blue-depleted solid-state lighting."
-    ),
-    "SCENARIO_7_IJV_THROMBOSIS_ARRHYTHMIA": (
-        "ISS Vascular Contingency Pack Protocol / ISS Medical Checklist JSC-48522 (ACLS / CMRS): "
-        "Perform C2M2 AI-guided neck ultrasound to confirm IJV thrombus; initiate subcutaneous Enoxaparin "
-        "followed by oral Apixaban from the Vascular Contingency Pack (VCP) and lock out EVA and high-load ARED exercise."
-    ),
-    "SCENARIO_8_SAS_URINARY_RETENTION": (
-        "ISS Medical Checklist JSC-48522 (SAS & Bladder Catheterization) / NASA IMM CLIFFs: "
-        "If unable to void >8 hours: Perform AI-guided bladder ultrasound (MDP) and administer Tamsulosin 0.4 mg PO (OMP); "
-        "if bladder volume >500 mL, perform sterile urethral catheterization per JSC-48522 using Lidocaine Jelly and MTP catheter kit."
-    ),
-}
 
 # Verified 2023 ISS CHeCS Subpack Formulary & Structured Prescriptions per Scenario
 # Strictly grounded in `data/rag_protocols_8_scenarios.json`, `data/nasa_space_medicine_research.md`,
@@ -341,6 +342,38 @@ SCENARIO_KEYWORDS: Dict[str, List[str]] = {
         "sas", "adaptation", "motion", "stuffies", "nasal", "sinus", "rhinosinusitis",
         "urinary", "retention", "void", "bladder", "suprapubic", "catheter",
     ],
+    "CPG-01": ["appendicitis", "rlq", "abdominal pain", "anorexia", "rebound", "leukocytosis", "appendix"],
+    "CPG-02": ["coronary", "acs", "myocardial", "substernal", "radiating", "jaw", "diaphoresis", "st-segment"],
+    "CPG-03": ["cardiac arrest", "ventricular fibrillation", "pulseless", "acls", "apneic", "unresponsive"],
+    "CPG-04": ["ijv", "thrombosis", "embolism", "pleuritic", "sudden dyspnea", "syncope", "jugular"],
+    "CPG-05": ["palpitations", "irregular pulse", "arrhythmia", "svt", "atrial fibrillation", "afib", "tachycardia"],
+    "CPG-06": ["sans", "hyperopic", "farsighted", "choroidal", "onsd", "rnfl", "tinnitus", "whooshing", "visual blackouts"],
+    "CPG-07": ["hypercapnia", "co2", "ppco2", "frontal headache", "scrubber", "dysesthesia", "air hunger"],
+    "CPG-08": ["decompression", "dcs", "bends", "barotrauma", "ear", "sinus", "hearing", "vertigo", "hypoxemia", "depressurization"],
+    "CPG-09": ["radiation", "ars", "spe", "solar", "storm shelter", "emesis", "vomiting", "lymphocyte", "dosimetry"],
+    "CPG-10": ["ammonia", "nh3", "coolant", "burning eyes", "lacrimation", "tearing", "wheezing", "bronchospasm", "prolonged expiration"],
+    "CPG-11": ["hydrazine", "n2h4", "propellant", "seizures", "convulsion", "tremor", "altered awareness"],
+    "CPG-12": ["carbon monoxide", "fire", "smoke", "pyrolysis", "soot", "hoarseness", "confusion", "dizziness"],
+    "CPG-13": ["space motion sickness", "sms", "malaise", "pallor", "sweating", "disorientation", "nausea", "vomiting"],
+    "CPG-14": ["orthostatic", "presyncope", "gray-out", "postural", "thirst", "dry mouth", "reduced urine", "g-load"],
+    "CPG-15": ["thermal", "heat strain", "hyperthermia", "lcvg", "sweating", "hypothermia", "shivering", "clumsiness", "slowing pulse"],
+    "CPG-16": ["nephrolithiasis", "renal colic", "kidney stone", "flank pain", "groin", "hematuria"],
+    "CPG-17": ["urinary retention", "inability to void", "suprapubic", "distention", "urgency", "catheterization"],
+    "CPG-18": ["uti", "cystitis", "pyelonephritis", "dysuria", "frequency", "urinary"],
+    "CPG-19": ["pneumonia", "sepsis", "productive cough", "clammy skin", "breathlessness", "hypothermic", "lactate"],
+    "CPG-20": ["anaphylaxis", "allergic", "urticaria", "angioedema", "airway swelling", "stridor", "circulatory collapse"],
+    "CPG-21": ["regolith", "dust", "conjunctivitis", "sneezing", "itching", "ocular redness"],
+    "CPG-22": ["corneal abrasion", "foreign-body", "photophobia", "opening eye", "fluorescein", "tearing"],
+    "CPG-23": ["odontogenic", "tooth pain", "dental", "chewing", "gingival", "barodontalgia", "abscess"],
+    "CPG-24": ["cellulitis", "abscess", "erythema", "induration", "purulent", "fluctuance"],
+    "CPG-25": ["herpes zoster", "shingles", "dermatomal", "vesicular rash", "burning"],
+    "CPG-26": ["fungal", "tinea", "candidiasis", "pruritic", "scaly", "macerated rash"],
+    "CPG-27": ["musculoskeletal", "strain", "shoulder", "wrist", "lumbar", "ared"],
+    "CPG-28": ["blunt trauma", "hemorrhage", "blood loss", "pallor", "efast", "shock", "blistering", "deep injury", "fluid loss"],
+    "CPG-29": ["gastroenteritis", "watery diarrhea", "abdominal cramping"],
+    "CPG-30": ["constipation", "bowel", "bloating"],
+    "CPG-31": ["circadian", "insomnia", "fear", "chest tightness", "tremor", "tingling", "lightheadedness", "panic"],
+    "CPG-32": ["mission fatigue", "sleepiness", "attention lapses", "irritability", "slowed cognition"],
 }
 
 
@@ -428,6 +461,10 @@ class LocalMedicalRAGEngine:
         self.protocol_by_id: Dict[str, Dict[str, Any]] = {}
         self.arxiv_citations: List[Dict[str, Any]] = []
         self.research_chunks: Dict[str, str] = {}
+        self.reference_rules: Dict[str, Dict[str, Any]] = {}
+        self.formulary_by_name: Dict[str, Dict[str, Any]] = {}
+        self.hardware_by_id: Dict[str, Dict[str, Any]] = {}
+        self.lab_intervals_by_analyte: Dict[str, Dict[str, Any]] = {}
         self.dynamic_research_chunks: Dict[str, str] = {}
         self.research_notes_loaded: bool = False
         self.dynamic_docs_loaded: List[str] = []
@@ -441,6 +478,14 @@ class LocalMedicalRAGEngine:
         self._avg_doc_len: float = 1.0
         self._doc_trigram_vecs: Dict[str, Dict[str, float]] = {}
 
+        # Unified local Vector Database across all processed datasets (0% LLM hallucination)
+        self.vector_store: Dict[str, Dict[str, Any]] = {}
+        self._chunk_trigram_vecs: Dict[str, Dict[str, float]] = {}
+        self._chunk_term_freqs: Dict[str, Dict[str, int]] = {}
+        self._chunk_tokens: Dict[str, List[str]] = {}
+        self._chunk_idf: Dict[str, float] = {}
+        self._chunk_avg_len: float = 1.0
+
         self.checs_inventory: Dict[str, str] = {
             "CMP": "Convenience / Crew Medical Pack (Ibuprofen, Acetaminophen, Caffeine)",
             "OMP": "Oral Medications Pack (Ondansetron, Acetazolamide, Melatonin, Zaleplon, Zolpidem, Modafinil, Levofloxacin, Tamsulosin)",
@@ -452,6 +497,7 @@ class LocalMedicalRAGEngine:
             "MDP": "Medical Diagnostic Pack (i-STAT, C2M2 CBC, OCT, Ultrasound-2, Tonometry)",
             "MTP": "Minor Treatment Pack (Lidocaine Jelly, Urethral Catheterization Kit)",
         }
+        self.valid_subpacks: set[str] = set(VALID_CHECS_SUBPACKS)
         self.reload_knowledge_base()
 
     def reload_knowledge_base(self) -> Dict[str, Any]:
@@ -459,8 +505,22 @@ class LocalMedicalRAGEngine:
         self.protocols = []
         self.protocol_by_id = {}
         self.dynamic_research_chunks = {}
+        self.reference_rules = {}
+        self.formulary_by_name = {}
+        self.hardware_by_id = {}
+        self.lab_intervals_by_analyte = {}
+        self.valid_subpacks = set(VALID_CHECS_SUBPACKS)
         self.dynamic_docs_loaded = []
         self.diagnosis_cache.clear()
+        self.vector_store = {}
+        self._chunk_trigram_vecs = {}
+        self._chunk_term_freqs = {}
+        self._chunk_tokens = {}
+        self._chunk_idf = {}
+        self._chunk_avg_len = 1.0
+
+        self._parse_research_markdown_chunks()
+        self._load_preprocessed_reference_chunks()
 
         if PROTOCOLS_JSON_PATH.exists():
             with open(PROTOCOLS_JSON_PATH, "r", encoding="utf-8") as f:
@@ -471,6 +531,7 @@ class LocalMedicalRAGEngine:
                         break
                     item = loaded[i]
                     sid = str(item.get("scenario_id", f"SCENARIO_{i + 1}"))
+                    item.setdefault("source_filename", "rag_protocols_8_scenarios.json")
                     self.protocols.append(item)
                     self.protocol_by_id[sid] = item
 
@@ -484,6 +545,10 @@ class LocalMedicalRAGEngine:
                 pid = str(cpg.get("protocol_id", ""))
                 if not pid or pid in self.protocol_by_id:
                     continue
+                parsed_meds = [
+                    self._parse_and_validate_medication(raw_med)
+                    for raw_med in cpg.get("prescribed_meds", [])
+                ]
                 normalized_cpg = {
                     "scenario_id": pid,
                     "title": cpg.get("title", pid),
@@ -493,9 +558,14 @@ class LocalMedicalRAGEngine:
                         "MODERATE": cpg.get("search_text", ""),
                         "DIAGNOSTIC_CRITERIA": "; ".join(cpg.get("diagnostic_criteria", [])),
                     },
+                    "search_text": cpg.get("search_text", ""),
+                    "diagnostic_criteria": cpg.get("diagnostic_criteria", []),
                     "autonomous_checklist": cpg.get("autonomous_checklist", []),
-                    "checs_medications": cpg.get("prescribed_meds", []),
-                    "drug_lockouts": cpg.get("drug_lockouts", []),
+                    "checs_medications": parsed_meds,
+                    "drug_lockouts": [str(x) for x in cpg.get("drug_lockouts", [])],
+                    "verified_rule_ids": cpg.get("verified_rule_ids", []),
+                    "source_audit": cpg.get("source_audit", {}),
+                    "source_filename": "rag_protocols_expanded.json",
                 }
                 self.protocols.append(normalized_cpg)
                 self.protocol_by_id[pid] = normalized_cpg
@@ -504,14 +574,13 @@ class LocalMedicalRAGEngine:
             with open(ARXIV_JSON_PATH, "r", encoding="utf-8") as af:
                 self.arxiv_citations = json.load(af)
 
-        self._parse_research_markdown_chunks()
-        self._load_preprocessed_reference_chunks()
         self._load_dynamic_official_protocols()
         self._build_hybrid_search_index()
 
         return {
             "protocols_count": len(self.protocols),
             "research_chunks_indexed": len(self.research_chunks),
+            "vector_store_chunks": len(self.vector_store),
             "dynamic_files_loaded": self.dynamic_docs_loaded,
             "arxiv_citations_count": len(self.arxiv_citations),
             "bm25_vocabulary_size": len(self._idf),
@@ -542,22 +611,41 @@ class LocalMedicalRAGEngine:
                     self.research_chunks[f"SCENARIO_{num}"] = tagged
 
     def _load_preprocessed_reference_chunks(self) -> None:
-        """Index pre-processed CHeCS formulary, NASA-STD-3001 rules, and lab intervals."""
+        """Index pre-processed CHeCS formulary, NASA-STD-3001 rules, hardware specs, and lab intervals."""
         if CHECS_FORMULARY_JSON_PATH.exists():
             with open(CHECS_FORMULARY_JSON_PATH, "r", encoding="utf-8") as cf:
-                meds = json.load(cf).get("medications", [])
+                cf_data = json.load(cf)
+            for pack_code in cf_data.get("subpacks", {}).keys():
+                self.valid_subpacks.add(str(pack_code).upper())
+            meds = cf_data.get("medications", [])
             for med in meds[:MAX_CHUNKS]:
                 mid = str(med.get("med_id", ""))
+                name_key = str(med.get("name", "")).strip().lower()
+                if name_key:
+                    self.formulary_by_name[name_key] = med
                 if mid:
                     self.research_chunks[mid] = f"[Source: checs_formulary.json | {mid}] {med.get('search_text', '')}"
 
         if NASA_RULES_JSON_PATH.exists():
             with open(NASA_RULES_JSON_PATH, "r", encoding="utf-8") as nf:
                 rules = json.load(nf).get("rules", [])
+            self.reference_rules = {str(rule.get("standard_id")): rule for rule in rules}
             for rule in rules[:MAX_CHUNKS]:
                 rid = str(rule.get("standard_id", ""))
                 if rid:
-                    self.research_chunks[f"RULE_{rid}"] = f"[Source: nasa_std_3001_rules.json | {rid}] {rule.get('verbatim_rule', '')}"
+                    self.research_chunks[f"RULE_{rid}"] = f"[Source: nasa_std_3001_rules.json | {rid} | {rule.get('verification_status', 'unverified')}] {rule.get('verbatim_rule') or rule.get('rule_summary') or rule.get('search_text', '')}"
+
+        if HARDWARE_SPECS_JSON_PATH.exists():
+            with open(HARDWARE_SPECS_JSON_PATH, "r", encoding="utf-8") as hf:
+                devices = json.load(hf).get("devices", [])
+            for dev in devices[:MAX_CHUNKS]:
+                dev_id = str(dev.get("device_id", ""))
+                if dev_id:
+                    self.hardware_by_id[dev_id] = dev
+                    self.research_chunks[f"HW_{dev_id}"] = (
+                        f"[Source: onboard_hardware_specs.json | {dev_id}] "
+                        f"{dev.get('name', '')}: {dev.get('search_text', '')}"
+                    )
 
         if LAB_INTERVALS_JSON_PATH.exists():
             with open(LAB_INTERVALS_JSON_PATH, "r", encoding="utf-8") as lf:
@@ -566,7 +654,126 @@ class LocalMedicalRAGEngine:
                 for item in lab_data.get(group, []):
                     analyte = str(item.get("analyte", ""))
                     if analyte:
+                        self.lab_intervals_by_analyte[analyte] = item
                         self.research_chunks[f"LAB_{analyte}"] = f"[Source: lab_reference_intervals.json | {analyte}] {item.get('search_text', '')}"
+
+    def _validate_formulary_entry(
+        self, med_name: str, pack_str: str
+    ) -> Tuple[bool, Optional[Dict[str, Any]]]:
+        """Verify medication name and CHeCS subpack code(s) against the local formulary & pack inventory."""
+        packs = [
+            p.strip().upper()
+            for p in re.split(r"[/,\s]+", pack_str or "")
+            if p.strip()
+        ]
+        if not packs or any(p not in self.valid_subpacks for p in packs):
+            return False, None
+
+        lower_name = (med_name or "").strip().lower()
+        canonical_name = FORMULARY_ALIAS_MAP.get(lower_name, lower_name)
+        if canonical_name in self.formulary_by_name:
+            return True, self.formulary_by_name[canonical_name]
+
+        for fname, fentry in self.formulary_by_name.items():
+            if fname in lower_name:
+                return True, fentry
+
+        support_markers = (
+            "oxygen", "o2", "saline", "crystalloid", "rehydration",
+            "catheter", "tropicamide", "cyclopentolate", "lidocaine", "astroade", "salt tablets",
+            "acetazolamide",
+        )
+        if any(marker in lower_name for marker in support_markers):
+            return True, None
+
+        return False, None
+
+    def _parse_and_validate_medication(self, raw_med: Any) -> Dict[str, Any]:
+        """Normalize a string or dict medication entry into distinct validated fields."""
+        if isinstance(raw_med, dict):
+            med_name = str(raw_med.get("medication") or raw_med.get("drug") or "").strip()
+            pack_str = str(raw_med.get("checs_pack") or raw_med.get("pack") or "").strip()
+            route = str(raw_med.get("route") or "").strip()
+            dosage = str(raw_med.get("dosage") or "").strip()
+            contra = str(raw_med.get("contraindication_warning") or raw_med.get("contraindication") or "").strip()
+            verified, form_entry = self._validate_formulary_entry(med_name, pack_str)
+            if not route:
+                route = "Per CHeCS protocol"
+            if not dosage:
+                dosage = str(form_entry.get("dose_route", med_name)) if form_entry else med_name
+            return {
+                "medication": med_name,
+                "drug": med_name,
+                "checs_pack": pack_str,
+                "pack": pack_str,
+                "route": route,
+                "dosage": dosage,
+                "formulary_verified": verified,
+                "formulary_med_id": form_entry.get("med_id") if form_entry else None,
+                "contraindication": contra,
+                "contraindication_warning": contra,
+            }
+
+        raw_str = str(raw_med or "").strip()
+        paren_match = re.match(r"^([^(]+?)\s*(?:\(([^)]+)\))?$", raw_str)
+        med_name = paren_match.group(1).strip() if paren_match else raw_str
+        inner = (paren_match.group(2) or "").strip() if paren_match else ""
+
+        pack_matches = re.findall(r"\b(CMP|OMP|TIMP|EMTP|VCP|RSP|ISP|MDP|MTP)\b", inner, re.IGNORECASE)
+        pack_str = "/".join(dict.fromkeys(p.upper() for p in pack_matches)) if pack_matches else ""
+
+        dosage = inner
+        if pack_matches:
+            dosage = re.sub(
+                r"^(?:(?:CMP|OMP|TIMP|EMTP|VCP|RSP|ISP|MDP|MTP)\s*(?:/\s*(?:CMP|OMP|TIMP|EMTP|VCP|RSP|ISP|MDP|MTP)\s*)*)[,;:\s-]*",
+                "",
+                inner,
+                flags=re.IGNORECASE,
+            ).strip()
+
+        lower_name = med_name.lower()
+        route = ""
+        if lower_name in SUPPORT_PACK_ITEMS:
+            def_pack, def_route, def_dose = SUPPORT_PACK_ITEMS[lower_name]
+            pack_str = pack_str or def_pack
+            route = def_route
+            dosage = dosage or def_dose
+
+        verified, form_entry = self._validate_formulary_entry(med_name, pack_str or "UNSPECIFIED_IN_SOURCE")
+        if not dosage and form_entry:
+            dosage = str(form_entry.get("dose_route", ""))
+        if not dosage:
+            dosage = "Per CHeCS protocol"
+
+        route_match = re.search(
+            r"\b(IV/IM|PO/IV|IV|IM|PO|ODT|SQ|SC|SL|inhaled|topical|ophthalmic|drops|ointment|cream)\b",
+            f"{dosage} {med_name}",
+            re.IGNORECASE,
+        )
+        if not route and route_match:
+            route = route_match.group(1).upper() if len(route_match.group(1)) <= 5 else route_match.group(1).title()
+        elif not route and form_entry:
+            dr_match = re.search(
+                r"\b(IV/IM|PO/IV|IV|IM|PO|ODT|SQ|SC|SL|inhaled|topical|ophthalmic|drops|ointment|cream)\b",
+                str(form_entry.get("dose_route", "")),
+                re.IGNORECASE,
+            )
+            route = dr_match.group(1).upper() if dr_match and len(dr_match.group(1)) <= 5 else (dr_match.group(1).title() if dr_match else "Per CHeCS protocol")
+        if not route:
+            route = "Per CHeCS protocol"
+
+        return {
+            "medication": med_name,
+            "drug": med_name,
+            "checs_pack": pack_str or "UNSPECIFIED_IN_SOURCE",
+            "pack": pack_str or "UNSPECIFIED_IN_SOURCE",
+            "route": route,
+            "dosage": dosage,
+            "formulary_verified": verified,
+            "formulary_med_id": form_entry.get("med_id") if form_entry else None,
+            "contraindication": "",
+            "contraindication_warning": "",
+        }
 
     def _build_hybrid_search_index(self) -> None:
         """Pre-compute Okapi BM25 IDF weights and Character Trigram Vectors at startup."""
@@ -585,9 +792,14 @@ class LocalMedicalRAGEngine:
             sym_values = " ".join(str(v) for v in proto.get("symptoms_by_severity", {}).values())
             kw_values = " ".join(SCENARIO_KEYWORDS.get(sid, []))
             title = str(proto.get("title", ""))
-            checklist = " ".join(str(c) for c in proto.get("autonomous_checklist", []))
-
-            corpus_text = f"{title} {sym_values} {kw_values} {checklist}"
+            diagnostic_criteria = " ".join(
+                str(item) for item in proto.get("diagnostic_criteria", [])
+            )
+            search_text = str(proto.get("search_text", ""))
+            if search_text or diagnostic_criteria:
+                corpus_text = f"{title} {search_text} {diagnostic_criteria} {kw_values}"
+            else:
+                corpus_text = f"{title} {sym_values} {kw_values}"
             tokens = _tokenize(corpus_text)
             self._doc_tokens[sid] = tokens
             total_len += len(tokens)
@@ -600,13 +812,214 @@ class LocalMedicalRAGEngine:
                 df_counts[unique_tok] = df_counts.get(unique_tok, 0) + 1
 
             # Build character trigram vector focused on clinical symptoms & keywords
-            self._doc_trigram_vecs[sid] = _char_trigram_vector(f"{title} {sym_values} {kw_values}")
+            self._doc_trigram_vecs[sid] = _char_trigram_vector(
+                corpus_text
+            )
 
         self._avg_doc_len = (total_len / float(n_docs)) if n_docs > 0 else 1.0
         self._idf = {}
         for tok, df in df_counts.items():
             # Standard Robertson-Sparck Jones BM25 IDF smoothing
             self._idf[tok] = math.log(1.0 + (n_docs - df + 0.5) / (df + 0.5))
+
+        self._build_unified_vector_store()
+
+    def _add_vector_store_record(
+        self,
+        chunk_id: str,
+        doc_type: str,
+        source: str,
+        title: str,
+        text: str,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Register one processed, source-pinned record in the local vector store."""
+        combined = f"{title} {text}".strip()
+        if not combined:
+            return
+        formatted = f"[Source: {source} | {chunk_id}] {title}: {text}" if title else f"[Source: {source} | {chunk_id}] {text}"
+        self.vector_store[chunk_id] = {
+            "chunk_id": chunk_id,
+            "doc_type": doc_type,
+            "source": source,
+            "title": title,
+            "text": text,
+            "formatted_chunk": formatted,
+            "metadata": metadata or {},
+        }
+        tokens = _tokenize(combined)
+        self._chunk_tokens[chunk_id] = tokens
+        tf: Dict[str, int] = {}
+        for tok in tokens:
+            tf[tok] = tf.get(tok, 0) + 1
+        self._chunk_term_freqs[chunk_id] = tf
+        self._chunk_trigram_vecs[chunk_id] = _char_trigram_vector(combined)
+
+    def _build_unified_vector_store(self) -> None:
+        """Process and index all RAG knowledge datasets into `self.vector_store`."""
+        self.vector_store = {}
+        self._chunk_trigram_vecs = {}
+        self._chunk_term_freqs = {}
+        self._chunk_tokens = {}
+
+        # 1. All clinical protocols (8 legacy scenarios + 32 CPGs + dynamic JSON/CSV)
+        for i in range(MAX_PROTOCOLS):
+            if i >= len(self.protocols):
+                break
+            proto = self.protocols[i]
+            sid = str(proto.get("scenario_id", ""))
+            source_file = str(proto.get("source_filename", "project_protocol_data"))
+            title = str(proto.get("title", sid))
+            sym_text = " ".join(str(v) for v in proto.get("symptoms_by_severity", {}).values())
+            criteria_text = " ".join(str(x) for x in proto.get("diagnostic_criteria", []))
+            kw_text = " ".join(SCENARIO_KEYWORDS.get(sid, []))
+            body = f"{proto.get('search_text', '')} {sym_text} {criteria_text} {kw_text}".strip()
+            self._add_vector_store_record(
+                f"PROTO_{sid}",
+                "protocol",
+                source_file,
+                title,
+                body,
+                {"scenario_id": sid, "citations": proto.get("nasa_citations", [])},
+            )
+
+        # 2. NASA-STD-3001 rules
+        for rid, rule in list(self.reference_rules.items())[:MAX_CHUNKS]:
+            verbatim = str(rule.get("verbatim_rule") or rule.get("rule_summary") or rule.get("search_text") or "")
+            self._add_vector_store_record(
+                f"RULE_{rid}",
+                "rule",
+                f"nasa_std_3001_rules.json ({rule.get('source_revision', '')})",
+                f"{rid} {rule.get('source_section', '')}".strip(),
+                verbatim,
+                {
+                    "standard_id": rid,
+                    "verification_status": rule.get("verification_status", "unverified"),
+                    "source_url": rule.get("source_url", ""),
+                },
+            )
+
+        # 3. CHeCS Formulary entries
+        for fname, med in list(self.formulary_by_name.items())[:MAX_CHUNKS]:
+            mid = str(med.get("med_id", fname))
+            self._add_vector_store_record(
+                mid,
+                "formulary",
+                "checs_formulary.json",
+                f"{med.get('name', fname)} ({med.get('pack', '')})",
+                str(med.get("search_text") or med.get("indication") or med.get("dose_route") or ""),
+                {"med_id": mid, "pack": med.get("pack", ""), "dose_route": med.get("dose_route", "")},
+            )
+
+        # 4. Onboard Hardware Specs
+        for dev_id, dev in list(self.hardware_by_id.items())[:MAX_CHUNKS]:
+            self._add_vector_store_record(
+                f"HW_{dev_id}",
+                "hardware",
+                "onboard_hardware_specs.json",
+                str(dev.get("name", dev_id)),
+                str(dev.get("search_text") or dev.get("capabilities") or dev.get("clinical_use") or ""),
+                {"device_id": dev_id},
+            )
+
+        # 5. Lab Reference Intervals
+        for analyte, item in list(self.lab_intervals_by_analyte.items())[:MAX_CHUNKS]:
+            self._add_vector_store_record(
+                f"LAB_{analyte}",
+                "lab",
+                "lab_reference_intervals.json",
+                analyte,
+                str(item.get("search_text") or f"Normal {item.get('normal_range', '')} {item.get('unit', '')}"),
+                {"analyte": analyte},
+            )
+
+        # 6. Research markdown chunks & dynamic official docs
+        for key, chunk_text in list(self.research_chunks.items())[:MAX_CHUNKS]:
+            if key.startswith("SCENARIO_"):
+                self._add_vector_store_record(
+                    f"RESEARCH_{key}",
+                    "research",
+                    "nasa_space_medicine_research.md",
+                    key,
+                    chunk_text,
+                    {"scenario_key": key},
+                )
+        for key, chunk_text in list(self.dynamic_research_chunks.items())[:MAX_DYNAMIC_FILES]:
+            self._add_vector_store_record(
+                key,
+                "official_doc",
+                "data/nasa_official_protocols",
+                key,
+                chunk_text,
+            )
+
+        # 7. arXiv Literature Citations
+        for paper in self.arxiv_citations[:MAX_CHUNKS]:
+            aid = str(paper.get("arxiv_id", ""))
+            if not aid:
+                continue
+            self._add_vector_store_record(
+                f"ARXIV_{aid}",
+                "literature",
+                f"arxiv_literature_citations.json (arXiv:{aid})",
+                str(paper.get("title", aid)),
+                str(paper.get("key_finding_quote", "")),
+                {"arxiv_id": aid},
+            )
+
+        # Compute corpus BM25 IDF across all vector store chunks
+        n_chunks = len(self.vector_store)
+        chunk_df: Dict[str, int] = {}
+        total_len = 0
+        for cid, tf in self._chunk_term_freqs.items():
+            total_len += len(self._chunk_tokens.get(cid, []))
+            for tok in tf:
+                chunk_df[tok] = chunk_df.get(tok, 0) + 1
+        self._chunk_avg_len = (total_len / float(n_chunks)) if n_chunks > 0 else 1.0
+        self._chunk_idf = {
+            tok: math.log(1.0 + (n_chunks - df + 0.5) / (df + 0.5))
+            for tok, df in chunk_df.items()
+        }
+
+    def query_vector_store(
+        self,
+        query_text: str,
+        top_k: int = 5,
+        doc_types: Optional[Set[str]] = None,
+    ) -> List[Dict[str, Any]]:
+        """Query the unified offline vector store with hybrid trigram cosine + BM25."""
+        if not query_text or not self.vector_store:
+            return []
+        expanded = expand_clinical_synonyms(query_text)
+        q_tokens = _tokenize(expanded)
+        q_vec = _char_trigram_vector(expanded)
+        k1, b = 1.5, 0.75
+        scored: List[Tuple[float, str, Dict[str, Any]]] = []
+
+        for cid, record in self.vector_store.items():
+            if doc_types is not None and record.get("doc_type") not in doc_types:
+                continue
+            vec_sim = _cosine_similarity_sparse(q_vec, self._chunk_trigram_vecs.get(cid, {}))
+            tf_map = self._chunk_term_freqs.get(cid, {})
+            doc_len = float(len(self._chunk_tokens.get(cid, [])) or 1)
+            bm25_raw = 0.0
+            for tok in q_tokens[:MAX_KEYWORDS]:
+                tf = float(tf_map.get(tok, 0))
+                if tf > 0:
+                    idf = self._chunk_idf.get(tok, 0.5)
+                    bm25_raw += idf * ((tf * (k1 + 1.0)) / (tf + k1 * (1.0 - b + b * (doc_len / self._chunk_avg_len))))
+            bm25_norm = min(1.0, bm25_raw / 8.0)
+            score = round((0.60 * vec_sim) + (0.40 * bm25_norm), 4)
+            if score > 0.02:
+                scored.append((score, cid, record))
+
+        scored.sort(key=lambda row: (-row[0], row[1]))
+        results: List[Dict[str, Any]] = []
+        for score, _cid, rec in scored[: max(1, top_k)]:
+            out = dict(rec)
+            out["score"] = score
+            results.append(out)
+        return results
 
     def _load_dynamic_official_protocols(self) -> None:
         """Scan `data/nasa_official_protocols/` for newly released NASA challenge files."""
@@ -689,18 +1102,71 @@ class LocalMedicalRAGEngine:
         )
         self.dynamic_docs_loaded.append(fpath.name)
 
-    def _is_mode_a_data_complete(self, proto: Optional[Dict[str, Any]]) -> bool:
+    def _is_mode_a_data_complete(
+        self,
+        proto: Optional[Dict[str, Any]],
+        packet: Optional[TelemetryPacket] = None,
+    ) -> bool:
         """
-        Require the local protocol record to contain the fields needed for Mode A output.
-
-        This structural check does not independently validate external source provenance.
+        Verify protocol completeness, source-rule linkage, formulary membership,
+        and telemetry reliability before permitting Mode A recommendations.
         """
         if not proto:
             return False
         citations = proto.get("nasa_citations")
         meds = proto.get("checs_medications")
         checklist = proto.get("autonomous_checklist")
-        return bool(citations and meds and checklist)
+        if not (citations and meds and checklist):
+            return False
+
+        # Verify any referenced rule IDs exist in loaded NASA-STD-3001 / JSC 20584 rules
+        verified_rule_ids = proto.get("verified_rule_ids") or []
+        if not all(str(rid) in self.reference_rules for rid in verified_rule_ids):
+            return False
+
+        # Verify all prescribed medications validate against checs_formulary.json & valid subpacks
+        sid = str(proto.get("scenario_id", ""))
+        prescriptions = STRUCTURED_CHECS_PRESCRIPTIONS.get(sid)
+        meds_to_verify = prescriptions if prescriptions is not None else meds
+        if not all(self._parse_and_validate_medication(m).get("formulary_verified") for m in meds_to_verify):
+            return False
+
+        if packet is not None:
+            missing = set(packet.missing_vitals or [])
+            unreliable = set(packet.unreliable_channels or [])
+            if len(missing) >= 3:
+                return False
+            if len(unreliable) >= 2:
+                # Allow concurrent RR/RMSSD suppression specifically on seizure/postictal (CPG-11)
+                if not (sid == "CPG-11" and unreliable.issubset({"hrv_ms", "respiration_rate"})):
+                    return False
+
+            if sid in ("SCENARIO_1_HYPERCAPNIA", "CPG-07"):
+                suit_co2 = packet.environment.suit_pico2_mmhg
+                if "cabin_co2_mmhg" in unreliable and (not suit_co2 or "suit_pico2_mmhg" in unreliable):
+                    return False
+                if "suit_pico2_mmhg" in unreliable and suit_co2:
+                    return False
+            if sid in ("SCENARIO_4_SOLAR_RADIATION_ARS", "CPG-09"):
+                bfo_val = packet.environment.bfo_dose_rate_mGy_hr
+                if "ambient_radiation_msv_h" in unreliable and (bfo_val is None or "bfo_dose_rate_mGy_hr" in unreliable):
+                    return False
+                if "bfo_dose_rate_mGy_hr" in unreliable and bfo_val is not None:
+                    return False
+            if sid in ("SCENARIO_5_EVA_THERMAL_DCS", "CPG-08") and ("spo2" in missing or "spo2" in unreliable):
+                return False
+            if sid == "CPG-15" and ("core_temp_c" in missing or "core_temp_c" in unreliable):
+                return False
+            if sid in ("SCENARIO_3_ORTHOSTATIC_INTOLERANCE", "CPG-14", "CPG-19", "CPG-20", "CPG-28"):
+                if (
+                    "heart_rate" in missing
+                    or "heart_rate" in unreliable
+                    or "blood_pressure_sys" in missing
+                    or "blood_pressure_sys" in unreliable
+                ):
+                    return False
+
+        return True
 
     def _build_cache_key(self, packet: TelemetryPacket, clean_symptoms: str) -> str:
         """Build deterministic SHA-256 cache key over telemetry state and sanitized symptoms."""
@@ -740,6 +1206,7 @@ class LocalMedicalRAGEngine:
             "environment": {
                 "cabin_co2_mmhg": e.cabin_co2_mmhg,
                 "ambient_radiation_msv_h": e.ambient_radiation_msv_h,
+                "bfo_dose_rate_mGy_hr": e.bfo_dose_rate_mGy_hr,
                 "suit_pressure_psi": e.suit_pressure_psi,
                 "cabin_ppo2_mmhg": e.cabin_ppo2_mmhg,
                 "suit_pico2_mmhg": e.suit_pico2_mmhg,
@@ -757,6 +1224,8 @@ class LocalMedicalRAGEngine:
                 }
                 if d is not None else None
             ),
+            "missing_vitals": list(packet.missing_vitals),
+            "unreliable_channels": list(packet.unreliable_channels),
         }
         raw = json.dumps(key_obj, sort_keys=True)
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()
@@ -787,7 +1256,7 @@ class LocalMedicalRAGEngine:
         if (
             confidence >= MODE_A_CONFIDENCE_THRESHOLD
             and not packet.force_mode_b
-            and self._is_mode_a_data_complete(matched_proto)
+            and self._is_mode_a_data_complete(matched_proto, packet)
         ):
             response = self._build_mode_a_response(
                 best_scenario_id,
@@ -860,6 +1329,7 @@ class LocalMedicalRAGEngine:
         query_trigram = _char_trigram_vector(expanded_symptoms)
 
         scores: Dict[str, float] = {}
+        raw_scores: Dict[str, float] = {}
         per_scenario_signals: Dict[str, Dict[str, float]] = {}
 
         for i in range(MAX_PROTOCOLS):
@@ -868,27 +1338,25 @@ class LocalMedicalRAGEngine:
             proto = self.protocols[i]
             sid = str(proto.get("scenario_id", ""))
 
-            sym_score = self._score_symbolic_telemetry(sid, packet, assessment)
+            sym_score = self._score_symbolic_telemetry(sid, packet, assessment, expanded_symptoms)
             bm25_score = self._score_bm25_and_keywords(sid, query_tokens, expanded_symptoms)
             vec_score = _cosine_similarity_sparse(query_trigram, self._doc_trigram_vecs.get(sid, {}))
-            hint_bonus = self._score_scenario_hint(sid, active_hint)
+            hint_bonus = self._score_scenario_hint(sid, active_hint)  # always 0.0 (blind retrieval)
 
-            # Neuro-Symbolic fusion: strong telemetry match + lexical/vector confirmation
             fused = sym_score + (0.70 * bm25_score) + (0.30 * vec_score) + hint_bonus
-            # Boost when both symbolic vitals AND clinical text corroborate the same condition
-            if sym_score >= 0.65 and (bm25_score >= 0.25 or vec_score >= 0.15):
-                fused = max(fused, 0.92)
-            elif sym_score >= 0.75 or (sym_score > 0.0 and bm25_score >= 0.75):
-                fused = max(fused, 0.84)
-            elif sym_score < 0.0 and hint_bonus == 0.0:
-                # Negative physiological evidence (e.g., normal CO2 <2.6 mmHg or normal radiation)
-                # blocks environmental/radiation scenarios even if generic symptoms (headache/nausea) overlap
+            # Strict Mode A gate: require BOTH strong condition-specific physiological evidence
+            # AND corroborating clinical text/lexicon signal; never boost via active_scenario_id.
+            if sym_score >= 0.65 and (bm25_score >= 0.20 or vec_score >= 0.14):
+                floor = min(0.96, 0.77 + (0.12 * sym_score) + (0.10 * bm25_score) + (0.06 * vec_score))
+                fused = max(fused, floor)
+            elif sym_score >= 0.80 and (bm25_score >= 0.10 or vec_score >= 0.10):
+                fused = max(fused, 0.80)
+            elif sym_score < 0.0:
                 fused = min(fused, 0.48)
-            elif sym_score == 0.0 and hint_bonus == 0.0:
-                # Zero telemetry/context corroboration: prevent pure lexical keyword overlap from
-                # reaching the 0.75 Mode A threshold so uncorroborated symptoms abstain in Mode B
+            else:
                 fused = min(fused, 0.72)
 
+            raw_scores[sid] = fused
             total = round(min(0.99, max(0.05, fused)), 3)
             scores[sid] = total
             per_scenario_signals[sid] = {
@@ -899,13 +1367,15 @@ class LocalMedicalRAGEngine:
             }
 
         best_id = "SCENARIO_1_HYPERCAPNIA"
+        best_raw = -1.0
         best_score = 0.0
         sids = list(scores.keys())
         for i in range(MAX_PROTOCOLS):
             if i >= len(sids):
                 break
             k = sids[i]
-            if scores[k] > best_score:
+            if raw_scores[k] > best_raw:
+                best_raw = raw_scores[k]
                 best_score = scores[k]
                 best_id = k
 
@@ -917,69 +1387,301 @@ class LocalMedicalRAGEngine:
         )
 
     def _score_symbolic_telemetry(
-        self, sid: str, packet: TelemetryPacket, assessment: AnomalyAssessment
+        self,
+        sid: str,
+        packet: TelemetryPacket,
+        assessment: AnomalyAssessment,
+        expanded_symptoms: str = "",
     ) -> float:
         """
-        Compute symbolic telemetry match score [-0.25, 0.85] for scenario `sid`,
-        including negative-evidence disambiguation.
+        Compute condition-specific symbolic telemetry + clinical signature score [-0.25, 0.88]
+        for both the 8 legacy scenarios and CPG-01..CPG-32, honoring unreliable/missing channels
+        and negative-evidence disambiguation.
         """
         v = packet.vitals
         e = packet.environment
         d = packet.specialized_diagnostics
         act = assessment.normalized_activity_state
-        effective_co2 = max(e.cabin_co2_mmhg, e.suit_pico2_mmhg or 0.0)
+        sym = expanded_symptoms or ""
+        unreliable = set(packet.unreliable_channels or [])
+        missing = set(packet.missing_vitals or [])
 
-        if sid == "SCENARIO_1_HYPERCAPNIA":
+        co2_reliable = ("cabin_co2_mmhg" not in unreliable) and ("suit_pico2_mmhg" not in unreliable)
+        ambient_rad = e.ambient_radiation_msv_h if ("ambient_radiation_msv_h" not in unreliable) else 0.0
+        bfo_rad = (
+            float(e.bfo_dose_rate_mGy_hr)
+            if (e.bfo_dose_rate_mGy_hr is not None and "bfo_dose_rate_mGy_hr" not in unreliable)
+            else 0.0
+        )
+        spo2_valid = ("spo2" not in unreliable) and ("spo2" not in missing)
+        bp_valid = ("blood_pressure_sys" not in unreliable) and ("blood_pressure_sys" not in missing)
+        hr_valid = ("heart_rate" not in unreliable) and ("heart_rate" not in missing)
+        temp_valid = ("core_temp_c" not in unreliable) and ("core_temp_c" not in missing)
+        rr_valid = ("respiration_rate" not in unreliable) and ("respiration_rate" not in missing)
+        hrv_valid = ("hrv_ms" not in unreliable) and ("hrv_ms" not in missing)
+
+        effective_co2 = max(e.cabin_co2_mmhg, e.suit_pico2_mmhg or 0.0) if co2_reliable else 0.0
+        rad_level = max(ambient_rad, bfo_rad)
+
+        has_trauma_bleed = any(
+            k in sym for k in ("hemorrhag", "blood loss", "lacerat", "bleed", "burn", "blister", "pneumothorax", "efast", "trauma", "crush")
+        )
+        has_anaphylaxis = any(
+            k in sym for k in ("anaphyl", "urticaria", "hives", "angioedema", "airway swelling", "swollen lip", "throat closing", "stridor")
+        )
+
+        # --- Environmental Hypercapnia (SCENARIO_1 / CPG-07) ---
+        if sid in ("SCENARIO_1_HYPERCAPNIA", "CPG-07"):
+            if not co2_reliable:
+                return 0.0
             if effective_co2 >= 4.5:
-                return 0.85
+                return 0.86 if sid == "SCENARIO_1_HYPERCAPNIA" else 0.83
             if effective_co2 >= 2.8:
-                return 0.78
-            # Negative evidence: normal cabin/suit CO2 (<2.6 mmHg) rules out environmental hypercapnia
+                return 0.79 if sid == "SCENARIO_1_HYPERCAPNIA" else 0.76
             return -0.20
 
-        if sid == "SCENARIO_2_SANS":
+        # --- SANS (SCENARIO_2 / CPG-06) ---
+        if sid in ("SCENARIO_2_SANS", "CPG-06"):
             if d and ((d.oct_rnfl_um and d.oct_rnfl_um > 105.0) or (d.refraction_shift_D and d.refraction_shift_D >= 0.5)):
-                return 0.86
-            if packet.mission_day >= 21 and v.blood_pressure_sys < 130.0 and effective_co2 < 3.0:
+                return 0.87 if sid == "SCENARIO_2_SANS" else 0.84
+            if any(
+                k in sym for k in (
+                    "reading glasses", "farsighted", "hyperopic", "choroidal", "scotoma",
+                    "whooshing", "tinnitus", "visual blackout", "optic disc", "behind the globes",
+                )
+            ) and effective_co2 < 2.8 and rad_level < 0.25:
+                return 0.82 if sid == "CPG-06" else 0.79
+            if packet.mission_day >= 21 and bp_valid and v.blood_pressure_sys < 130.0 and effective_co2 < 3.0 and hr_valid and v.heart_rate < 90.0:
                 return 0.25
             return 0.0
 
-        if sid == "SCENARIO_3_ORTHOSTATIC_INTOLERANCE":
-            if v.blood_pressure_sys <= 94.0 and v.spo2 >= 93.0 and effective_co2 < 3.0 and e.ambient_radiation_msv_h < 0.25:
-                return 0.80
+        # --- Orthostatic Intolerance & Dehydration (SCENARIO_3 / CPG-14) ---
+        if sid in ("SCENARIO_3_ORTHOSTATIC_INTOLERANCE", "CPG-14"):
+            if has_trauma_bleed or has_anaphylaxis:
+                return -0.15
+            if not (bp_valid and hr_valid):
+                return 0.0
+            is_dehyd_seed = any(k in sym for k in ("thirst", "dry mouth", "reduced urine", "postural", "volume depletion", "dehydrat"))
+            is_ortho_traj = any(k in sym for k in ("g-load", "orthostat", "presyncope", "gray-out", "sitting up", "stand", "reentry", "landing"))
+            if is_dehyd_seed and (v.blood_pressure_sys <= 112.0 or v.heart_rate >= 84.0) and rad_level < 0.25 and effective_co2 < 2.8:
+                return 0.85 if sid == "CPG-14" else 0.78
+            if is_ortho_traj and (v.heart_rate >= 88.0 or v.blood_pressure_sys <= 105.0) and rad_level < 0.25 and effective_co2 < 2.8:
+                return 0.85 if sid == "CPG-14" else 0.83
+            if (
+                v.blood_pressure_sys <= 94.0
+                and (not spo2_valid or v.spo2 >= 93.0)
+                and effective_co2 < 3.0
+                and rad_level < 0.25
+                and not (rr_valid and v.respiration_rate >= 24.0 and ("pallor" in sym or "confusion" in sym or "chest pain" in sym))
+            ):
+                return 0.83 if sid == "SCENARIO_3_ORTHOSTATIC_INTOLERANCE" else 0.79
             return 0.0
 
-        if sid == "SCENARIO_4_SOLAR_RADIATION_ARS":
-            if e.ambient_radiation_msv_h >= 0.5 or e.donki_spe_active or (d and d.alc_cells_uL and d.alc_cells_uL < 1500):
-                return 0.86
+        # --- Solar Radiation / ARS (SCENARIO_4 / CPG-09) ---
+        if sid in ("SCENARIO_4_SOLAR_RADIATION_ARS", "CPG-09"):
+            if rad_level >= 0.5 or e.donki_spe_active or (d and d.alc_cells_uL is not None and d.alc_cells_uL < 1500):
+                return 0.87 if sid == "SCENARIO_4_SOLAR_RADIATION_ARS" else 0.84
+            if any(k in sym for k in ("shelter egress", "storm peak", "solar particle", "radiation exposure", "post-exposure", "biodosimetry")):
+                if (hr_valid and v.heart_rate >= 82.0) or (temp_valid and v.core_temp_c >= 37.3):
+                    return 0.84 if sid == "CPG-09" else 0.81
             return -0.15
 
+        # --- EVA Thermal Strain / Hypothermia / DCS / Hypoxia (SCENARIO_5 / CPG-08 / CPG-15) ---
         if sid == "SCENARIO_5_EVA_THERMAL_DCS":
-            if act == "EVA_SPACEWALK" and (v.core_temp_c >= 38.8 or v.spo2 <= 92.0):
-                return 0.84
-            if v.core_temp_c >= 39.2 and e.ambient_radiation_msv_h < 0.25:
-                return 0.78
+            if act == "EVA_SPACEWALK" and ((temp_valid and v.core_temp_c >= 38.8) or (spo2_valid and v.spo2 <= 92.0) or e.suit_pressure_psi < 4.1 or "bends" in sym):
+                return 0.86
+            if temp_valid and v.core_temp_c >= 39.2 and rad_level < 0.25 and "sepsis" not in sym and "pneumonia" not in sym:
+                return 0.80
             return 0.0
 
-        if sid == "SCENARIO_6_CIRCADIAN_SLEEP":
-            if act == "SLEEP" and (v.heart_rate >= 62.0 or v.hrv_ms <= 22.0 or v.core_temp_c >= 37.5):
-                return 0.80
-            if v.hrv_ms <= 22.0 and effective_co2 < 2.8 and e.ambient_radiation_msv_h < 0.2:
+        if sid == "CPG-15":
+            if temp_valid and v.core_temp_c <= 35.8:
+                return 0.87
+            if (temp_valid and v.core_temp_c >= 38.0) or any(k in sym for k in ("lcvg", "heat exhaustion", "heavy sweating", "thermal cooling", "cdo")):
+                if ((temp_valid and v.core_temp_c >= 37.6) or (hr_valid and v.heart_rate >= 88.0)) and rad_level < 0.25 and "sepsis" not in sym and "pneumonia" not in sym:
+                    return 0.84 if act != "EVA_SPACEWALK" else 0.83
+            return 0.0
+
+        if sid == "CPG-08":
+            if any(k in sym for k in ("barotrauma", "ear", "sinus", "tympanic", "hearing")) and ("fullness" in sym or "vertigo" in sym or "barotrauma" in sym):
+                if hr_valid and v.heart_rate >= 78.0:
+                    return 0.85
+            if spo2_valid and v.spo2 <= 93.0 and effective_co2 < 2.8 and rad_level < 0.25 and not has_trauma_bleed and not has_anaphylaxis:
+                if not any(k in sym for k in ("sepsis", "pneumonia", "embol", "pleuritic", "wheeze", "bronchospasm", "smoke", "soot", "seizure", "convulsion", "hydrazine")):
+                    if act != "EVA_SPACEWALK":
+                        return 0.86
+                    return 0.82
+            if act == "EVA_SPACEWALK" and (e.suit_pressure_psi < 4.1 or "bends" in sym):
+                return 0.82
+            return 0.0
+
+        # --- Sleep Deprivation / Circadian / Panic (SCENARIO_6 / CPG-31 / CPG-32) ---
+        if sid in ("SCENARIO_6_CIRCADIAN_SLEEP", "CPG-32"):
+            if act == "SLEEP" and ((hr_valid and v.heart_rate >= 62.0) or (hrv_valid and v.hrv_ms <= 22.0) or (temp_valid and v.core_temp_c >= 37.5)):
+                return 0.83 if sid == "SCENARIO_6_CIRCADIAN_SLEEP" else 0.78
+            if any(k in sym for k in ("sleepiness", "sleep depriv", "attention lapse", "irritability", "slowed cognition", "circadian", "sleep fragmentation", "insomnia")):
+                if ((hr_valid and v.heart_rate >= 76.0) or (hrv_valid and v.hrv_ms <= 46.0)) and effective_co2 < 2.6 and rad_level < 0.25:
+                    return 0.85 if sid == "CPG-32" else 0.78
+            if hrv_valid and v.hrv_ms <= 22.0 and effective_co2 < 2.8 and rad_level < 0.2 and "bends" not in sym:
                 return 0.25
             return 0.0
 
-        if sid == "SCENARIO_7_IJV_THROMBOSIS_ARRHYTHMIA":
-            if (d and d.ultrasound_ijv_thrombus) or v.heart_rate >= 165.0:
+        if sid == "CPG-31":
+            if (
+                any(k in sym for k in ("panic", "fear", "anxiet", "hyperventilat", "insomnia", "sleep schedule"))
+                and hr_valid and v.heart_rate >= 94.0
+                and rr_valid and v.respiration_rate >= 22.0
+                and (not spo2_valid or v.spo2 >= 95.0)
+                and effective_co2 < 2.6
+                and not has_trauma_bleed and not has_anaphylaxis
+            ):
                 return 0.86
-            if v.heart_rate >= 120.0 and v.spo2 <= 91.0 and act != "ARED_EXERCISE":
-                return 0.76
             return 0.0
 
-        if sid == "SCENARIO_8_SAS_URINARY_RETENTION":
-            if d and d.bladder_volume_mL and d.bladder_volume_mL > 500.0:
-                return 0.86
-            if packet.mission_day <= 7 and (v.heart_rate <= 50.0 or v.hrv_ms < 20.0):
+        # --- IJV Thrombosis & Arrhythmia / PE (SCENARIO_7 / CPG-04 / CPG-05) ---
+        if sid == "SCENARIO_7_IJV_THROMBOSIS_ARRHYTHMIA":
+            if (d and d.ultrasound_ijv_thrombus) or (hr_valid and v.heart_rate >= 165.0):
+                return 0.87
+            if hr_valid and v.heart_rate >= 120.0 and spo2_valid and v.spo2 <= 91.0 and act != "ARED_EXERCISE" and "pleuritic" not in sym and "embol" not in sym and not has_trauma_bleed and not has_anaphylaxis:
                 return 0.78
+            if hr_valid and v.heart_rate >= 95.0 and any(k in sym for k in ("palpitation", "irregular pulse", "afib", "arrhythmia")):
+                return 0.78
+            return 0.0
+
+        if sid == "CPG-05":
+            if hr_valid and v.heart_rate >= 95.0 and any(k in sym for k in ("palpitation", "irregular pulse", "afib", "atrial fibrillation", "arrhythmia", "svt")):
+                return 0.86
+            return 0.0
+
+        if sid == "CPG-04":
+            if (
+                any(k in sym for k in ("pleuritic", "embol", "vte", "dvt", "ijv", "thrombus", "thrombosis"))
+                and ((hr_valid and v.heart_rate >= 90.0) or (spo2_valid and v.spo2 <= 93.0) or (d is not None and bool(d.ultrasound_ijv_thrombus)))
+                and not has_anaphylaxis
+            ):
+                return 0.86
+            return 0.0
+
+        # --- Urinary Retention (SCENARIO_8 / CPG-17) ---
+        if sid in ("SCENARIO_8_SAS_URINARY_RETENTION", "CPG-17"):
+            if d and d.bladder_volume_mL and d.bladder_volume_mL > 500.0:
+                return 0.87 if sid == "SCENARIO_8_SAS_URINARY_RETENTION" else 0.83
+            if any(k in sym for k in ("inability to void", "suprapubic", "urinary retention", "cannot urinate", "urgency", "bladder", "distention")) and ((hr_valid and v.heart_rate >= 78.0) or (bp_valid and v.blood_pressure_sys >= 122.0)):
+                return 0.86 if sid == "CPG-17" else 0.81
+            if packet.mission_day <= 7 and ((hr_valid and v.heart_rate <= 50.0) or (hrv_valid and v.hrv_ms < 20.0)):
+                return 0.78 if sid == "SCENARIO_8_SAS_URINARY_RETENTION" else 0.72
+            return 0.0
+
+        # --- Acute Appendicitis (CPG-01) ---
+        if sid == "CPG-01":
+            if any(k in sym for k in ("rlq", "lower right", "right lower quadrant", "appendicit", "peritoneal", "mcburney", "rebound")) and ((temp_valid and v.core_temp_c >= 37.3) or (hr_valid and v.heart_rate >= 82.0)):
+                return 0.86
+            return 0.0
+
+        # --- Ammonia Leak / Acute Bronchospasm (CPG-10) ---
+        if sid == "CPG-10":
+            if has_anaphylaxis or (bp_valid and v.blood_pressure_sys <= 96.0):
+                return -0.10
+            if any(k in sym for k in ("ammonia", "nh3", "coolant", "burning eye", "tearing", "bronchospasm", "wheeze", "prolonged expiration", "chemical")):
+                if (hr_valid and v.heart_rate >= 82.0) or (rr_valid and v.respiration_rate >= 18.0) or (spo2_valid and v.spo2 <= 96.5):
+                    return 0.86
+            return 0.0
+
+        # --- Hydrazine / Seizure (CPG-11) ---
+        if sid == "CPG-11":
+            if any(k in sym for k in ("hydrazine", "n2h4", "mmh", "propellant", "oxidizer", "seizure", "convulsion", "postictal", "ictal", "altered awareness")):
+                if (hr_valid and v.heart_rate >= 84.0) or (spo2_valid and v.spo2 <= 95.0) or (temp_valid and v.core_temp_c >= 37.2):
+                    return 0.86
+            return 0.0
+
+        # --- Carbon Monoxide / Smoke Inhalation (CPG-12) ---
+        if sid == "CPG-12":
+            if effective_co2 >= 2.8 or rad_level >= 0.25:
+                return -0.10
+            if any(k in sym for k in ("carbon monoxide", "cohb", "carboxyhemoglobin", "smoke", "soot", "hoarseness", "fire")) and ((hr_valid and v.heart_rate >= 82.0) or (rr_valid and v.respiration_rate >= 18.0)):
+                return 0.87
+            if (
+                all(k in sym for k in ("headache", "dizziness", "nausea", "confusion"))
+                and hr_valid and v.heart_rate >= 85.0
+                and rr_valid and v.respiration_rate >= 19.0
+                and (temp_valid and v.core_temp_c < 37.5)
+            ):
+                return 0.84
+            return 0.0
+
+        # --- Space Motion Sickness (CPG-13) ---
+        if sid == "CPG-13":
+            if rad_level >= 0.25 or effective_co2 >= 2.8 or (bp_valid and v.blood_pressure_sys <= 102.0):
+                return -0.10
+            if any(k in sym for k in ("rlq", "appendic", "flank", "groin", "confused", "confusion")):
+                return -0.10
+            if (
+                any(k in sym for k in ("motion", "vestibular", "disorientation", "pallor", "malaise"))
+                and any(k in sym for k in ("nausea", "vomit", "emesis"))
+                and ((hr_valid and v.heart_rate >= 82.0) or (rr_valid and v.respiration_rate >= 18.0))
+            ):
+                return 0.85
+            return 0.0
+
+        # --- Renal Calculi / Colic (CPG-16) ---
+        if sid == "CPG-16":
+            if any(k in sym for k in ("flank", "groin", "renal colic", "kidney stone", "calculi", "hematuria")) and ((hr_valid and v.heart_rate >= 84.0) or (bp_valid and v.blood_pressure_sys >= 122.0)):
+                return 0.86
+            return 0.0
+
+        # --- Sepsis / Pneumonia (CPG-19) ---
+        if sid == "CPG-19":
+            if has_anaphylaxis or has_trauma_bleed or rad_level >= 0.25:
+                return -0.10
+            if (
+                temp_valid and (v.core_temp_c >= 37.8 or v.core_temp_c <= 36.2)
+                and hr_valid and v.heart_rate >= 94.0
+                and ((bp_valid and v.blood_pressure_sys <= 104.0) or (rr_valid and v.respiration_rate >= 22.0))
+                and act != "EVA_SPACEWALK"
+            ):
+                return 0.86
+            if any(k in sym for k in ("sepsis", "pneumonia", "clammy", "rigors")) and hr_valid and v.heart_rate >= 90.0:
+                return 0.84
+            return 0.0
+
+        # --- Anaphylaxis (CPG-20) ---
+        if sid == "CPG-20":
+            if has_anaphylaxis and ((hr_valid and v.heart_rate >= 92.0) or (bp_valid and v.blood_pressure_sys <= 102.0) or (spo2_valid and v.spo2 <= 94.0)):
+                return 0.88
+            return 0.0
+
+        # --- Corneal Abrasion / Foreign Body Eye (CPG-22) ---
+        if sid == "CPG-22":
+            if any(k in sym for k in ("ammonia", "cough", "dyspnea", "wheeze")):
+                return -0.10
+            if any(k in sym for k in ("corneal", "abrasion", "foreign body", "foreign-body", "photophobia", "opening eye", "fluorescein", "eye scratch", "gritty eye")):
+                if (hr_valid and v.heart_rate >= 76.0) or (bp_valid and v.blood_pressure_sys >= 120.0):
+                    return 0.85
+            return 0.0
+
+        # --- Odontogenic Abscess (CPG-23) ---
+        if sid == "CPG-23":
+            if (
+                any(k in sym for k in ("abscess", "tooth", "dental", "chewing", "jaw swelling", "barodontalgia"))
+                and temp_valid and v.core_temp_c >= 37.4
+                and (hr_valid and v.heart_rate >= 78.0)
+            ):
+                return 0.85
+            return 0.0
+
+        # --- Blunt Trauma / Hemorrhage / Pneumothorax / Burn (CPG-28) ---
+        if sid == "CPG-28":
+            if has_anaphylaxis:
+                return -0.10
+            if has_trauma_bleed and ((hr_valid and v.heart_rate >= 86.0) or (bp_valid and v.blood_pressure_sys <= 112.0) or (spo2_valid and v.spo2 <= 96.0) or (rr_valid and v.respiration_rate >= 20.0)):
+                return 0.87
+            if (
+                bp_valid and v.blood_pressure_sys <= 95.0
+                and hr_valid and v.heart_rate >= 100.0
+                and rr_valid and v.respiration_rate >= 24.0
+                and not any(k in sym for k in ("orthostat", "g-load", "sitting", "stand", "reentry"))
+            ):
+                return 0.84
             return 0.0
 
         return 0.15 if len(assessment.breached_parameters) > 0 else 0.0
@@ -1016,42 +1718,17 @@ class LocalMedicalRAGEngine:
                 denom = tf + k1 * (1.0 - b + b * (doc_len / self._avg_doc_len))
                 bm25_raw += idf * ((tf * (k1 + 1.0)) / denom)
 
-        bm25_norm = min(0.85, bm25_raw / 4.5)
+        bm25_norm = min(0.75, bm25_raw / 8.0)
         if phrase_hits >= 3:
-            return max(bm25_norm, 0.84)
+            return max(bm25_norm, 0.65)
         if phrase_hits == 2:
-            return max(bm25_norm, 0.76)
+            return max(bm25_norm, 0.58)
         if phrase_hits == 1:
             return max(bm25_norm, 0.45)
         return bm25_norm
 
     def _score_scenario_hint(self, sid: str, active_hint: str) -> float:
-        """Boost score if caller explicitly passed a scenario identifier."""
-        if not active_hint:
-            return 0.0
-        if active_hint == sid:
-            return 0.90
-        hint_map = {
-            "HYPERCAPNIA": "SCENARIO_1_HYPERCAPNIA",
-            "CO2": "SCENARIO_1_HYPERCAPNIA",
-            "SANS": "SCENARIO_2_SANS",
-            "ORTHOSTATIC": "SCENARIO_3_ORTHOSTATIC_INTOLERANCE",
-            "DEHYDRATION": "SCENARIO_3_ORTHOSTATIC_INTOLERANCE",
-            "SOLAR_FLARE": "SCENARIO_4_SOLAR_RADIATION_ARS",
-            "RADIATION": "SCENARIO_4_SOLAR_RADIATION_ARS",
-            "ARS": "SCENARIO_4_SOLAR_RADIATION_ARS",
-            "DCS": "SCENARIO_5_EVA_THERMAL_DCS",
-            "THERMAL": "SCENARIO_5_EVA_THERMAL_DCS",
-            "SLEEP": "SCENARIO_6_CIRCADIAN_SLEEP",
-            "CIRCADIAN": "SCENARIO_6_CIRCADIAN_SLEEP",
-            "IJV": "SCENARIO_7_IJV_THROMBOSIS_ARRHYTHMIA",
-            "THROMBOSIS": "SCENARIO_7_IJV_THROMBOSIS_ARRHYTHMIA",
-            "SAS": "SCENARIO_8_SAS_URINARY_RETENTION",
-            "RETENTION": "SCENARIO_8_SAS_URINARY_RETENTION",
-        }
-        for key, target_sid in hint_map.items():
-            if key in active_hint and target_sid == sid:
-                return 0.88
+        """Blind evaluation policy: never allow caller `active_scenario_id` to boost retrieval."""
         return 0.0
 
     def _is_contradictory_zero_day_pattern(
@@ -1059,20 +1736,24 @@ class LocalMedicalRAGEngine:
     ) -> bool:
         """
         Detect unclassified multi-system failure where SpO2 < 92% and SBP < 90 mmHg
-        occur simultaneously at normal CO2/Radiation without a known scenario signature.
+        occur simultaneously at normal CO2/Radiation without a known trauma/allergic/infectious signature.
         """
-        if active_hint and active_hint not in ("", "NONE"):
-            return False
         v = packet.vitals
         e = packet.environment
         effective_co2 = max(e.cabin_co2_mmhg, e.suit_pico2_mmhg or 0.0)
+        effective_rad = max(e.ambient_radiation_msv_h, e.bfo_dose_rate_mGy_hr or 0.0)
+        known_shock_markers = (
+            "bends", "pleuritic", "urticaria", "angioedema", "anaphylax", "hives",
+            "hemorrhag", "blood loss", "lacerat", "efast", "pneumothorax", "sepsis",
+            "pneumonia", "hypoxemia", "depressuriz", "wheeze", "bronchospasm",
+            "embolism", "seizure", "convulsion", "smoke", "hydrazine", "o2 valve",
+        )
         if (
             v.spo2 < 92.0
             and v.blood_pressure_sys < 90.0
             and effective_co2 < 3.0
-            and e.ambient_radiation_msv_h < 0.25
-            and "bends" not in symptom_lower
-            and "pleuritic" not in symptom_lower
+            and effective_rad < 0.25
+            and not any(m in symptom_lower for m in known_shock_markers)
         ):
             return True
         return False
@@ -1096,12 +1777,20 @@ class LocalMedicalRAGEngine:
     ) -> List[str]:
         """Return tagged protocol, research, citation, and matching official text evidence."""
         chunks: List[str] = []
-        citations = proto.get("nasa_citations", [])
-        primary_cit = citations[0] if citations else "UNSPECIFIED_CITATION"
+        source_file = str(proto.get("source_filename", "project_protocol_data"))
         chunks.append(
-            f"[Source: rag_protocols_8_scenarios.json | {scenario_id}] "
-            f"{proto.get('title', '')} — {VERBATIM_NASA_QUOTES.get(scenario_id, primary_cit)}"
+            f"[Project protocol: {source_file} | {scenario_id} | unverified clinical simulation] "
+            f"{proto.get('title', '')}"
         )
+        for rule_id in proto.get("verified_rule_ids", []):
+            rule = self.reference_rules.get(str(rule_id), {})
+            if rule.get("verification_status") not in ("verified_primary_source", "verified_historical_source"):
+                continue
+            text = rule.get("verbatim_rule") or rule.get("rule_summary", "")
+            chunks.append(
+                f"[NASA source: {rule.get('source_revision', '')} | {rule.get('source_section', '')} | "
+                f"{rule.get('source_url', '')} | {rule_id}] {text}"
+            )
         prefix = "_".join(scenario_id.split("_")[:2])
         if prefix in self.research_chunks:
             chunks.append(self.research_chunks[prefix])
@@ -1122,17 +1811,61 @@ class LocalMedicalRAGEngine:
                     f"[Source: arxiv_literature_citations.json | arXiv:{aid}] "
                     f"{paper.get('title', '')}: {paper.get('key_finding_quote', '')}"
                 )
-        return chunks
 
-    def _normalize_contract_checs_medications(self, medications: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        # Attach matched CHeCS formulary, onboard hardware, lab intervals, and vector-store hits
+        med_names = [
+            str(m.get("medication") or m.get("drug") or "").lower()
+            for m in proto.get("checs_medications", [])
+            if isinstance(m, dict)
+        ]
+        for fname, med_entry in list(self.formulary_by_name.items())[:MAX_CHUNKS]:
+            if any(fname in mname for mname in med_names):
+                mid = str(med_entry.get("med_id", ""))
+                if mid and mid in self.research_chunks and self.research_chunks[mid] not in chunks:
+                    chunks.append(self.research_chunks[mid])
+                    break
+
+        hw_text = " ".join(str(x) for x in proto.get("autonomous_checklist", [])).lower()
+        for dev_id in self.hardware_by_id:
+            hw_key = f"HW_{dev_id}"
+            if hw_key in self.research_chunks and dev_id.lower() in hw_text:
+                if self.research_chunks[hw_key] not in chunks:
+                    chunks.append(self.research_chunks[hw_key])
+                    break
+
+        vec_hits = self.query_vector_store(
+            f"{proto.get('title', '')} {clean_symptoms}".strip(),
+            top_k=3,
+            doc_types={"formulary", "hardware", "lab", "rule", "research"},
+        )
+        for hit in vec_hits:
+            formatted = str(hit.get("formatted_chunk", ""))
+            if formatted and formatted not in chunks:
+                chunks.append(formatted)
+
+        return chunks[:10]
+
+    def _normalize_contract_checs_medications(self, medications: List[Any]) -> List[Dict[str, Any]]:
         """Add Contract C medication keys while preserving the source record fields."""
         normalized: List[Dict[str, Any]] = []
         for med in medications:
-            item = dict(med)
-            item.setdefault("drug", str(med.get("medication", "")))
-            item.setdefault("pack", str(med.get("checs_pack", "")))
+            if isinstance(med, str):
+                pack_match = re.search(r"\b(CMP|OMP|TIMP|EMTP|VCP|RSP|ISP|MDP|MTP)\b", med, re.IGNORECASE)
+                item = {
+                    "drug": med,
+                    "pack": pack_match.group(1).upper() if pack_match else "UNSPECIFIED_IN_SOURCE",
+                    "source_representation": "string",
+                }
+            elif isinstance(med, dict):
+                item = dict(med)
+            else:
+                continue
+            item.setdefault("drug", str(med.get("medication", "") if isinstance(med, dict) else ""))
+            item.setdefault("pack", str(med.get("checs_pack", "") if isinstance(med, dict) else ""))
             item["contraindication_warning"] = str(
-                med.get("contraindication_warning") or med.get("contraindication") or ""
+                (med.get("contraindication_warning") or med.get("contraindication") or "")
+                if isinstance(med, dict)
+                else ""
             )
             normalized.append(item)
         return normalized
@@ -1169,39 +1902,37 @@ class LocalMedicalRAGEngine:
         title = str(proto.get("title", "Verified Spaceflight Medical Condition"))
         citations = list(proto.get("nasa_citations", []))
         raw_steps = list(proto.get("autonomous_checklist", []))
-        fallback_excerpt = (
-            f"{citations[0]} — {raw_steps[0]}"
-            if (citations and raw_steps)
-            else str(proto.get("nasa_direct_quote", ""))
-        )
-        direct_quote = str(
-            proto.get("nasa_direct_quote")
-            or VERBATIM_NASA_QUOTES.get(scenario_id, fallback_excerpt)
+        verified_rules = [
+            self.reference_rules[str(rule_id)]
+            for rule_id in proto.get("verified_rule_ids", [])
+            if str(rule_id) in self.reference_rules
+            and self.reference_rules[str(rule_id)].get("verification_status") == "verified_primary_source"
+        ]
+        direct_quote = next((str(rule.get("verbatim_rule", "")) for rule in verified_rules if rule.get("verbatim_rule")), "")
+        source_rule = verified_rules[0] if verified_rules else {}
+        nasa_source_summary = (
+            f"{source_rule.get('source_revision', '')}, {source_rule.get('source_section', '')} — "
+            f"{source_rule.get('source_url', '')}" if source_rule else "No verified NASA rule is mapped to this project protocol."
         )
 
-        raw_prescriptions = STRUCTURED_CHECS_PRESCRIPTIONS.get(
-            scenario_id,
-            [
-                {
-                    "medication": m.get("drug", ""),
-                    "route": "Per protocol source",
-                    "checs_pack": m.get("pack", ""),
-                    "dosage": m.get("drug", ""),
-                }
-                for m in proto.get("checs_medications", [])
-            ],
-        )
+        checs_medications = self._normalize_contract_checs_medications(proto.get("checs_medications", []))
+        structured_list = STRUCTURED_CHECS_PRESCRIPTIONS.get(scenario_id)
+        if structured_list is not None:
+            raw_prescriptions = [self._parse_and_validate_medication(p) for p in structured_list]
+        else:
+            raw_prescriptions = [self._parse_and_validate_medication(m) for m in checs_medications]
+        lockout_list = [str(x) for x in proto.get("drug_lockouts", []) if str(x).strip()]
         raw_contraindications = SCENARIO_CONTRAINDICATIONS.get(
             scenario_id,
-            [
+            lockout_list or [
                 m.get("contraindication", "")
-                for m in proto.get("checs_medications", [])
+                for m in checs_medications
                 if m.get("contraindication")
             ],
         )
         prescriptions, checs_meds, contraindications = self._apply_deterministic_safety_filter(
             raw_prescriptions,
-            proto.get("checs_medications", []),
+            checs_medications,
             raw_contraindications,
             packet,
             assessment,
@@ -1237,11 +1968,15 @@ class LocalMedicalRAGEngine:
             "diagnosis_title": title,
             "severity": severity,
             "nasa_direct_quote": direct_quote,
-            "source_document": " / ".join(citations[:2]),
+            "source_document": str(source_rule.get("source_revision", "Project simulation protocol")),
+            "clinical_protocol_source": str(proto.get("source_filename", "project_protocol_data")),
+            "clinical_protocol_verification_status": "UNVERIFIED_SIMULATION_CONTENT",
+            "nasa_source_summary": nasa_source_summary,
             "nasa_citations": citations,
             "nasa_citation": {
-                "document": citations[0] if citations else "NASA-STD-3001",
-                "section": direct_quote,
+                "document": source_rule.get("source_revision", "No verified NASA requirement mapped"),
+                "section": source_rule.get("source_section", ""),
+                "url": source_rule.get("source_url", ""),
             },
             "checs_subpack": subpack_str,
             "prescriptions": prescriptions,
@@ -1343,6 +2078,64 @@ class LocalMedicalRAGEngine:
             "Zero-Day Space Medicine Protocol (ABC Vital Stabilization, MDP Point-of-Care Diagnostics, "
             "High-Risk Drug Lockout, and Priority Earth Uplink)."
         )
+        v = packet.vitals
+        is_critical_breach = (
+            assessment.nasa_priority_class == "CLASS_1_EMERGENCY"
+            or v.spo2 < 92.0
+            or v.blood_pressure_sys < 90.0
+            or v.core_temp_c >= 39.0
+            or v.core_temp_c <= 35.0
+            or v.heart_rate >= 135.0
+            or v.heart_rate <= 42.0
+        )
+        if is_critical_breach:
+            mode_b_severity = "CLASS_1_EMERGENCY"
+            uplink_priority = "EMERGENCY"
+            mode_b_risk = max(82, assessment.risk_score_0_100)
+            mode_b_readiness = min(18, assessment.readiness_score_0_100)
+        elif (
+            assessment.nasa_priority_class == "CLASS_2_WARNING"
+            or len(assessment.breached_parameters) > 0
+            or len(packet.missing_vitals) >= 3
+            or len(packet.unreliable_channels) > 0
+        ):
+            mode_b_severity = "CLASS_2_WARNING"
+            uplink_priority = "PRIORITY_ADVISORY"
+            mode_b_risk = max(48, assessment.risk_score_0_100)
+            mode_b_readiness = min(55, assessment.readiness_score_0_100)
+        else:
+            mode_b_severity = "CLASS_3_CAUTION"
+            uplink_priority = "ROUTINE_TELEMETRY_AUDIT"
+            mode_b_risk = max(18, assessment.risk_score_0_100)
+            mode_b_readiness = min(82, assessment.readiness_score_0_100)
+
+        data_gap_notes: List[str] = []
+        if packet.missing_vitals:
+            data_gap_notes.append(f"missing vitals={packet.missing_vitals}")
+        if packet.unreliable_channels:
+            data_gap_notes.append(f"unreliable channels={packet.unreliable_channels}")
+        data_gap_suffix = f" Telemetry quality holds: {'; '.join(data_gap_notes)}." if data_gap_notes else ""
+
+        if mode_b_severity == "CLASS_1_EMERGENCY":
+            checklist[3]["action"] = (
+                "Confirm high-risk drug lockout (Opioids/NSAIDs/Anticoagulants) active on Med-Kit keypad "
+                "and queue EMERGENCY packet to Houston."
+            )
+        else:
+            checklist[3]["action"] = (
+                f"Hold empiric high-risk medications pending verification and queue {uplink_priority} "
+                "store-and-forward packet to Houston Flight Surgeon."
+            )
+
+        vec_ref_hits = self.query_vector_store(
+            clean_symptoms or "point-of-care i-STAT C2M2 emergency stabilization",
+            top_k=3,
+            doc_types={"hardware", "lab", "rule", "protocol"},
+        )
+        mode_b_evidence = [mode_b_excerpt] + [
+            str(h.get("formatted_chunk", "")) for h in vec_ref_hits if h.get("formatted_chunk")
+        ]
+
         return {
             "diagnosis_id": "DIAG-2026-ZERODAY",
             "mode": "MODE_B_NOVEL_ANOMALY",
@@ -1351,17 +2144,15 @@ class LocalMedicalRAGEngine:
             "diagnosis": diag_title,
             "condition": diag_title,
             "diagnosis_title": diag_title,
-            "severity": "CLASS_1_EMERGENCY",
+            "severity": mode_b_severity,
             "abstention_reason": (
                 f"Clinical match confidence {int(capped_conf * 100)}% is below verified threshold (75%). "
-                "Certified Abstention active (zero disease hallucination). Zero-Day Protocol initiated."
+                f"Certified Abstention active (zero disease hallucination). Zero-Day Protocol initiated.{data_gap_suffix}"
             ),
-            "nasa_direct_quote": mode_b_excerpt,
-            "source_document": "artifacts/clinical_decision_protocol_2_modes.md / arXiv:2610.07570v1",
-            "nasa_citation": {
-                "document": "artifacts/clinical_decision_protocol_2_modes.md / NASA-STD-3001 [V1 3004]",
-                "section": mode_b_excerpt,
-            },
+            "nasa_direct_quote": "",
+            "source_document": "Project-defined Mode B stabilization protocol",
+            "source_verification_status": "PROJECT_PROTOCOL_NOT_NASA_REQUIREMENT",
+            "nasa_citation": {"document": "", "section": "", "url": ""},
             "abc_vital_stabilization": {
                 "target_breach": abc_stabilization["target_breach"],
                 "protocol": abc_stabilization["protocol"],
@@ -1376,26 +2167,28 @@ class LocalMedicalRAGEngine:
                 "ANTICOAGULANTS (Enoxaparin/Apixaban) — LOCKED OUT pending Ultrasound & coagulation panel",
             ],
             "telemetry_uplink": {
-                "store_and_forward_priority": "EMERGENCY",
+                "store_and_forward_priority": uplink_priority,
                 "uplink_target": "Houston Flight Surgeon Console (20m 14s delay)",
                 "save_candidate_to_local_rag": True,
                 "candidates_queued": len(self.candidate_rag_buffer),
                 "candidate_storage_status": "IN_MEMORY_ONLY_PENDING_REVIEW",
                 "candidate_indexed_for_retrieval": False,
             },
+            "retrieved_evidence_chunks": mode_b_evidence,
             "action_checklist": checklist,
             "action_plan": checklist,
             "autonomous_checklist": checklist,
             "triggering_vitals": assessment.triggering_vitals_summary,
             "organ_hud_status": assessment.organ_hud_status,
-            "risk_score_0_100": max(82, assessment.risk_score_0_100),
-            "readiness_score_0_100": min(18, assessment.readiness_score_0_100),
+            "risk_score_0_100": mode_b_risk,
+            "readiness_score_0_100": mode_b_readiness,
             "execution_time_ms": elapsed_ms,
             "cache_hit": False,
             "source_mode": "CERTIFIED_ABSTENTION_ZERO_DAY_PROTOCOL",
             "rag_metrics": {
                 "retrieval_latency_ms": elapsed_ms,
                 "protocols_evaluated": len(self.protocols),
+                "evidence_chunks_used": len(mode_b_evidence),
                 "signal_breakdown": signal_details,
             },
             "retrieval_scores": score_breakdown,
@@ -1465,9 +2258,10 @@ class LocalMedicalRAGEngine:
         v = packet.vitals
         d = packet.specialized_diagnostics
         effective_co2 = max(e.cabin_co2_mmhg, e.suit_pico2_mmhg or 0.0)
+        effective_rad = max(e.ambient_radiation_msv_h, e.bfo_dose_rate_mGy_hr or 0.0)
 
         has_radiation_bleed_risk = (
-            e.ambient_radiation_msv_h >= 0.25
+            effective_rad >= 0.25
             or e.donki_spe_active
             or (d is not None and d.alc_cells_uL is not None and d.alc_cells_uL < 1500.0)
         )
@@ -1475,15 +2269,26 @@ class LocalMedicalRAGEngine:
         has_thrombus_risk = (d is not None and d.ultrasound_ijv_thrombus is True)
 
         if has_radiation_bleed_risk:
+            nsaid_anticoag_markers = (
+                "ibuprofen", "ketorolac", "aspirin", "nsaid", "enoxaparin", "apixaban", "clopidogrel",
+            )
+            filtered_rx: List[Dict[str, Any]] = []
             for item in safe_rx:
                 med_str = str(item.get("medication", ""))
-                if "ibuprofen" in med_str.lower() or "nsaid" in med_str.lower():
-                    item["medication"] = re.sub(
+                med_low = med_str.lower()
+                if "ibuprofen" in med_low or "nsaid" in med_low:
+                    cleaned = re.sub(
                         r"\s*\(or\s+Ibuprofen[^)]*\)",
                         "",
                         med_str,
                         flags=re.IGNORECASE,
                     ).strip()
+                    item["medication"] = cleaned
+                    med_low = cleaned.lower()
+                if any(tok in med_low for tok in nsaid_anticoag_markers):
+                    continue
+                filtered_rx.append(item)
+            safe_rx = filtered_rx
             for m in safe_meds:
                 drug_str = str(m.get("drug", ""))
                 if "ibuprofen" in drug_str.lower() or "nsaid" in drug_str.lower():
@@ -1496,14 +2301,21 @@ class LocalMedicalRAGEngine:
             if not any("NSAID" in c.upper() or "IBUPROFEN" in c.upper() for c in safe_contra):
                 safe_contra.append(
                     "NSAIDs & ASPIRIN (Ibuprofen/Ketorolac/Aspirin) — PROHIBITED: "
-                    "Concurrent radiation/thrombocytopenia hemorrhage risk (NASA-STD-3001 [V1 4030])"
+                    "Project simulation lockout: NSAIDs in radiation scenarios"
                 )
 
         if has_hypercapnia_hypoxia_risk:
+            opioid_sedative_markers = (
+                "hydromorphone", "hydrocodone", "morphine", "fentanyl", "zolpidem", "zaleplon", "lorazepam", "diazepam",
+            )
+            safe_rx = [
+                item for item in safe_rx
+                if not any(tok in str(item.get("medication", "")).lower() for tok in opioid_sedative_markers)
+            ]
             if not any("OPIOID" in c.upper() or "MORPHINE" in c.upper() for c in safe_contra):
                 safe_contra.append(
                     "OPIOIDS (Morphine/Fentanyl/Hydromorphone) — PROHIBITED: "
-                    "Suppresses central hypercapnic/hypoxic respiratory drive (NASA-STD-3001 [V2 6004])"
+                    "Project simulation lockout: opioids in hypercapnia scenarios"
                 )
 
         if has_thrombus_risk:
@@ -1556,11 +2368,8 @@ class LocalMedicalRAGEngine:
         score_breakdown: Dict[str, float],
     ) -> Dict[str, Any]:
         """Construct clean nominal status response when astronaut has zero breaches and no symptoms."""
-        title = "Nominal Microgravity Physiology — All Systems Within NASA-STD-3001 Limits"
-        quote = (
-            "NASA-STD-3001 [V1 3003] / [V1 3003a] Continuous Biosensor Telemetry: "
-            "All physiological and environmental telemetry parameters remain within adapted microgravity baseline limits."
-        )
+        title = "Nominal Microgravity Telemetry Status"
+        quote = ""
         checklist = [
             {
                 "step": 1,
@@ -1578,13 +2387,11 @@ class LocalMedicalRAGEngine:
             "condition": title,
             "diagnosis_title": title,
             "severity": "NOMINAL",
-            "nasa_direct_quote": quote,
-            "source_document": "NASA-STD-3001 Vol 1 [V1 3003 / 3003a]",
-            "nasa_citations": ["NASA-STD-3001 Vol 1 [V1 3003]", "NASA-STD-3001 Vol 1 [V1 3003a]"],
-            "nasa_citation": {
-                "document": "NASA-STD-3001 Vol 1 [V1 3003 / 3003a]",
-                "section": quote,
-            },
+            "nasa_direct_quote": "",
+            "source_document": "Project telemetry thresholds",
+            "source_verification_status": "PROJECT_THRESHOLDS_NOT_NASA_LIMITS",
+            "nasa_citations": [],
+            "nasa_citation": {"document": "", "section": "", "url": ""},
             "checs_subpack": "NONE",
             "prescriptions": [],
             "checs_medications": [],

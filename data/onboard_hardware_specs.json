@@ -5,14 +5,18 @@
     "source": "NASA Space Medicine RAG Corpus (ISS & Exploration Medical Kit Hardware)",
     "total_devices": 5,
     "offline_ready": true,
-    "description": "Pre-processed hardware capabilities, measurable analytes/metrics, and spaceflight limitations for offline RAG retrieval."
+    "description": "Project hardware inventory. Verify device models, capabilities, and operational limits against the cited manufacturer or NASA source before clinical use.",
+    "evidence_class": "mixed, device details require source review"
   },
   "devices": [
     {
       "device_id": "HW-001",
       "name": "Abbott i-STAT Portable Clinical Analyzer",
       "category": "Point-of-Care Blood Chemistry & Blood Gas",
-      "cartridges_supported": ["CG8+", "CG4+"],
+      "cartridges_supported": [
+        "CG8+",
+        "CG4+"
+      ],
       "measurable_parameters": [
         "Na+, K+, iCa (Ionized Calcium), Glucose, Hematocrit (CG8+ measured)",
         "Hemoglobin, HCO3-, TCO2, Base Excess, sO2 (CG8+ calculated from measured values)",

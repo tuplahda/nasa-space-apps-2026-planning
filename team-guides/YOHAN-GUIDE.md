@@ -9,7 +9,7 @@
 
 ## 🎯 Your Mission
 Build the **Autonomous NASA Level V Crew Medical Officer AI (RAG Agent)** that monitors Dheer's astronaut telemetry, evaluates anomalies against microgravity baselines using a JPL-compliant sliding ring buffer, and executes our **Strict 2-Mode Clinical Decision Protocol**:
-* **MODE A:** KNOWN CONDITION (Confidence $\ge 0.75$) $\rightarrow$ Exact NASA protocol, verbatim quotation, CHeCS physical subpack formulary, and flight contraindications.
+* **MODE A:** KNOWN CONDITION (Confidence $\ge 0.75$) $\rightarrow$ Project protocol match with source-linked NASA requirements where available. Clinical steps, medications and lockouts remain unverified simulation content.
 * **MODE B:** NOVEL / UNSEEN ANOMALY (Confidence $< 0.75$) $\rightarrow$ **Certified Abstention** (no hallucination) + 4-Step Zero-Day Space Medicine Protocol (ABC vital stabilization, Point-of-Care lab orders, drug lockout, in-flight RAG learning).
 
 ---
@@ -18,9 +18,9 @@ Build the **Autonomous NASA Level V Crew Medical Officer AI (RAG Agent)** that m
 
 | Resource | Path | How You Use It |
 | :--- | :--- | :--- |
-| **Expanded RAG Protocols (40)** | [`data/rag_protocols_expanded.json`](../data/rag_protocols_expanded.json) | **PRIMARY:** 8 spaceflight scenarios (with `layer1_equations`) + 32 NASA Space Medicine CPGs (`CPG-01`–`CPG-32`) as pre-processed RAG chunks. |
-| **CHeCS Formulary (54 Meds)** | [`data/checs_formulary.json`](../data/checs_formulary.json) | Pre-processed ISS CHeCS subpack formulary (`CMP`, `OMP`, `TIMP`, `EMTP`, `RSP`, `ISP`), doses, and hard lockout rules. |
-| **NASA-STD-3001 Rules (26)** | [`data/nasa_std_3001_rules.json`](../data/nasa_std_3001_rules.json) | Verbatim clinical, radiation, atmospheric, and JSC 20584 SMAC threshold rules for `nasa_direct_quote`. |
+| **Expanded RAG Protocols (40)** | [`data/rag_protocols_expanded.json`](../data/rag_protocols_expanded.json) | Project scenario corpus containing 8 legacy scenarios and 32 project-labeled CPG records. Their clinical content is simulation material, with source support tracked per claim. |
+| **CHeCS Formulary (54 Meds)** | [`data/checs_formulary.json`](../data/checs_formulary.json) | Project medication and pack dataset. Contents, doses and clinical lockouts need independent primary-source verification. |
+| **NASA-STD-3001 Rules (29)** | [`data/nasa_std_3001_rules.json`](../data/nasa_std_3001_rules.json) | NASA requirements and exposure limits with revision, section, primary-source URL and verification status. Only short verified excerpts populate `nasa_direct_quote`. |
 | **Onboard Hardware Specs (5)** | [`data/onboard_hardware_specs.json`](../data/onboard_hardware_specs.json) | Point-of-care diagnostic specs (`i-STAT CG8+/CG4+`, `Ultrasound-2`, `C2M2` platform, `PanOptic/OCT`, `Tempus Pro`) for Mode B lab orders. |
 | **Lab Reference Intervals** | [`data/lab_reference_intervals.json`](../data/lab_reference_intervals.json) | Specimen-aware `i-STAT` & `CBC` reference, warning, and critical bands (`unreliable -> critical -> warning -> within_reference`). |
 | **Simulation Scenario Seeds** | [`data/simulation_scenario_seeds.json`](../data/simulation_scenario_seeds.json) | Dheer's 24 synthetic seeds & 6 crisis trajectories (remember: `scenario_id` stays hidden during blind RAG evaluation!). |
@@ -28,7 +28,7 @@ Build the **Autonomous NASA Level V Crew Medical Officer AI (RAG Agent)** that m
 | **NASA Research Notes** | [`data/nasa_space_medicine_research.md`](../data/nasa_space_medicine_research.md) | Clinical evidence, ISS medical checklist excerpts, and CHeCS formulary notes. |
 | **Microgravity Thresholds** | [`data/nasa_baselines_and_thresholds.json`](../data/nasa_baselines_and_thresholds.json) | Threshold numbers used by your edge anomaly detector. |
 | **arXiv Citations** | [`data/arxiv_literature_citations.json`](../data/arxiv_literature_citations.json) | Academic papers to cite for AI and space medicine validation. |
-| **Clinical Protocol Spec** | [`artifacts/clinical_decision_protocol_2_modes.md`](../artifacts/clinical_decision_protocol_2_modes.md) | **MUST READ:** Exact JSON schema and clinical rules for Mode A vs Mode B. |
+| **Clinical Protocol Spec** | [`artifacts/clinical_decision_protocol_2_modes.md`](../artifacts/clinical_decision_protocol_2_modes.md) | **MUST READ:** Project response schema and simulation workflow. Its treatment examples are not NASA requirements. |
 | **Safety Guardrails** | [`artifacts/security_and_safety_guardrails.md`](../artifacts/security_and_safety_guardrails.md) | Deterministic fallback rules, ring buffer specifications, anti-hallucination. |
 
 ---
@@ -52,20 +52,20 @@ Build the **Autonomous NASA Level V Crew Medical Officer AI (RAG Agent)** that m
 * Requires **3 consecutive abnormal ticks** before triggering an anomaly (filters single-tick cosmic ray bit-flips).
 
 ### 2. The 2-Mode RAG Engine (`backend/services/rag_engine.py`)
-Loads our pre-processed, offline-ready datasets into your local vector/keyword store:
+Loads local project datasets and source-checked requirements into keyword retrieval. Project clinical advice remains unverified:
 * [`data/rag_protocols_expanded.json`](../data/rag_protocols_expanded.json) (8 legacy scenarios + 32 `CPG-01`–`CPG-32` clinical protocols)
 * [`data/checs_formulary.json`](../data/checs_formulary.json) (54 ISS CHeCS medications + spaceflight lockouts)
-* [`data/nasa_std_3001_rules.json`](../data/nasa_std_3001_rules.json) (26 verbatim NASA-STD-3001 & JSC 20584 SMAC rules)
+* [`data/nasa_std_3001_rules.json`](../data/nasa_std_3001_rules.json) (29 sourced requirement and exposure-limit records)
 * [`data/onboard_hardware_specs.json`](../data/onboard_hardware_specs.json) (5 onboard diagnostic devices)
 * [`data/nasa_space_medicine_research.md`](../data/nasa_space_medicine_research.md)
 
 When an anomaly packet arrives, it queries the local knowledge base and computes a **Retrieval Confidence Score (0.0 to 1.0)**:
 
 #### 🟢 MODE A: KNOWN CONDITION (Confidence $\ge 0.75$)
-* Diagnose the condition strictly using the matched NASA protocol.
-* Quote the exact NASA standard code and verbatim rule in `nasa_direct_quote`.
-* Prescribe ONLY medications physically present in the 2023 ISS CHeCS subpacks (`CMP`, `OMP`, `TIMP`, `EMTP`, `VCP`).
-* Enforce contraindications:
+* Return the matched project scenario and its confidence. Show NASA rule evidence only when a verified rule ID is explicitly mapped to the scenario.
+* Populate `nasa_direct_quote` only from a verified primary-source excerpt. Leave it empty when the mapped source has no excerpt or the scenario has no mapped requirement.
+* Treat medication entries as project data until each drug, pack and dose is independently verified against an authoritative formulary.
+* Label clinical lockouts as project simulation rules until verified clinical sources are added:
   * *NEVER prescribe opioids during Hypercapnia* (respiratory acidosis risk).
   * *NEVER prescribe NSAIDs/Aspirin during Acute Radiation Syndrome* (platelet depletion & bleeding risk).
 
@@ -95,7 +95,7 @@ Implement the clinical services in `/backend`:
 1. `services/ring_buffer.py`: A 60-second fixed-size ring buffer adhering to JPL Power-of-Ten rules (no unbounded growth, no recursion) that computes rolling averages, slew rates, and applies a 3-tick persistence debounce.
 2. `services/anomaly_detector.py`: Evaluates incoming ticks against `data/nasa_baselines_and_thresholds.json` taking activity state (SLEEP, REST, EXERCISE, EVA) into account.
 3. `services/rag_engine.py`: Loads `data/rag_protocols_8_scenarios.json` into an offline local retrieval engine with dynamic document loading for upcoming NASA datasets, and executes our strict 2-Mode Clinical Decision Protocol:
-   - MODE A (Confidence >= 0.75): Known condition. Return exact NASA standard citation (NASA-STD-3001), verbatim quote, medications strictly from 2023 CHeCS subpacks (CMP, TIMP, etc.), and flight contraindications (e.g. lockout opioids during Hypercapnia).
+   - MODE A (Confidence >= 0.75): Known condition. Return a source-linked NASA excerpt only when mapped and verified. Identify medications and lockouts as unverified project data (e.g. lockout opioids during Hypercapnia).
    - MODE B (Confidence < 0.75): Unseen anomaly. Trigger Certified Abstention (do not hallucinate a disease name). Execute the 4-Step Zero-Day Space Medicine Protocol: 1) ABC Vital Stabilization (RSP O2, ISP Saline, cooling), 2) Point-of-Care Lab Orders (i-STAT, C2M2 CBC, Ultrasound), 3) Drug Lockout (Lock Opioids/NSAIDs), 4) Priority Earth Uplink + In-Flight RAG Learning flag.
 4. Expose `POST /api/diagnose` returning the structured JSON payload. Ensure execution takes <50ms with a deterministic fallback mode for full offline reliability.
 ```

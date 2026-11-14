@@ -388,6 +388,7 @@ def test_cache_key_covers_every_normalized_input_field() -> None:
         ("astronaut", "vitals", "ve_L_min", 15.2),
         ("astronaut", "specialized_diagnostics", "refraction_shift_D", 0.5),
         ("environment", "cabin_ppO2_mmHg", None, 140),
+        ("environment", "bfo_dose_rate_mGy_hr", None, 2.5),
         ("environment", "suit_pressure_psi", None, 5.0),
         ("environment", "cabin_pressure_kPa", None, 99.0),
         ("environment", "cabin_temp_C", None, 24.0),
@@ -430,3 +431,180 @@ if __name__ == "__main__":
     test_sustained_step_change_and_multi_hazard_guardrails()
     total_ms = (time.perf_counter() - t_start) * 1000.0
     print(f"ALL A.R.E.S. MED CLINICAL PIPELINE TESTS PASSED IN {total_ms:.2f}ms (<50ms SLA VERIFIED)!")
+
+
+def test_canonical_1hz_telemetry_adapter_and_missing_unreliable_gates() -> None:
+    """Verify canonical 1 Hz alias conversion (O2_kPa -> mmHg) and missing/unreliable Mode B gates."""
+    from backend.models.telemetry import TelemetryPacket
+    from backend.services.anomaly_detector import EdgeAnomalyDetector
+    from backend.services.rag_engine import LocalMedicalRAGEngine
+
+    detector = EdgeAnomalyDetector()
+    rag = LocalMedicalRAGEngine()
+
+    # 1. Canonical 1 Hz field aliases & O2_kPa conversion + critical reliable Mode A
+    canonical_pkt = TelemetryPacket(
+        crew_state_id="EVA",
+        elapsed_s=360.0,
+        timestamp_utc="2026-11-14T10:00:00Z",
+        vitals={
+            "hr_bpm": 102.0,
+            "sbp_mmHg": 134.0,
+            "dbp_mmHg": 86.0,
+            "spo2_pct": 96.0,
+            "hrv_rmssd_ms": 24.0,
+            "cbt_C": 37.3,
+            "rr_bpm": 22.0,
+            "ve_L_min": 16.0,
+        },
+        environment={
+            "cabin_ppCO2_mmHg": 5.4,
+            "O2_kPa": 21.0,
+            "dosimetry_rate_mSv_hr": 0.05,
+            "bfo_dose_rate_mGy_hr": 3.0,
+        },
+        symptom_log="Throbbing frontal headache, cheek tingling and deep breathing.",
+    )
+    assert canonical_pkt.elapsed_s == 360.0
+    assert canonical_pkt.met == "000:00:06:00"
+    assert abs((canonical_pkt.environment.cabin_ppo2_mmhg or 0.0) - (21.0 * 7.50062)) < 0.2
+    assert canonical_pkt.environment.ambient_radiation_msv_h == 0.05
+    assert canonical_pkt.environment.bfo_dose_rate_mGy_hr == 3.0
+    assert canonical_pkt.missing_vitals == []
+    assert canonical_pkt.unreliable_channels == []
+
+    # 2. Missing vitals (>= 3 omitted) must block Mode A and abstain to Mode B
+    incomplete_pkt = TelemetryPacket(
+        vitals={"hr_bpm": 102.0, "dbp_mmHg": 84.0, "ve_L_min": 15.0},
+        environment={"ppCO2_mmHg": 5.6, "radiation_mSv_h": 0.05},
+        symptom_log="Throbbing frontal headache and deep breathing.",
+    )
+    assert len(incomplete_pkt.missing_vitals) >= 3
+    incomplete_res = rag.diagnose(incomplete_pkt, detector.evaluate_packet(incomplete_pkt))
+    assert incomplete_res["mode"] == "MODE_B_NOVEL_ANOMALY"
+    assert incomplete_res["severity"] in ("CLASS_1_EMERGENCY", "CLASS_2_WARNING")
+    assert "missing vitals" in incomplete_res["abstention_reason"]
+
+    # 3. Unreliable critical CO2 channel must block Hypercapnia Mode A and abstain to Mode B
+    faulty_pkt = TelemetryPacket(
+        vitals={
+            "heart_rate": 104.0,
+            "blood_pressure_sys": 134.0,
+            "blood_pressure_dia": 86.0,
+            "spo2": 96.0,
+            "hrv_ms": 26.0,
+            "core_temp_c": 37.2,
+            "respiration_rate": 22.0,
+            "ve_l_min": 15.0,
+        },
+        environment={"cabin_co2_mmhg": 6.0, "ambient_radiation_msv_h": 0.05},
+        quality_flags={"cabin_co2_mmhg": "sensor_fault"},
+        symptom_log="Throbbing frontal headache and deep breathing.",
+    )
+    assert "cabin_co2_mmhg" in faulty_pkt.unreliable_channels
+    faulty_res = rag.diagnose(faulty_pkt, detector.evaluate_packet(faulty_pkt))
+    assert faulty_res["mode"] == "MODE_B_NOVEL_ANOMALY"
+
+
+def test_active_scenario_id_does_not_leak_into_diagnosis_or_mode_a() -> None:
+    """Ensure active_scenario_id never biases retrieval or unlocks Mode A."""
+    from backend.models.telemetry import TelemetryPacket
+    from backend.services.anomaly_detector import EdgeAnomalyDetector
+    from backend.services.rag_engine import LocalMedicalRAGEngine
+
+    detector = EdgeAnomalyDetector()
+    rag = LocalMedicalRAGEngine()
+
+    # Normal vitals + mild nonspecific headache + misleading active_scenario_id -> must stay Mode B
+    probe_pkt = TelemetryPacket(
+        active_scenario_id="SCENARIO_1_HYPERCAPNIA",
+        vitals={
+            "heart_rate": 72.0,
+            "blood_pressure_sys": 118.0,
+            "blood_pressure_dia": 76.0,
+            "spo2": 98.0,
+            "hrv_ms": 50.0,
+            "core_temp_c": 37.0,
+            "respiration_rate": 15.0,
+            "ve_l_min": 8.0,
+        },
+        environment={"cabin_co2_mmhg": 1.8, "ambient_radiation_msv_h": 0.05},
+        symptom_log="Mild non-specific headache and tired eyes.",
+    )
+    probe_res = rag.diagnose(probe_pkt, detector.evaluate_packet(probe_pkt))
+    assert probe_res["mode"] == "MODE_B_NOVEL_ANOMALY"
+    assert probe_res["severity"] == "CLASS_3_CAUTION"
+    assert probe_res["telemetry_uplink"]["store_and_forward_priority"] == "ROUTINE_TELEMETRY_AUDIT"
+
+    # Trauma hemorrhage case with wrong active_scenario_id hint -> must still select CPG-28
+    hemorrhage_pkt = TelemetryPacket(
+        active_scenario_id="SCENARIO_3_ORTHOSTATIC_INTOLERANCE",
+        vitals={
+            "heart_rate": 107.0,
+            "blood_pressure_sys": 93.0,
+            "blood_pressure_dia": 61.0,
+            "spo2": 98.0,
+            "hrv_ms": 25.0,
+            "core_temp_c": 36.7,
+            "respiration_rate": 27.0,
+            "ve_l_min": 15.0,
+        },
+        environment={"cabin_co2_mmhg": 1.8, "ambient_radiation_msv_h": 0.05},
+        symptom_log="Deep laceration with visible blood loss, pallor, thirst, weakness, and confusion.",
+    )
+    hem_res = rag.diagnose(hemorrhage_pkt, detector.evaluate_packet(hemorrhage_pkt))
+    assert hem_res["mode"] == "MODE_A_KNOWN_CONDITION"
+    assert hem_res["scenario_id"] == "CPG-28"
+
+
+def test_unified_vector_store_indexes_all_datasets_and_retrieves() -> None:
+    """Verify unified vector store indexes protocols, rules, formulary, hardware, labs, and literature."""
+    from backend.models.telemetry import TelemetryPacket
+    from backend.services.anomaly_detector import EdgeAnomalyDetector
+    from backend.services.rag_engine import LocalMedicalRAGEngine
+
+    rag = LocalMedicalRAGEngine()
+    doc_types = {rec.get("doc_type") for rec in rag.vector_store.values()}
+    assert {"protocol", "rule", "formulary", "hardware", "lab", "research", "literature"}.issubset(doc_types)
+    assert len([r for r in rag.vector_store.values() if r.get("doc_type") == "protocol"]) == 40
+
+    hits = rag.query_vector_store("hypercapnia cabin CO2 scrubber i-STAT Epinephrine", top_k=5)
+    assert len(hits) > 0
+    assert all(hit.get("formatted_chunk") and hit.get("source") and hit.get("score", 0.0) > 0 for hit in hits)
+
+    # Verify drug lockout filter removes NSAIDs when radiation bleed risk is concurrent
+    detector = EdgeAnomalyDetector()
+    co_hazard_pkt = TelemetryPacket(
+        vitals={
+            "heart_rate": 108.0,
+            "blood_pressure_sys": 134.0,
+            "blood_pressure_dia": 86.0,
+            "spo2": 96.0,
+            "hrv_ms": 20.0,
+            "core_temp_c": 37.5,
+            "respiration_rate": 22.0,
+            "ve_l_min": 16.0,
+        },
+        environment={"cabin_co2_mmhg": 5.5, "ambient_radiation_msv_h": 1.2, "donki_spe_active": True},
+        symptom_log="Throbbing frontal headache and cheek tingling.",
+    )
+    res = rag.diagnose(co_hazard_pkt, detector.evaluate_packet(co_hazard_pkt))
+    if res["mode"] == "MODE_A_KNOWN_CONDITION":
+        med_names = " ".join(rx["medication"].lower() for rx in res["prescriptions"])
+        assert "ibuprofen" not in med_names
+        assert any("NSAID" in c.upper() for c in res["contraindications_locked"])
+
+
+def test_blind_benchmark_meets_accuracy_validity_and_latency_targets() -> None:
+    """Verify the 54-case blind evaluation meets >=90% accuracy, 100% validity/abstention, and <50ms p95."""
+    from backend.evaluate_blind_seeds import evaluate
+
+    summary = evaluate()
+    assert summary["blind_inputs"] is True
+    assert summary["cases"] == 54
+    assert summary["top1_accuracy"] >= 0.90
+    assert summary["held_out_top1_accuracy"] >= 0.90
+    assert summary["mode_a_precision"] >= 0.95
+    assert summary["mode_b_abstention_accuracy"] == 1.0
+    assert summary["citation_and_formulary_validity_rate"] == 1.0
+    assert summary["latency_metrics_ms"]["p95_ms"] < 50.0

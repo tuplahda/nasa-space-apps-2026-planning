@@ -9,7 +9,7 @@ Includes automatic pure-Python standard-library fallback if Pydantic is not inst
 in an air-gapped environment.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 try:
     from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -36,42 +36,89 @@ def _reject_unknown_fields(data: Dict[str, Any], allowed: set[str], model_name: 
         raise ValueError(f"Unknown {model_name} field(s): {', '.join(sorted(unknown))}")
 
 
+CORE_VITAL_KEYS = (
+    "heart_rate",
+    "blood_pressure_sys",
+    "blood_pressure_dia",
+    "spo2",
+    "hrv_ms",
+    "core_temp_c",
+    "respiration_rate",
+)
+
+VITAL_ALIAS_MAP = {
+    "hr_bpm": "heart_rate",
+    "HR_bpm": "heart_rate",
+    "sbp_mmHg": "blood_pressure_sys",
+    "SBP_mmHg": "blood_pressure_sys",
+    "dbp_mmHg": "blood_pressure_dia",
+    "DBP_mmHg": "blood_pressure_dia",
+    "spo2_pct": "spo2",
+    "SpO2_pct": "spo2",
+    "hrv_rmssd_ms": "hrv_ms",
+    "HRV_RMSSD_ms": "hrv_ms",
+    "cbt_C": "core_temp_c",
+    "Tcore_C": "core_temp_c",
+    "tcore_c": "core_temp_c",
+    "rr_bpm": "respiration_rate",
+    "RR_breaths_min": "respiration_rate",
+    "rr_breaths_min": "respiration_rate",
+    "ve_L_min": "ve_l_min",
+}
+
+ENV_ALIAS_MAP = {
+    "cabin_ppCO2_mmHg": "cabin_co2_mmhg",
+    "ppCO2_mmHg": "cabin_co2_mmhg",
+    "ppco2_mmhg": "cabin_co2_mmhg",
+    "dosimetry_rate_mSv_hr": "ambient_radiation_msv_h",
+    "radiation_mSv_h": "ambient_radiation_msv_h",
+    "radiation_msv_h": "ambient_radiation_msv_h",
+    "cabin_ppO2_mmHg": "cabin_ppo2_mmhg",
+    "ppO2_mmHg": "cabin_ppo2_mmhg",
+    "suit_PICO2_mmHg": "suit_pico2_mmhg",
+}
+
+
 def _normalize_vitals_dict(data: Dict[str, Any]) -> Dict[str, Any]:
-    """Normalize both Dheer (`heart_rate`) and NASA (`hr_bpm`) vital field names."""
+    """Normalize Dheer, NASA, and canonical 1 Hz vital field names."""
     normalized = dict(data)
-    alias_map = {
-        "hr_bpm": "heart_rate",
-        "sbp_mmHg": "blood_pressure_sys",
-        "dbp_mmHg": "blood_pressure_dia",
-        "spo2_pct": "spo2",
-        "hrv_rmssd_ms": "hrv_ms",
-        "cbt_C": "core_temp_c",
-        "rr_bpm": "respiration_rate",
-        "ve_L_min": "ve_l_min",
-    }
-    for src_key, dst_key in alias_map.items():
+    for src_key, dst_key in VITAL_ALIAS_MAP.items():
         if src_key in normalized:
-            if dst_key not in normalized:
+            if dst_key not in normalized or normalized[dst_key] is None:
                 normalized[dst_key] = normalized[src_key]
             normalized.pop(src_key, None)
+    for core_key in CORE_VITAL_KEYS:
+        if core_key in normalized and normalized[core_key] is None:
+            normalized.pop(core_key, None)
     return normalized
 
 
 def _normalize_env_dict(data: Dict[str, Any]) -> Dict[str, Any]:
-    """Normalize both `cabin_co2_mmhg` and `cabin_ppCO2_mmHg` environment keys."""
+    """Normalize environment keys and convert canonical `O2_kPa` to `cabin_ppo2_mmhg`."""
     normalized = dict(data)
-    alias_map = {
-        "cabin_ppCO2_mmHg": "cabin_co2_mmhg",
-        "dosimetry_rate_mSv_hr": "ambient_radiation_msv_h",
-        "bfo_dose_rate_mGy_hr": "ambient_radiation_msv_h",
-        "cabin_ppO2_mmHg": "cabin_ppo2_mmhg",
-        "suit_PICO2_mmHg": "suit_pico2_mmhg",
-    }
-    for src_key, dst_key in alias_map.items():
+    for src_key, dst_key in ENV_ALIAS_MAP.items():
         if src_key in normalized:
-            if dst_key not in normalized:
+            if dst_key not in normalized or normalized[dst_key] is None:
                 normalized[dst_key] = normalized[src_key]
             normalized.pop(src_key, None)
+    for kpa_key in ("O2_kPa", "o2_kpa"):
+        if kpa_key in normalized:
+            raw_kpa = normalized.pop(kpa_key, None)
+            if raw_kpa is not None and normalized.get("cabin_ppo2_mmhg") is None:
+                try:
+                    normalized["cabin_ppo2_mmhg"] = round(float(raw_kpa) * 7.50062, 2)
+                except (TypeError, ValueError):
+                    pass
+    for req_env_key in (
+        "cabin_co2_mmhg",
+        "ambient_radiation_msv_h",
+        "suit_pressure_psi",
+        "cabin_ppo2_mmhg",
+        "donki_spe_active",
+        "bfo_dose_rate_mGy_hr",
+    ):
+        if req_env_key in normalized and normalized[req_env_key] is None:
+            normalized.pop(req_env_key, None)
     return normalized
 
 
@@ -80,9 +127,90 @@ def _normalize_comms_dict(data: Dict[str, Any]) -> Dict[str, Any]:
     return dict(data)
 
 
+def _format_elapsed_met(elapsed_s: Any) -> str:
+    """Convert elapsed seconds into MET `DDD:HH:MM:SS` format."""
+    try:
+        total = max(0, int(float(elapsed_s)))
+    except (TypeError, ValueError):
+        return "000:00:00:00"
+    days = total // 86400
+    hours = (total % 86400) // 3600
+    minutes = (total % 3600) // 60
+    seconds = total % 60
+    return f"{days:03d}:{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+
+def _normalize_quality_flags(raw_flags: Any) -> Tuple[Optional[Dict[str, str]], List[str]]:
+    """Normalize `quality_flags` (dict or list) and identify unreliable channels."""
+    if raw_flags is None:
+        return None, []
+    bad_markers = ("UNRELIABLE", "MISSING", "DROPOUT", "INVALID", "FAULT", "CORRUPT", "BAD", "SUSPECT")
+    normalized: Dict[str, str] = {}
+    unreliable: List[str] = []
+
+    def _canon_channel(name: str) -> str:
+        if name in ("O2_kPa", "o2_kpa"):
+            return "cabin_ppo2_mmhg"
+        return VITAL_ALIAS_MAP.get(name, ENV_ALIAS_MAP.get(name, name))
+
+    if isinstance(raw_flags, dict):
+        for k, v in raw_flags.items():
+            key_s = str(k)
+            val_s = str(v)
+            normalized[key_s] = val_s
+            upper_v = val_s.upper()
+            if any(m in upper_v for m in bad_markers):
+                unreliable.append(_canon_channel(key_s))
+    elif isinstance(raw_flags, list):
+        for entry in raw_flags:
+            key_s = str(entry)
+            normalized[key_s] = "UNRELIABLE"
+            unreliable.append(_canon_channel(key_s))
+    return normalized, sorted(set(unreliable))
+
+
+def _detect_missing_vitals(raw_vitals: Any) -> List[str]:
+    """Return canonical vital names omitted or set to None in the input payload."""
+    if raw_vitals is None:
+        return list(CORE_VITAL_KEYS)
+    if isinstance(raw_vitals, dict):
+        present: set[str] = set()
+        for k, val in raw_vitals.items():
+            if val is None:
+                continue
+            canon = VITAL_ALIAS_MAP.get(k, k)
+            if canon in CORE_VITAL_KEYS:
+                try:
+                    float(val)
+                    present.add(canon)
+                except (TypeError, ValueError):
+                    pass
+        return [key for key in CORE_VITAL_KEYS if key not in present]
+    present = set()
+    for core_key in CORE_VITAL_KEYS:
+        if getattr(raw_vitals, core_key, None) is not None:
+            present.add(core_key)
+    return [key for key in CORE_VITAL_KEYS if key not in present]
+
+
 def _unpack_packet_dict(data: Dict[str, Any]) -> Dict[str, Any]:
-    """Support Dheer's schema, Contract A nested `astronaut` schema, and flat dicts."""
+    """Support Dheer's schema, Contract A nested `astronaut` schema, canonical 1 Hz keys, and flat dicts."""
     payload = dict(data)
+    if "timestamp_utc" in payload:
+        ts_val = payload.pop("timestamp_utc")
+        if ts_val is not None and "timestamp" not in payload:
+            payload["timestamp"] = ts_val
+    if "elapsed_s" in payload and payload["elapsed_s"] is not None and "met" not in payload:
+        payload["met"] = _format_elapsed_met(payload["elapsed_s"])
+    if "crew_state_id" in payload:
+        cs_val = payload.pop("crew_state_id")
+        if cs_val is not None and "activity_state" not in payload:
+            payload["activity_state"] = cs_val
+    if "scenario_id" in payload:
+        sc_val = payload.pop("scenario_id")
+        if sc_val is not None and not payload.get("active_scenario_id"):
+            payload["active_scenario_id"] = sc_val
+
     if "astronaut" in payload and isinstance(payload["astronaut"], dict):
         astro = payload["astronaut"]
         _reject_unknown_fields(
@@ -99,12 +227,7 @@ def _unpack_packet_dict(data: Dict[str, Any]) -> Dict[str, Any]:
         payload.setdefault("symptom_log", astro.get("symptom_log", ""))
         payload.pop("astronaut", None)
 
-    vital_keys = {
-        "heart_rate", "hr_bpm", "blood_pressure_sys", "sbp_mmHg",
-        "blood_pressure_dia", "dbp_mmHg", "spo2", "spo2_pct",
-        "hrv_ms", "hrv_rmssd_ms", "core_temp_c", "cbt_C",
-        "respiration_rate", "rr_bpm", "ve_L_min", "ve_l_min",
-    }
+    vital_keys = set(VITAL_ALIAS_MAP.keys()) | set(CORE_VITAL_KEYS) | {"ve_l_min"}
     if "vitals" not in payload:
         extracted_vitals = {k: payload[k] for k in vital_keys if k in payload}
         if extracted_vitals:
@@ -112,10 +235,11 @@ def _unpack_packet_dict(data: Dict[str, Any]) -> Dict[str, Any]:
             for key in extracted_vitals:
                 payload.pop(key, None)
 
-    env_keys = {
-        "cabin_co2_mmhg", "cabin_ppCO2_mmHg", "ambient_radiation_msv_h",
-        "dosimetry_rate_mSv_hr", "suit_pressure_psi", "cabin_ppO2_mmHg",
-        "suit_PICO2_mmHg", "donki_spe_active", "cabin_pressure_kPa", "cabin_temp_C",
+    env_keys = set(ENV_ALIAS_MAP.keys()) | {
+        "cabin_co2_mmhg", "ambient_radiation_msv_h", "suit_pressure_psi",
+        "cabin_ppo2_mmhg", "suit_pico2_mmhg", "donki_spe_active",
+        "cabin_pressure_kPa", "cabin_temp_C", "O2_kPa", "o2_kpa",
+        "bfo_dose_rate_mGy_hr",
     }
     if "environment" not in payload:
         extracted_env = {k: payload[k] for k in env_keys if k in payload}
@@ -128,6 +252,18 @@ def _unpack_packet_dict(data: Dict[str, Any]) -> Dict[str, Any]:
         if not payload.get("active_scenario_id"):
             payload["active_scenario_id"] = payload["scenario"]
         payload.pop("scenario", None)
+
+    if "vitals" in payload:
+        payload.setdefault("missing_vitals", _detect_missing_vitals(payload["vitals"]))
+    elif not payload.get("force_mode_b", False):
+        payload.setdefault("missing_vitals", list(CORE_VITAL_KEYS))
+    else:
+        payload.setdefault("missing_vitals", [])
+
+    q_flags, unreliable = _normalize_quality_flags(payload.get("quality_flags"))
+    if q_flags is not None:
+        payload["quality_flags"] = q_flags
+    payload.setdefault("unreliable_channels", unreliable)
 
     return payload
 
@@ -178,6 +314,7 @@ if PYDANTIC_AVAILABLE:
 
         cabin_co2_mmhg: float = Field(default=2.2, ge=0.0, le=50.0)
         ambient_radiation_msv_h: float = Field(default=0.054, ge=0.0, le=500.0)
+        bfo_dose_rate_mGy_hr: Optional[float] = Field(default=None, ge=0.0, le=500.0)
         suit_pressure_psi: float = Field(default=4.3, ge=2.0, le=16.0)
         cabin_ppo2_mmhg: float = Field(default=148.0, ge=50.0, le=250.0)
         suit_pico2_mmhg: Optional[float] = Field(default=None, ge=0.0, le=50.0)
@@ -210,6 +347,7 @@ if PYDANTIC_AVAILABLE:
 
         timestamp: str = Field(default="2026-11-14T10:15:30Z")
         met: str = Field(default="042:14:30:12")
+        elapsed_s: Optional[float] = Field(default=None, ge=0.0)
         mission_day: int = Field(default=84, ge=1, le=1200)
         astronaut_id: str = Field(default="ASTRO-01")
         name: str = Field(default="Cmdr. Maya Lin")
@@ -222,6 +360,11 @@ if PYDANTIC_AVAILABLE:
         symptom_log: str = Field(default="Nominal resting state; no acute complaints.")
         force_mode_b: bool = Field(default=False)
         stateless_evaluation: bool = Field(default=True)
+        quality_flags: Optional[Dict[str, str]] = Field(default=None)
+        source_manifest_id: Optional[str] = Field(default=None)
+        model_version: Optional[str] = Field(default=None)
+        missing_vitals: List[str] = Field(default_factory=list)
+        unreliable_channels: List[str] = Field(default_factory=list)
 
         @model_validator(mode="before")
         @classmethod
@@ -288,12 +431,7 @@ else:
         def __init__(self, **kwargs: Any) -> None:
             _reject_unknown_fields(
                 kwargs,
-                {
-                    "heart_rate", "hr_bpm", "blood_pressure_sys", "sbp_mmHg",
-                    "blood_pressure_dia", "dbp_mmHg", "spo2", "spo2_pct",
-                    "hrv_ms", "hrv_rmssd_ms", "core_temp_c", "cbt_C",
-                    "respiration_rate", "rr_bpm", "ve_l_min", "ve_L_min",
-                },
+                set(VITAL_ALIAS_MAP.keys()) | set(CORE_VITAL_KEYS) | {"ve_l_min"},
                 "vitals",
             )
             norm = _normalize_vitals_dict(kwargs)
@@ -310,17 +448,21 @@ else:
         def __init__(self, **kwargs: Any) -> None:
             _reject_unknown_fields(
                 kwargs,
-                {
-                    "cabin_co2_mmhg", "cabin_ppCO2_mmHg", "ambient_radiation_msv_h",
-                    "dosimetry_rate_mSv_hr", "bfo_dose_rate_mGy_hr", "suit_pressure_psi",
-                    "cabin_ppo2_mmhg", "cabin_ppO2_mmHg", "suit_pico2_mmhg",
-                    "suit_PICO2_mmHg", "donki_spe_active", "cabin_pressure_kPa", "cabin_temp_C",
+                set(ENV_ALIAS_MAP.keys()) | {
+                    "cabin_co2_mmhg", "ambient_radiation_msv_h", "suit_pressure_psi",
+                    "cabin_ppo2_mmhg", "suit_pico2_mmhg", "donki_spe_active",
+                    "cabin_pressure_kPa", "cabin_temp_C", "O2_kPa", "o2_kpa",
+                    "bfo_dose_rate_mGy_hr",
                 },
                 "environment",
             )
             norm = _normalize_env_dict(kwargs)
             self.cabin_co2_mmhg = _clamp_float(norm.get("cabin_co2_mmhg", 2.2), 2.2, 0.0, 50.0)
             self.ambient_radiation_msv_h = _clamp_float(norm.get("ambient_radiation_msv_h", 0.054), 0.054, 0.0, 500.0)
+            self.bfo_dose_rate_mGy_hr = (
+                _clamp_float(norm["bfo_dose_rate_mGy_hr"], 0.0, 0.0, 500.0)
+                if norm.get("bfo_dose_rate_mGy_hr") is not None else None
+            )
             self.suit_pressure_psi = _clamp_float(norm.get("suit_pressure_psi", 4.3), 4.3, 2.0, 16.0)
             self.cabin_ppo2_mmhg = _clamp_float(norm.get("cabin_ppo2_mmhg", 148.0), 148.0, 50.0, 250.0)
             self.suit_pico2_mmhg = norm.get("suit_pico2_mmhg")
@@ -350,21 +492,25 @@ else:
     class TelemetryPacket:  # type: ignore[no-redef]
         def __init__(self, **kwargs: Any) -> None:
             unpacked = _unpack_packet_dict(kwargs)
-            root_fields = {
-                "timestamp", "met", "mission_day", "astronaut_id", "name", "activity_state",
-                "active_scenario_id", "comms_status", "vitals", "environment",
-                "specialized_diagnostics", "symptom_log", "force_mode_b", "stateless_evaluation",
-                "astronaut", "scenario", "heart_rate", "hr_bpm", "blood_pressure_sys", "sbp_mmHg",
-                "blood_pressure_dia", "dbp_mmHg", "spo2", "spo2_pct", "hrv_ms", "hrv_rmssd_ms",
-                "core_temp_c", "cbt_C", "respiration_rate", "rr_bpm", "ve_l_min", "ve_L_min",
-                "cabin_co2_mmhg", "cabin_ppCO2_mmHg", "ambient_radiation_msv_h",
-                "dosimetry_rate_mSv_hr", "bfo_dose_rate_mGy_hr", "suit_pressure_psi",
-                "cabin_ppo2_mmhg", "cabin_ppO2_mmHg", "suit_pico2_mmhg", "suit_PICO2_mmHg",
-                "donki_spe_active", "cabin_pressure_kPa", "cabin_temp_C",
-            }
+            root_fields = (
+                {
+                    "timestamp", "met", "elapsed_s", "mission_day", "astronaut_id", "name", "activity_state",
+                    "active_scenario_id", "comms_status", "vitals", "environment",
+                    "specialized_diagnostics", "symptom_log", "force_mode_b", "stateless_evaluation",
+                    "quality_flags", "source_manifest_id", "model_version",
+                    "missing_vitals", "unreliable_channels", "astronaut", "scenario",
+                    "cabin_co2_mmhg", "ambient_radiation_msv_h", "bfo_dose_rate_mGy_hr", "suit_pressure_psi",
+                    "cabin_ppo2_mmhg", "suit_pico2_mmhg", "donki_spe_active",
+                    "cabin_pressure_kPa", "cabin_temp_C", "O2_kPa", "o2_kpa", "ve_l_min",
+                }
+                | set(VITAL_ALIAS_MAP.keys())
+                | set(CORE_VITAL_KEYS)
+                | set(ENV_ALIAS_MAP.keys())
+            )
             _reject_unknown_fields(unpacked, root_fields, "telemetry")
             self.timestamp = str(unpacked.get("timestamp", "2026-11-14T10:15:30Z"))
             self.met = str(unpacked.get("met", "042:14:30:12"))
+            self.elapsed_s = unpacked.get("elapsed_s")
             self.mission_day = int(unpacked.get("mission_day", 84))
             self.astronaut_id = str(unpacked.get("astronaut_id", "ASTRO-01"))
             self.name = str(unpacked.get("name", "Cmdr. Maya Lin"))
@@ -385,6 +531,11 @@ else:
             self.symptom_log = str(unpacked.get("symptom_log", "Nominal resting state; no acute complaints."))
             self.force_mode_b = bool(unpacked.get("force_mode_b", False))
             self.stateless_evaluation = bool(unpacked.get("stateless_evaluation", True))
+            self.quality_flags = unpacked.get("quality_flags")
+            self.source_manifest_id = unpacked.get("source_manifest_id")
+            self.model_version = unpacked.get("model_version")
+            self.missing_vitals = list(unpacked.get("missing_vitals", []))
+            self.unreliable_channels = list(unpacked.get("unreliable_channels", []))
 
         @classmethod
         def model_validate(cls, data: Any) -> "TelemetryPacket":
