@@ -10,6 +10,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 from fastapi import WebSocketDisconnect
+from fastapi.testclient import TestClient
 
 import backend.main as server
 from backend.evaluate_blind_seeds import PARAPHRASED_HELD_OUT_CASES
@@ -25,6 +26,7 @@ def simulation(monkeypatch):
     monkeypatch.setattr(server, "anomaly_detector", EdgeAnomalyDetector())
     monkeypatch.setattr(server, "rag_engine", LocalMedicalRAGEngine())
     monkeypatch.setattr(server, "latest_telemetry", None)
+    monkeypatch.setattr(server, "latest_earth_report", None)
     monkeypatch.setattr(server.donki_service, "get_space_weather", server.donki_service._get_cache_fallback)
     return server.astronaut_sim
 
@@ -243,3 +245,150 @@ vm.runInContext(fs.readFileSync(0, 'utf8'), context);
 '''
     result = subprocess.run([node, "-e", harness], input=script, text=True, capture_output=True, timeout=10)
     assert result.returncode == 0, result.stderr
+
+
+def test_simulate_crisis_creates_dynamic_random_problem_and_auto_recovers(simulation):
+    """Simulate Crisis picks dynamic random vital anomalies from nominal and auto-recovers."""
+    assert simulation.active_scenario == "nominal"
+
+    seen_scenarios = []
+    seen_perturbations = []
+    for _ in range(4):
+        res = server.run_simulation_command("simulate_crisis", {"duration_ticks": 4})
+        assert res["status"] == "ok"
+        assert res["temporary_crisis"] is True
+        assert res["dynamic_perturbation"]
+        seen_scenarios.append(res["scenario"])
+        seen_perturbations.append(json.dumps(res["dynamic_perturbation"], sort_keys=True))
+
+    # Consecutive calls avoid repeating the exact same scenario back-to-back
+    for i in range(1, len(seen_scenarios)):
+        assert seen_scenarios[i] != seen_scenarios[i - 1]
+    assert len(set(seen_scenarios)) >= 2
+    assert len(set(seen_perturbations)) >= 2
+
+    # only_if_nominal guard skips replacing an already active crisis
+    skipped = server.run_simulation_command("simulate_crisis", {"only_if_nominal": True})
+    assert skipped["status"] == "skipped"
+    assert skipped["already_in_crisis"] is True
+
+    # Advancing without manual treatment exhausts the temporary window and auto-recovers
+    for _ in range(4):
+        server.advance_telemetry()
+    assert simulation.is_recovering is True
+    for _ in range(12):
+        server.advance_telemetry()
+    assert simulation.active_scenario == "nominal"
+    assert simulation.is_recovering is False
+
+
+def test_simulate_crisis_mode_a_vs_mode_b_confidence_lockouts_and_earth_report_download(simulation):
+    """Verify Mode A (>=75%) vs Mode B (<75% abstention + opioid lock) and Earth report downloads."""
+    with TestClient(server.app) as client:
+        # 1. Mode A (>= 75% confidence): displays confidence, diagnoses/treats, auto-generates report
+        for _ in range(6):
+            resp_a = client.post(
+                "/api/scenarios/simulate-crisis",
+                json={"mode_preference": "mode_a", "duration_ticks": 5},
+            )
+            assert resp_a.status_code == 200
+            data_a = resp_a.json()
+            assert data_a["status"] == "ok"
+            assert data_a["mode"] == "MODE_A_KNOWN_CONDITION"
+            assert data_a["confidence"] >= 0.75
+            assert data_a["confidence_pct"] >= 75.0
+            assert "%" in data_a["confidence_display"]
+            assert data_a["threshold_met_75pct"] is True
+            assert data_a["certified_abstention"] is False
+            assert data_a["diagnosis"]
+            assert data_a["earth_report"]["auto_generated"] is True
+            assert data_a["earth_report"]["transmission_status"] == "QUEUED_AUTO_EARTH_UPLINK"
+
+        dl_a = client.get("/api/reports/latest/download")
+        assert dl_a.status_code == 200
+        assert "attachment; filename=" in dl_a.headers.get("content-disposition", "")
+        assert "75% Gate Passed   : YES" in dl_a.text
+
+        # 2. Mode B (< 75% confidence): Certified Abstention locks opioids + suggests symptom alleviation
+        seen_mode_b = set()
+        for _ in range(4):
+            resp_b = client.post(
+                "/api/simulate-crisis",
+                json={"mode_preference": "mode_b", "duration_ticks": 5},
+            )
+            assert resp_b.status_code == 200
+            data_b = resp_b.json()
+            seen_mode_b.add(data_b["scenario"])
+            assert data_b["mode"] == "MODE_B_NOVEL_ANOMALY"
+            assert data_b["confidence"] < 0.75
+            assert data_b["confidence_pct"] < 75.0
+            assert data_b["threshold_met_75pct"] is False
+            assert data_b["certified_abstention"] is True
+            assert data_b["opioids_locked"] is True
+            assert any("opioid" in str(item).lower() for item in data_b["contraindications_locked"])
+            alleviation = data_b["symptom_alleviation_treatments"]
+            assert len(alleviation) >= 1
+            assert all(item["opioid_free"] is True for item in alleviation)
+            assert data_b["earth_report"]["certified_abstention"] is True
+            assert data_b["earth_report"]["opioids_locked"] is True
+
+        assert len(seen_mode_b) >= 2
+
+        latest_json = client.get("/api/reports/latest")
+        assert latest_json.status_code == 200
+        assert latest_json.json()["opioids_locked"] is True
+
+        dl_b = client.get("/api/reports/latest/download")
+        assert dl_b.status_code == 200
+        assert "attachment; filename=" in dl_b.headers.get("content-disposition", "")
+        assert "OPIOIDS LOCKED OUT" in dl_b.text
+        assert "SYMPTOM ALLEVIATION" in dl_b.text
+
+        dl_post = client.post("/api/reports/download", json={})
+        assert dl_post.status_code == 200
+        assert "attachment; filename=" in dl_post.headers.get("content-disposition", "")
+
+    # 3. Verify WebSocket command support for simulate_crisis
+    class SimulateCrisisSocket:
+        def __init__(self):
+            self.commands = [json.dumps({"command": "simulate_crisis", "payload": {"mode_preference": "mode_b"}})]
+            self.messages = []
+
+        async def accept(self):
+            pass
+
+        async def send_text(self, text):
+            self.messages.append(json.loads(text))
+
+        async def receive_text(self):
+            if not self.commands:
+                raise WebSocketDisconnect(code=1000)
+            return self.commands.pop(0)
+
+    ws = SimulateCrisisSocket()
+    asyncio.run(server.websocket_telemetry_endpoint(ws))
+    ack = [msg for msg in ws.messages if msg.get("type") == "COMMAND_ACK"][0]
+    assert ack["action"] == "simulate_crisis"
+    assert ack["result"]["status"] == "ok"
+    assert ack["result"]["certified_abstention"] is True
+    assert ack["result"]["earth_report"]["auto_generated"] is True
+
+    # 4. Verify stdlib HTTP fallback routes for simulate-crisis and report downloads
+    status, payload = stdlib_post({"mode_preference": "mode_a"}, "/api/scenarios/simulate-crisis")
+    assert status == 200
+    assert payload["status"] == "ok"
+    assert payload["threshold_met_75pct"] is True
+
+    handler = server.AresMedStdlibRequestHandler.__new__(server.AresMedStdlibRequestHandler)
+    handler.path = "/api/reports/latest/download"
+    handler.headers = {"Origin": "http://localhost:8000"}
+    handler.wfile = io.BytesIO()
+    handler.send_response = Mock()
+    handler.send_header = Mock()
+    handler.end_headers = Mock()
+    handler.do_GET()
+
+    handler.send_response.assert_called_with(200)
+    header_map = {call.args[0]: call.args[1] for call in handler.send_header.call_args_list}
+    assert "attachment; filename=" in header_map.get("Content-Disposition", "")
+    assert "EARTH TRANSMISSION REPORT" in handler.wfile.getvalue().decode("utf-8")

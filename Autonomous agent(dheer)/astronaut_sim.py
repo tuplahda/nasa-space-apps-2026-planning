@@ -70,6 +70,20 @@ SCENARIO_ALIASES = {
     "mode_b": "zero_day",
     "mode_b_zero_day": "zero_day",
 }
+MODE_A_CRISIS_SCENARIOS: Tuple[str, ...] = (
+    "hypercapnia",
+    "solar_flare",
+    "sans",
+    "decompression",
+    "heat_strain",
+    "orthostatic_intolerance",
+)
+MODE_B_CRISIS_SCENARIOS: Tuple[str, ...] = (
+    "zero_day",
+    "novel_bronchospasm",
+    "novel_pleuritic_shock",
+    "novel_hypothermic_brady",
+)
 
 
 class ActivityBaseline:
@@ -183,6 +197,16 @@ class AstronautSimulationEngine:
         self._readiness_score: Optional[int] = None
         self._readiness_tick: int = -1
         self._readiness_detector = None
+
+        # Dynamic demo "Simulate Crisis" state (temporary vitals anomaly + auto-recovery)
+        self._crisis_rng = random.Random()
+        self.temporary_crisis_ticks_remaining: int = 0
+        self.temporary_crisis_auto_recover: bool = False
+        self.last_simulated_crisis: Optional[str] = None
+        self.dynamic_crisis_label: Optional[str] = None
+        self.dynamic_perturbation: Dict[str, float] = {}
+        self.dynamic_overrides: Dict[str, float] = {}
+        self.dynamic_symptom_log: Optional[str] = None
 
         # Mission Elapsed Time base (Day 84, 10:15:00)
         self.met_seconds: int = (84 * 86400) + (10 * 3600) + (15 * 60)
@@ -351,6 +375,7 @@ class AstronautSimulationEngine:
         normalized = name.replace(" ", "_")
         normalized = SCENARIO_ALIASES.get(normalized, normalized)
         if normalized in ("nominal", "normal", "healthy", "baseline"):
+            self._clear_dynamic_crisis_state()
             self.incident_id += 1
             self._treatment_options.clear()
             self._treatment_policy_key = None
@@ -370,6 +395,7 @@ class AstronautSimulationEngine:
             normalized = seed["seed_id"].lower()
         elif normalized not in TRAJECTORY_SCENARIOS.values() and normalized not in ("dehydration", "zero_day"):
             return {"status": "error", "message": "Unknown simulation scenario."}
+        self._clear_dynamic_crisis_state()
         self.incident_id += 1
         self._treatment_options.clear()
         self._treatment_policy_key = None
@@ -384,6 +410,178 @@ class AstronautSimulationEngine:
             "scenario": normalized,
             "message": f"Injected scenario: {normalized}. Vitals trending into crisis.",
         }
+
+    def _clear_dynamic_crisis_state(self) -> None:
+        """Reset temporary demo crisis perturbations and countdown timers."""
+        self.temporary_crisis_ticks_remaining = 0
+        self.temporary_crisis_auto_recover = False
+        self.dynamic_crisis_label = None
+        self.dynamic_perturbation.clear()
+        self.dynamic_overrides.clear()
+        self.dynamic_symptom_log = None
+
+    def _start_temporary_crisis_recovery(self) -> None:
+        """Automatically start biological recovery washout after a temporary crisis expires."""
+        self.is_recovering = True
+        self.active_treatment = "Temporary Demo Crisis Timeout (Auto-Recovery)"
+        self.recovery_tick = 0
+        self.recovery_start = max(0.25, self.scenario_progression)
+        self.temporary_crisis_ticks_remaining = 0
+        self.temporary_crisis_auto_recover = False
+        self.dynamic_crisis_label = None
+        self.dynamic_perturbation.clear()
+        self.dynamic_overrides.clear()
+        self.dynamic_symptom_log = None
+
+    def simulate_crisis(
+        self,
+        *,
+        only_if_nominal: bool = False,
+        mode_preference: Optional[str] = None,
+        duration_ticks: int = 15,
+        seed: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        Dynamically inject a random, non-hardcoded temporary vital problem for demo
+        purposes (especially when astronaut vitals are nominal) with auto-recovery.
+        """
+        if only_if_nominal and self.active_scenario != "nominal":
+            return {
+                "status": "skipped",
+                "already_in_crisis": True,
+                "scenario": self.active_scenario,
+                "message": f"Astronaut already experiencing active crisis: {self.active_scenario}.",
+            }
+
+        rng = random.Random(seed) if seed is not None else self._crisis_rng
+        pref = mode_preference.strip().lower() if isinstance(mode_preference, str) else ""
+        if pref in ("mode_a", "known", "high_confidence"):
+            candidates = list(MODE_A_CRISIS_SCENARIOS)
+        elif pref in ("mode_b", "unknown", "novel", "low_confidence", "zero_day"):
+            candidates = list(MODE_B_CRISIS_SCENARIOS)
+        else:
+            candidates = list(MODE_A_CRISIS_SCENARIOS) + list(MODE_B_CRISIS_SCENARIOS)
+
+        if len(candidates) > 1 and self.last_simulated_crisis in candidates:
+            candidates = [candidate for candidate in candidates if candidate != self.last_simulated_crisis]
+
+        chosen = rng.choice(candidates)
+        is_mode_b_profile = chosen in MODE_B_CRISIS_SCENARIOS
+        base_scenario = "zero_day" if is_mode_b_profile else chosen
+
+        result = self.trigger_scenario(base_scenario)
+        if result.get("status") == "error":
+            return result
+
+        ticks = max(3, min(120, int(duration_ticks)))
+        self.scenario_progression = round(rng.uniform(0.84, 1.0), 3)
+        self.target_progression = 1.0
+        self.temporary_crisis_ticks_remaining = ticks
+        self.temporary_crisis_auto_recover = True
+        self.last_simulated_crisis = chosen
+        self.dynamic_crisis_label = chosen
+
+        if chosen == "novel_bronchospasm":
+            self.dynamic_overrides = {
+                "heart_rate": round(rng.uniform(116.0, 134.0), 1),
+                "blood_pressure_sys": round(rng.uniform(132.0, 146.0), 1),
+                "blood_pressure_dia": round(rng.uniform(82.0, 94.0), 1),
+                "spo2": round(rng.uniform(88.5, 91.8), 1),
+                "hrv_ms": round(rng.uniform(12.0, 21.0), 1),
+                "core_temp_c": round(rng.uniform(37.4, 38.2), 2),
+                "respiration_rate": round(rng.uniform(24.0, 30.0), 1),
+            }
+            self.dynamic_symptom_log = rng.choice([
+                "Sudden audible expiratory wheezing, prolonged expiration, and acute bronchospasm with air hunger.",
+                "Progressive tight chest with diffuse expiratory wheeze and prolonged expiration of unknown origin.",
+            ])
+        elif chosen == "novel_pleuritic_shock":
+            self.dynamic_overrides = {
+                "heart_rate": round(rng.uniform(120.0, 138.0), 1),
+                "blood_pressure_sys": round(rng.uniform(78.0, 88.0), 1),
+                "blood_pressure_dia": round(rng.uniform(48.0, 58.0), 1),
+                "spo2": round(rng.uniform(87.0, 90.8), 1),
+                "hrv_ms": round(rng.uniform(10.0, 18.0), 1),
+                "core_temp_c": round(rng.uniform(36.4, 37.9), 2),
+                "respiration_rate": round(rng.uniform(24.0, 31.0), 1),
+            }
+            self.dynamic_symptom_log = rng.choice([
+                "Acute unilateral chest pain, severe dyspnea, rapidly worsening shock and impending collapse.",
+                "Sharp pleuritic chest pain on inspiration with progressive dyspnea and hypotensive presyncope.",
+            ])
+        elif chosen == "novel_hypothermic_brady":
+            self.dynamic_overrides = {
+                "heart_rate": round(rng.uniform(44.0, 56.0), 1),
+                "blood_pressure_sys": round(rng.uniform(88.0, 100.0), 1),
+                "blood_pressure_dia": round(rng.uniform(56.0, 66.0), 1),
+                "spo2": round(rng.uniform(92.0, 95.2), 1),
+                "hrv_ms": round(rng.uniform(20.0, 32.0), 1),
+                "core_temp_c": round(rng.uniform(34.6, 35.6), 2),
+                "respiration_rate": round(rng.uniform(10.0, 13.0), 1),
+            }
+            self.dynamic_symptom_log = rng.choice([
+                "Uncontrollable shivering after cooling-loop leak; progressive hypothermia and cold exposure.",
+                "Severe shivering, numbness, hypothermia from thermal suit loop failure and cold exposure.",
+            ])
+        elif chosen == "zero_day":
+            self.dynamic_perturbation = {
+                "heart_rate": round(rng.uniform(5.0, 16.0), 1),
+                "blood_pressure_sys": round(rng.uniform(-6.0, 4.0), 1),
+                "spo2": round(rng.uniform(-2.0, 0.4), 1),
+                "core_temp_c": round(rng.uniform(0.1, 0.7), 2),
+                "respiration_rate": round(rng.uniform(2.0, 6.0), 1),
+            }
+            self.dynamic_symptom_log = rng.choice([
+                "Unexplained metallic taste, peripheral tingling, and sudden systemic weakness.",
+                "Acute bilateral paresthesia, unexplained malaise, and transient orthostatic dimming.",
+            ])
+        else:
+            self.dynamic_perturbation = {
+                "heart_rate": round(rng.uniform(2.0, 7.0), 1),
+                "blood_pressure_sys": round(rng.uniform(1.0, 6.0), 1),
+                "hrv_ms": round(rng.uniform(-4.0, -0.5), 1),
+                "core_temp_c": round(rng.uniform(0.05, 0.25), 2),
+                "respiration_rate": round(rng.uniform(0.5, 2.5), 1),
+            }
+            self.dynamic_symptom_log = None
+
+        return {
+            "status": "ok",
+            "scenario": chosen,
+            "base_scenario": base_scenario,
+            "mode_hint": "MODE_B_NOVEL" if is_mode_b_profile else "MODE_A_KNOWN",
+            "temporary_crisis": True,
+            "auto_recovery_ticks": ticks,
+            "dynamic_perturbation": dict(self.dynamic_overrides or self.dynamic_perturbation),
+            "message": f"Dynamic temporary crisis '{chosen}' injected for {ticks} ticks.",
+        }
+
+    def _apply_dynamic_crisis_modifiers(self, packet: TelemetryPacket) -> None:
+        """Apply active dynamic crisis overrides or jitter while clamping physiological bounds."""
+        bounds = {
+            "heart_rate": (30.0, 220.0, 1),
+            "blood_pressure_sys": (60.0, 220.0, 1),
+            "blood_pressure_dia": (35.0, 140.0, 1),
+            "spo2": (70.0, 100.0, 1),
+            "hrv_ms": (3.0, 160.0, 1),
+            "core_temp_c": (33.5, 42.5, 2),
+            "respiration_rate": (6.0, 50.0, 1),
+        }
+        if self.dynamic_overrides:
+            for field_name, target_value in self.dynamic_overrides.items():
+                if hasattr(packet.vitals, field_name) and field_name in bounds:
+                    low, high, digits = bounds[field_name]
+                    clamped = max(low, min(high, float(target_value)))
+                    setattr(packet.vitals, field_name, round(clamped, digits))
+        if self.dynamic_perturbation:
+            for field_name, delta in self.dynamic_perturbation.items():
+                if hasattr(packet.vitals, field_name) and field_name in bounds:
+                    low, high, digits = bounds[field_name]
+                    current = float(getattr(packet.vitals, field_name))
+                    clamped = max(low, min(high, current + float(delta)))
+                    setattr(packet.vitals, field_name, round(clamped, digits))
+        if self.dynamic_symptom_log:
+            packet.symptom_log = self.dynamic_symptom_log
 
     def set_treatment_options(self, treatments: List[str], policy_key=None) -> None:
         """Register exact countermeasure names from the current filtered RAG decision."""
@@ -450,6 +648,7 @@ class AstronautSimulationEngine:
                 self.active_treatment = None
                 self._treatment_options.clear()
                 self._treatment_policy_key = None
+                self._clear_dynamic_crisis_state()
         else:
             if self.scenario_progression < self.target_progression:
                 self.scenario_progression = min(
@@ -684,6 +883,13 @@ class AstronautSimulationEngine:
             symptom_log=symptom_log,
             quality_flags=quality_flags or None,
         )
+        if not self.is_recovering and self.active_scenario != "nominal":
+            self._apply_dynamic_crisis_modifiers(packet)
+            if self.temporary_crisis_ticks_remaining > 0:
+                self.temporary_crisis_ticks_remaining -= 1
+                if self.temporary_crisis_ticks_remaining == 0 and self.temporary_crisis_auto_recover:
+                    self._start_temporary_crisis_recovery()
+
         self._latest_packet = packet
         return packet
 

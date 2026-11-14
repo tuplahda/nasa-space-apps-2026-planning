@@ -1355,6 +1355,7 @@ class LocalMedicalRAGEngine:
                 signal_details,
             )
 
+        self._attach_decision_report(response, packet, assessment)
         response["execution_time_ms"] = round((time.perf_counter_ns() - start_ns) / 1_000_000.0, 3)
         response["rag_metrics"]["retrieval_latency_ms"] = elapsed_ms
         self._cache_put(self.diagnosis_cache, cache_key, deepcopy(response))
@@ -2590,4 +2591,317 @@ class LocalMedicalRAGEngine:
                 "evidence_chunks_used": 0,
             },
             "retrieval_scores": score_breakdown,
+        }
+
+    def attach_decision_report(
+        self,
+        response: Dict[str, Any],
+        packet: TelemetryPacket,
+        assessment: AnomalyAssessment,
+    ) -> Dict[str, Any]:
+        """Public wrapper to enrich any diagnosis payload with confidence display, lockouts, and Earth report."""
+        return self._attach_decision_report(response, packet, assessment)
+
+    def _attach_decision_report(
+        self,
+        response: Dict[str, Any],
+        packet: TelemetryPacket,
+        assessment: AnomalyAssessment,
+    ) -> Dict[str, Any]:
+        """
+        Attach unified confidence display, Mode B Certified Abstention + Opioid lockout flags,
+        non-opioid symptom alleviation suggestions, and automatic Earth uplink report text.
+        """
+        mode = str(response.get("mode", ""))
+        confidence = round(float(response.get("confidence", 0.0) or 0.0), 4)
+        confidence_pct = round(confidence * 100.0, 1)
+        is_nominal = mode == "NOMINAL_TELEMETRY"
+        is_mode_b = mode == "MODE_B_NOVEL_ANOMALY" or (
+            not is_nominal and confidence < MODE_A_CONFIDENCE_THRESHOLD
+        )
+        certified_abstention = bool(response.get("certified_abstention", False) or is_mode_b)
+        threshold_met_75pct = bool((not is_mode_b) and confidence >= MODE_A_CONFIDENCE_THRESHOLD)
+
+        contraindications = [
+            item.get("medication") or item.get("name") or str(item)
+            if isinstance(item, dict)
+            else str(item)
+            for item in (response.get("contraindications_locked") or [])
+        ]
+        if certified_abstention and not any("opioid" in item.lower() for item in contraindications):
+            contraindications.append("OPIOIDS (CERTIFIED ABSTENTION LOCKOUT)")
+            response["contraindications_locked"] = contraindications
+
+        opioids_locked = bool(
+            certified_abstention or any("opioid" in item.lower() for item in contraindications)
+        )
+        if is_nominal:
+            confidence_display = f"NOMINAL ({confidence_pct:.1f}%)"
+        elif certified_abstention:
+            confidence_display = f"CERTIFIED ABSTENTION ({confidence_pct:.1f}% < 75.0%)"
+        else:
+            confidence_display = f"{confidence_pct:.1f}% (Mode A >= 75.0%)"
+
+        alleviation_list = self._derive_symptom_alleviation_treatments(
+            response, packet, assessment, certified_abstention=certified_abstention
+        )
+
+        response["confidence_pct"] = confidence_pct
+        response["confidence_display"] = confidence_display
+        response["threshold_met_75pct"] = threshold_met_75pct
+        response["certified_abstention"] = certified_abstention
+        response["opioids_locked"] = opioids_locked
+        response["symptom_alleviation_treatments"] = alleviation_list
+        response["earth_report"] = self.build_earth_transmission_report(
+            response, packet, assessment
+        )
+        return response
+
+    def _derive_symptom_alleviation_treatments(
+        self,
+        response: Dict[str, Any],
+        packet: TelemetryPacket,
+        assessment: AnomalyAssessment,
+        *,
+        certified_abstention: bool,
+    ) -> List[Dict[str, Any]]:
+        """Build safe, opioid-free treatment / symptom alleviation entries for HUD and Earth reports."""
+        entries: List[Dict[str, Any]] = []
+        seen: set[str] = set()
+
+        def _add(label: str, purpose: str, source: str) -> None:
+            clean = label.strip()
+            if not clean:
+                return
+            lowered = clean.lower()
+            if any(op in lowered for op in ("opioid", "morphine", "fentanyl", "hydromorphone", "oxycodone")):
+                return
+            if lowered in seen:
+                return
+            seen.add(lowered)
+            entries.append(
+                {
+                    "treatment": clean,
+                    "purpose": purpose,
+                    "opioid_free": True,
+                    "source": source,
+                }
+            )
+
+        for item in response.get("prescriptions") or response.get("checs_medications") or []:
+            if isinstance(item, dict):
+                med = str(item.get("medication") or item.get("name") or "").strip()
+                dose = str(item.get("dose") or "").strip()
+                route = str(item.get("route") or "").strip()
+                desc = " ".join(part for part in (med, dose, route) if part).strip()
+                purpose = str(item.get("indication") or item.get("rationale") or "Clinical protocol treatment")
+                _add(desc, purpose, "CHECS_FORMULARY")
+            else:
+                _add(str(item), "Clinical protocol treatment", "CHECS_FORMULARY")
+
+        if certified_abstention:
+            v = packet.vitals
+            e = packet.environment
+            sym = (packet.symptom_log or "").lower()
+            if v.spo2 < 94.0:
+                _add(
+                    "Supplemental 100% O2 via ISS non-rebreather mask",
+                    "Alleviate acute hypoxia / maintain SpO2 >= 94%",
+                    "MODE_B_SUPPORTIVE",
+                )
+            if max(e.cabin_co2_mmhg, e.suit_pico2_mmhg or 0.0) >= 3.0:
+                _add(
+                    "Activate CDRA / LiOH CO2 scrubber bypass",
+                    "Reduce atmospheric hypercapnic drive and dyspnea",
+                    "MODE_B_SUPPORTIVE",
+                )
+            if v.blood_pressure_sys < 92.0:
+                _add(
+                    "Shock Trendelenburg positioning + Isotonic fluid bolus",
+                    "Stabilize blood pressure and cerebral perfusion",
+                    "MODE_B_SUPPORTIVE",
+                )
+            if v.core_temp_c >= 38.0:
+                _add(
+                    "Conductive cooling loop + Acetaminophen 650 mg PO q6h PRN",
+                    "Alleviate pyrexia and discomfort without NSAIDs or opioids",
+                    "MODE_B_SUPPORTIVE",
+                )
+            elif v.core_temp_c <= 35.8:
+                _add(
+                    "Active thermal blanket rewarming + warm oral hydration",
+                    "Reverse progressive hypothermia safely",
+                    "MODE_B_SUPPORTIVE",
+                )
+            if any(tok in sym for tok in ("wheez", "bronchospasm", "prolonged expiration", "dyspnea")):
+                _add(
+                    "Inhaled bronchodilator support + upright posture + SpO2 watch",
+                    "Relieve bronchospasm and work of breathing (non-opioid)",
+                    "MODE_B_SUPPORTIVE",
+                )
+            if any(tok in sym for tok in ("nausea", "vomit", "emesis")):
+                _add(
+                    "Ondansetron 4 mg ODT PRN + oral rehydration salts",
+                    "Control acute nausea/emesis without sedative opioids",
+                    "MODE_B_SUPPORTIVE",
+                )
+            if any(tok in sym for tok in ("pain", "headache", "ache", "tingling", "weakness")):
+                _add(
+                    "Acetaminophen 500-650 mg PO q6h PRN comfort",
+                    "Non-opioid symptom analgesia while opioids are locked",
+                    "MODE_B_SUPPORTIVE",
+                )
+            if not entries:
+                _add(
+                    "Continuous 1 Hz vitals surveillance + Oxygen/fluid standby",
+                    "Non-opioid symptomatic stabilization pending Earth consult",
+                    "MODE_B_SUPPORTIVE",
+                )
+
+        if not entries and str(response.get("mode", "")) == "NOMINAL_TELEMETRY":
+            _add("Routine telemetry monitoring", "Maintain baseline mission health", "NOMINAL")
+
+        return entries
+
+    def build_earth_transmission_report(
+        self,
+        response: Dict[str, Any],
+        packet: TelemetryPacket,
+        assessment: AnomalyAssessment,
+    ) -> Dict[str, Any]:
+        """Generate structured & downloadable plain-text Earth Flight Surgeon transmission report."""
+        mode = str(response.get("mode", "UNKNOWN"))
+        confidence = round(float(response.get("confidence", 0.0) or 0.0), 4)
+        confidence_pct = round(confidence * 100.0, 1)
+        certified_abstention = bool(response.get("certified_abstention", False))
+        threshold_met = bool(response.get("threshold_met_75pct", False))
+        opioids_locked = bool(response.get("opioids_locked", False))
+        confidence_display = str(response.get("confidence_display") or f"{confidence_pct:.1f}%")
+        diagnosis_title = str(
+            response.get("diagnosis") or response.get("diagnosis_title") or "Unclassified Telemetry Event"
+        )
+        severity = str(response.get("severity") or assessment.alert_level)
+
+        met_token = str(packet.met or "000-00-00-00").replace(":", "-")
+        mode_tag = "MODE-B" if certified_abstention else ("NOMINAL" if mode == "NOMINAL_TELEMETRY" else "MODE-A")
+        report_id = f"EARTH-UPLINK-{packet.astronaut_id}-{met_token}-{mode_tag}"
+        filename = f"ares_med_earth_report_{packet.astronaut_id.lower()}_{met_token}.txt"
+        transmission_status = "NOMINAL_LOGGED" if mode == "NOMINAL_TELEMETRY" else "QUEUED_AUTO_EARTH_UPLINK"
+
+        locked_list = [
+            item.get("medication") or item.get("name") or str(item)
+            if isinstance(item, dict)
+            else str(item)
+            for item in (response.get("contraindications_locked") or [])
+        ]
+        alleviation_list = list(response.get("symptom_alleviation_treatments") or [])
+        checklist_lines = [
+            f"{item.get('step', idx + 1)}. {item.get('action', '')}".strip()
+            if isinstance(item, dict)
+            else f"{idx + 1}. {item}"
+            for idx, item in enumerate(response.get("action_checklist") or [])
+        ]
+
+        v = packet.vitals
+        e = packet.environment
+        vitals_snapshot = {
+            "heart_rate_bpm": v.heart_rate,
+            "blood_pressure_mmhg": f"{v.blood_pressure_sys}/{v.blood_pressure_dia}",
+            "spo2_pct": v.spo2,
+            "hrv_ms": v.hrv_ms,
+            "core_temp_c": v.core_temp_c,
+            "respiration_rate_bpm": v.respiration_rate,
+            "cabin_co2_mmhg": e.cabin_co2_mmhg,
+            "ambient_radiation_msv_h": e.ambient_radiation_msv_h,
+        }
+
+        recommended_treatments = [item["treatment"] for item in alleviation_list]
+        lines = [
+            "==========================================================================",
+            "A.R.E.S. MED - AUTONOMOUS FLIGHT SURGEON EARTH TRANSMISSION REPORT",
+            "==========================================================================",
+            f"Report ID         : {report_id}",
+            f"Transmission      : {transmission_status}",
+            "Destination       : NASA JSC Flight Surgeon Console (Houston, TX)",
+            f"Mission Elapsed   : MET {packet.met} (Flight Day {packet.mission_day})",
+            f"Crew Member       : {packet.name} ({packet.astronaut_id})",
+            f"Activity State    : {assessment.normalized_activity_state}",
+            f"Alert Level       : {assessment.alert_level} (Severity: {severity})",
+            "--------------------------------------------------------------------------",
+            "RAG CLINICAL DECISION & CONFIDENCE GATE (>= 75.0%)",
+            f"Decision Mode     : {mode}",
+            f"Confidence Level  : {confidence_display}",
+            f"75% Gate Passed   : {'YES' if threshold_met else 'NO'}",
+            f"Certified Abstain : {'RAISED - ZERO-DAY / UNCLASSIFIED ANOMALY' if certified_abstention else 'NO'}",
+            f"Opioid Lockout    : {'ACTIVE - OPIOIDS LOCKED OUT' if opioids_locked else 'NOT REQUIRED'}",
+            f"Clinical Finding  : {diagnosis_title}",
+            f"Risk / Readiness  : Risk {response.get('risk_score_0_100', assessment.risk_score_0_100)}/100 | "
+            f"Readiness {response.get('readiness_score_0_100', assessment.readiness_score_0_100)}/100",
+            "--------------------------------------------------------------------------",
+            "BIOTELEMETRY SNAPSHOT",
+            f"  Heart Rate      : {v.heart_rate} bpm    | Resp Rate : {v.respiration_rate} breaths/min",
+            f"  Blood Pressure  : {v.blood_pressure_sys}/{v.blood_pressure_dia} mmHg | SpO2      : {v.spo2}%",
+            f"  Core Temp (CBT) : {v.core_temp_c} C     | HRV RMSSD : {v.hrv_ms} ms",
+            f"  Cabin ppCO2     : {e.cabin_co2_mmhg} mmHg | Radiation : {e.ambient_radiation_msv_h} mSv/h",
+            f"  Symptom Log     : {packet.symptom_log or 'None reported'}",
+            "--------------------------------------------------------------------------",
+            "LOCKED CONTRAINDICATIONS & MEDICATION SAFETY",
+        ]
+        if locked_list:
+            for item in locked_list:
+                lines.append(f"  - LOCKED: {item}")
+        else:
+            lines.append("  - None triggered")
+
+        lines.append("--------------------------------------------------------------------------")
+        if certified_abstention:
+            lines.append("SYMPTOM ALLEVIATION & STABILIZATION PLAN (NON-OPIOID)")
+        else:
+            lines.append("AUTHORIZED DIAGNOSIS TREATMENT & CHECS INTERVENTIONS")
+        if alleviation_list:
+            for item in alleviation_list:
+                lines.append(f"  - {item['treatment']} -- {item['purpose']}")
+        else:
+            lines.append("  - Continue routine baseline monitoring")
+
+        if checklist_lines:
+            lines.append("--------------------------------------------------------------------------")
+            lines.append("ACTION CHECKLIST")
+            for step in checklist_lines:
+                lines.append(f"  {step}")
+
+        reasoning = str(response.get("clinical_reasoning") or "").strip()
+        if reasoning:
+            lines.append("--------------------------------------------------------------------------")
+            lines.append(f"CLINICAL REASONING: {reasoning}")
+        lines.append("==========================================================================")
+
+        return {
+            "report_id": report_id,
+            "filename": filename,
+            "auto_generated": True,
+            "transmission_status": transmission_status,
+            "destination": "NASA Johnson Space Center - Flight Surgeon Console (Houston)",
+            "timestamp": packet.timestamp,
+            "met": packet.met,
+            "mission_day": packet.mission_day,
+            "astronaut_id": packet.astronaut_id,
+            "astronaut_name": packet.name,
+            "activity_state": assessment.normalized_activity_state,
+            "mode": mode,
+            "confidence": confidence,
+            "confidence_pct": confidence_pct,
+            "confidence_display": confidence_display,
+            "threshold_met_75pct": threshold_met,
+            "certified_abstention": certified_abstention,
+            "opioids_locked": opioids_locked,
+            "diagnosis": diagnosis_title,
+            "severity": severity,
+            "risk_score_0_100": response.get("risk_score_0_100", assessment.risk_score_0_100),
+            "readiness_score_0_100": response.get("readiness_score_0_100", assessment.readiness_score_0_100),
+            "locked_contraindications": locked_list,
+            "recommended_treatments": recommended_treatments,
+            "symptom_alleviation_treatments": alleviation_list,
+            "vitals_snapshot": vitals_snapshot,
+            "report_text": "\n".join(lines),
         }

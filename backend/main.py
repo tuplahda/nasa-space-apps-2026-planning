@@ -85,6 +85,7 @@ manager = ConnectionManager()
 
 
 latest_telemetry: Dict[str, Any] | None = None
+latest_earth_report: Dict[str, Any] | None = None
 simulation_lock = RLock()
 offline_simulation_lock = simulation_lock
 
@@ -103,11 +104,123 @@ def run_simulation_command(action: Any, payload: Dict[str, Any]) -> Dict[str, An
     """Validate controls consistently across REST, WebSocket, and offline HTTP."""
     if action == "trigger_scenario":
         return astronaut_sim.trigger_scenario(payload.get("scenario") or payload.get("scenario_id"))
+    if action in ("simulate_crisis", "random_crisis", "trigger_random_crisis"):
+        return simulate_crisis_action(payload)
     if action == "apply_treatment":
         return astronaut_sim.apply_treatment(payload.get("treatment") or payload.get("action"))
     if action == "set_activity":
         return astronaut_sim.set_activity_state(payload.get("activity_state") or payload.get("activity"))
     return {"status": "error", "message": "Unknown simulation command."}
+
+
+@_simulation_locked
+def simulate_crisis_action(payload: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    """
+    Inject a dynamic random temporary vital problem for demo purposes, immediately
+    advance telemetry for RAG decisioning, and capture the automatic Earth report.
+    """
+    global latest_earth_report
+    data = payload if isinstance(payload, dict) else {}
+    only_if_nominal = bool(data.get("only_if_nominal", False))
+    mode_pref = data.get("mode_preference") or data.get("mode")
+    raw_duration = data.get("duration_ticks", 15)
+    try:
+        duration_ticks = max(3, min(120, int(raw_duration)))
+    except (TypeError, ValueError):
+        return {"status": "error", "message": "Invalid duration_ticks parameter."}
+
+    seed = data.get("seed")
+    if seed is not None:
+        try:
+            seed = int(seed)
+        except (TypeError, ValueError):
+            return {"status": "error", "message": "Invalid seed parameter."}
+
+    immediate_ticks = 3
+    sim_result = astronaut_sim.simulate_crisis(
+        only_if_nominal=only_if_nominal,
+        mode_preference=mode_pref,
+        duration_ticks=duration_ticks + immediate_ticks,
+        seed=seed,
+    )
+    if sim_result.get("status") != "ok":
+        return sim_result
+
+    snapshot: Dict[str, Any] | None = None
+    for _ in range(immediate_ticks):
+        snapshot = advance_telemetry()
+
+    decision = (snapshot or {}).get("rag_diagnosis")
+    if decision is None and snapshot is not None:
+        packet = TelemetryPacket.model_validate(snapshot)
+        packet.active_scenario_id = None
+        packet.stateless_evaluation = True
+        assessment = anomaly_detector.evaluate_packet(packet)
+        decision = rag_engine.diagnose(packet, assessment)
+        snapshot["rag_diagnosis"] = decision
+
+    decision = decision or {}
+    earth_report = decision.get("earth_report")
+    if isinstance(earth_report, dict):
+        latest_earth_report = earth_report
+
+    return {
+        "status": "ok",
+        "scenario": sim_result["scenario"],
+        "base_scenario": sim_result["base_scenario"],
+        "mode_hint": sim_result["mode_hint"],
+        "temporary_crisis": True,
+        "auto_recovery_ticks": duration_ticks,
+        "dynamic_perturbation": sim_result.get("dynamic_perturbation", {}),
+        "message": sim_result["message"],
+        "mode": decision.get("mode"),
+        "diagnosis": decision.get("diagnosis"),
+        "confidence": decision.get("confidence"),
+        "confidence_pct": decision.get("confidence_pct"),
+        "confidence_display": decision.get("confidence_display"),
+        "threshold_met_75pct": decision.get("threshold_met_75pct"),
+        "certified_abstention": decision.get("certified_abstention"),
+        "opioids_locked": decision.get("opioids_locked"),
+        "prescriptions": decision.get("prescriptions", []),
+        "symptom_alleviation_treatments": decision.get("symptom_alleviation_treatments", []),
+        "contraindications_locked": decision.get("contraindications_locked", []),
+        "earth_report": earth_report,
+        "report_download_url": "/api/reports/latest/download",
+        "telemetry": snapshot,
+    }
+
+
+@_simulation_locked
+def get_or_create_latest_earth_report() -> Dict[str, Any]:
+    """Return the latest Earth uplink report, generating one from current telemetry if absent."""
+    global latest_earth_report
+    if isinstance(latest_earth_report, dict) and latest_earth_report.get("report_text"):
+        return latest_earth_report
+    snapshot = latest_telemetry if isinstance(latest_telemetry, dict) else advance_telemetry()
+    existing = snapshot.get("rag_diagnosis")
+    if isinstance(existing, dict) and isinstance(existing.get("earth_report"), dict):
+        latest_earth_report = existing["earth_report"]
+        return latest_earth_report
+    packet = TelemetryPacket.model_validate(snapshot)
+    packet.active_scenario_id = None
+    packet.stateless_evaluation = True
+    assessment = anomaly_detector.evaluate_packet(packet)
+    decision = rag_engine.diagnose(packet, assessment)
+    latest_earth_report = decision["earth_report"]
+    return latest_earth_report
+
+
+@_simulation_locked
+def generate_report_from_payload(payload: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    """Generate downloadable Earth report for either posted telemetry or latest state."""
+    global latest_earth_report
+    data = payload if isinstance(payload, dict) else {}
+    if "vitals" in data:
+        rag_result = execute_diagnosis_pipeline(data)
+        report = rag_result["earth_report"]
+        latest_earth_report = report
+        return report
+    return get_or_create_latest_earth_report()
 
 
 @_simulation_locked
@@ -132,6 +245,8 @@ def simulation_state_snapshot() -> Dict[str, Any]:
         "scenario_progression": round(astronaut_sim.scenario_progression, 3),
         "tick_count": astronaut_sim.tick_count,
         "external_dataset_loaded": astronaut_sim.external_dataset_loaded,
+        "dynamic_crisis_label": astronaut_sim.dynamic_crisis_label,
+        "temporary_crisis_ticks_remaining": astronaut_sim.temporary_crisis_ticks_remaining,
     }
 
 
@@ -160,6 +275,8 @@ def simulation_response(path: str):
     if path == "/api/space-weather":
         report = donki_service.get_space_weather(force_active_flare=(astronaut_sim.active_scenario == "solar_flare"))
         return 200, report.to_dict()
+    if path == "/api/reports/latest":
+        return 200, get_or_create_latest_earth_report()
     return 404, {"title": "Not Found", "status": 404}
 
 
@@ -199,6 +316,7 @@ def recovery_diagnosis(
                                      if not any(name in step.lower() for name in blocked)],
         "checs_subpack": " / ".join(sorted({item["checs_pack"] for item in prescriptions})) or "NONE",
     })
+    rag_engine.attach_decision_report(context, packet, assessment)
     context["rag_metrics"]["retrieval_latency_ms"] = 0.0
     return context
 
@@ -217,7 +335,7 @@ def refresh_treatment_options(decision, packet, assessment, policy=None) -> None
 @_simulation_locked
 def advance_telemetry() -> Dict[str, Any]:
     """Advance the shared simulation and publish one snapshot for all readers."""
-    global latest_telemetry
+    global latest_telemetry, latest_earth_report
     was_recovering = astronaut_sim.is_recovering
     packet = astronaut_sim.step()
     payload = packet.model_dump()
@@ -253,13 +371,17 @@ def advance_telemetry() -> Dict[str, Any]:
     if assessment.trigger_rag_consultation:
         try:
             decision = rag_engine.diagnose(packet, assessment)
+            decision["earth_report"] = rag_engine.build_earth_transmission_report(decision, packet, assessment)
             payload["rag_diagnosis"] = decision
+            latest_earth_report = decision["earth_report"]
             if decision.get("mode") == "MODE_A_KNOWN_CONDITION":
                 refresh_treatment_options(decision, packet, assessment)
             else:
                 astronaut_sim.set_treatment_options([])
         except Exception:
             logger.exception("Diagnosis failed for a simulation tick")
+    elif isinstance(payload.get("rag_diagnosis"), dict) and isinstance(payload["rag_diagnosis"].get("earth_report"), dict):
+        latest_earth_report = payload["rag_diagnosis"]["earth_report"]
 
     latest_telemetry = payload
     return payload
@@ -311,9 +433,9 @@ def run_offline_telemetry(stop: Event) -> None:
 
 
 if FASTAPI_AVAILABLE:
-    from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+    from fastapi import Body, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
     from fastapi.middleware.cors import CORSMiddleware
-    from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+    from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -347,6 +469,7 @@ if FASTAPI_AVAILABLE:
         allow_credentials=True,
         allow_methods=["GET", "POST", "OPTIONS"],
         allow_headers=["Content-Type", "Authorization"],
+        expose_headers=["Content-Disposition"],
     )
 
     app.include_router(diagnose_router)
@@ -413,6 +536,48 @@ if FASTAPI_AVAILABLE:
         """
         result = run_simulation_command("trigger_scenario", payload)
         return JSONResponse(result, status_code=command_status(result))
+
+    @app.post("/api/scenarios/simulate-crisis", tags=["Simulation Control"])
+    @app.post("/api/simulate-crisis", tags=["Simulation Control"])
+    async def simulate_crisis_endpoint(
+        payload: Dict[str, Any] | None = Body(default=None),
+    ) -> JSONResponse:
+        """
+        Demo endpoint: inject a random temporary vital crisis (especially when nominal),
+        evaluate through Layer 2/3 RAG, and auto-generate a downloadable Earth report.
+        """
+        result = run_simulation_command("simulate_crisis", payload or {})
+        return JSONResponse(result, status_code=command_status(result))
+
+    @app.get("/api/reports/latest", tags=["Earth Uplink Reports"])
+    async def latest_earth_report_endpoint() -> Dict[str, Any]:
+        """Return the latest automatically generated Earth uplink clinical report."""
+        return simulation_response("/api/reports/latest")[1]
+
+    @app.get("/api/reports/latest/download", tags=["Earth Uplink Reports"])
+    async def download_latest_earth_report_endpoint() -> Response:
+        """Download the latest auto-generated Earth uplink report as a text file attachment."""
+        report = get_or_create_latest_earth_report()
+        return Response(
+            content=report["report_text"],
+            media_type="text/plain; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{report["filename"]}"'},
+        )
+
+    @app.post("/api/reports/download", tags=["Earth Uplink Reports"])
+    async def download_custom_earth_report_endpoint(
+        payload: Dict[str, Any] | None = Body(default=None),
+    ) -> Response:
+        """Generate and download an Earth uplink report for telemetry or latest assessment."""
+        try:
+            report = generate_report_from_payload(payload)
+        except (ValueError, TypeError) as exc:
+            raise HTTPException(status_code=422, detail="Invalid telemetry payload.") from exc
+        return Response(
+            content=report["report_text"],
+            media_type="text/plain; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{report["filename"]}"'},
+        )
 
     @app.post("/api/treatments/apply", tags=["Simulation Control"])
     async def apply_treatment_endpoint(payload: Dict[str, Any]) -> JSONResponse:
@@ -497,11 +662,14 @@ OFFLINE_API_DOCS = """<!DOCTYPE html>
     <div class="endpoint">
       <div><span class="method-post">POST</span><span class="path">/api/scenarios/trigger</span> — Inject Crisis Scenario</div>
       <p style="font-size:13px;color:#94a3b8;">Use these demo shortcuts or get the full scenario list.</p>
+      <button onclick="sendPost('/api/scenarios/simulate-crisis', JSON.stringify({}), 'scenarioResp')">Simulate Random Crisis</button>
       <button onclick="sendPost('/api/scenarios/trigger', JSON.stringify({scenario: 'hypercapnia'}), 'scenarioResp')">Trigger Hypercapnia</button>
       <button onclick="sendPost('/api/scenarios/trigger', JSON.stringify({scenario: 'solar_flare'}), 'scenarioResp')">Trigger Solar Flare</button>
       <button onclick="sendPost('/api/scenarios/trigger', JSON.stringify({scenario: 'zero_day'}), 'scenarioResp')">Trigger Mode B Demo</button>
       <button onclick="sendPost('/api/scenarios/trigger', JSON.stringify({scenario: 'nominal'}), 'scenarioResp')">Reset to Nominal</button>
       <button onclick="sendGet('/api/scenarios/list', 'scenarioResp')">List Scenarios</button>
+      <button onclick="sendGet('/api/reports/latest', 'scenarioResp')">Inspect Latest Earth Report</button>
+      <a href="/api/reports/latest/download" download style="text-decoration:none;"><button type="button">Download Earth Report (.txt)</button></a>
       <pre id="scenarioResp">// Scenario response will appear here...</pre>
     </div>
 
@@ -588,18 +756,30 @@ def render_offline_api_docs(*, include_openapi: bool = False) -> str:
 class AresMedStdlibRequestHandler(BaseHTTPRequestHandler):
     """Zero-dependency standard-library HTTP handler for air-gapped operation."""
 
+    def _send_cors_headers(self) -> None:
+        origin = self.headers.get("Origin", "http://localhost:8000")
+        allowed = origin if origin in ALLOWED_ORIGINS else "http://localhost:8000"
+        self.send_header("Access-Control-Allow-Origin", allowed)
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        self.send_header("Access-Control-Expose-Headers", "Content-Disposition")
+
     def _send_json(self, status_code: int, payload: Dict[str, Any]) -> None:
         body = json.dumps(payload, indent=2).encode("utf-8")
         self.send_response(status_code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
-        origin = self.headers.get("Origin", "http://localhost:8000")
-        if origin in ALLOWED_ORIGINS:
-            self.send_header("Access-Control-Allow-Origin", origin)
-        else:
-            self.send_header("Access-Control-Allow-Origin", "http://localhost:8000")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        self._send_cors_headers()
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _send_text_download(self, status_code: int, text: str, filename: str) -> None:
+        body = text.encode("utf-8")
+        self.send_response(status_code)
+        self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+        self.send_header("Content-Length", str(len(body)))
+        self._send_cors_headers()
         self.end_headers()
         self.wfile.write(body)
 
@@ -618,6 +798,10 @@ class AresMedStdlibRequestHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         if parsed.path in ("/", "/docs", "/redoc"):
             self._send_html(200, render_offline_api_docs())
+            return
+        if parsed.path == "/api/reports/latest/download":
+            report = get_or_create_latest_earth_report()
+            self._send_text_download(200, report["report_text"], report["filename"])
             return
         status, snapshot = simulation_response(parsed.path)
         if status != 404:
@@ -661,12 +845,24 @@ class AresMedStdlibRequestHandler(BaseHTTPRequestHandler):
 
         action = {
             "/api/scenarios/trigger": "trigger_scenario",
+            "/api/scenarios/simulate-crisis": "simulate_crisis",
+            "/api/simulate-crisis": "simulate_crisis",
             "/api/treatments/apply": "apply_treatment",
             "/api/simulation/activity": "set_activity",
         }.get(parsed.path)
         if action:
             result = run_simulation_command(action, data)
             self._send_json(command_status(result), result)
+            return
+
+        if parsed.path == "/api/reports/download":
+            try:
+                report = generate_report_from_payload(data)
+            except (ValueError, TypeError):
+                self._send_json(422, {"detail": [{"loc": ["body"], "type": "value_error",
+                                                "msg": "Invalid telemetry payload."}]})
+                return
+            self._send_text_download(200, report["report_text"], report["filename"])
             return
 
         if parsed.path == "/api/scenarios/cure":
