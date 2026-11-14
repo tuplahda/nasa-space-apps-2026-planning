@@ -215,7 +215,7 @@
       "evidence_class": "synthetic",
       "time_scale": "10-60 min exposure-dependent",
       "vector": { "dHR_bpm": 20, "dSBP_mmHg": -5, "dDBP_mmHg": -2, "dSpO2_pct": 0, "dRR_bpm": 6, "dTcore_C": 0.0, "dRMSSD_pct": -30 },
-      "symptoms": "Headache, dizziness, nausea, weakness, chest pain, confusion.",
+      "symptoms": "I have a headache, dizziness, nausea, weakness, and chest pain. The cabin carbon monoxide detector alarm sounded.",
       "guardrail": "Conventional SpO2 may be falsely reassuring (0*); add hidden COHb state and mark saturation untrusted."
     },
     {
@@ -380,7 +380,7 @@
       "evidence_class": "synthetic",
       "time_scale": "Minutes-hours; adaptation days",
       "vector": { "dHR_bpm": 20, "dSBP_mmHg": 5, "dDBP_mmHg": 3, "dSpO2_pct": 0, "dRR_bpm": 4, "dTcore_C": 0.1, "dRMSSD_pct": -20 },
-      "symptoms": "Nausea, vomiting, pallor, sweating, malaise, disorientation.",
+      "symptoms": "Turning my head in microgravity brings on nausea, vomiting, and disorientation. The nausea eases when I hold my head still.",
       "guardrail": "Subsequent dehydration is a separate cumulative state."
     },
     {
@@ -420,7 +420,7 @@
       "evidence_class": "synthetic",
       "time_scale": "18-36 h and cumulative",
       "vector": { "dHR_bpm": 8, "dSBP_mmHg": 3, "dDBP_mmHg": 2, "dSpO2_pct": 0, "dRR_bpm": 1, "dTcore_C": 0.1, "dRMSSD_pct": -15 },
-      "symptoms": "Sleepiness, attention lapses, irritability and slowed cognition.",
+      "symptoms": "I missed most of my last two sleep periods. I have persistent sleepiness, attention lapses, and slowed cognition.",
       "guardrail": "Large acute vital changes are not required; use performance and sleep history."
     },
     {

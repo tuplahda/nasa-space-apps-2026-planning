@@ -141,15 +141,15 @@ def test_slow_websocket_does_not_delay_fast_client():
     asyncio.run(check())
 
 
-def test_live_replay_reports_known_matches_and_unsupported_abstentions():
+@pytest.mark.parametrize("activity_state", ["IVA_REST", "SLEEP", "ARED_EXERCISE", "EVA_SPACEWALK"])
+@pytest.mark.parametrize("mission_day", [3, 84])
+def test_live_replay_matches_protocols_across_activity_baselines(activity_state, mission_day):
     from backend.evaluate_blind_seeds import evaluate_live_simulation
 
-    result = evaluate_live_simulation()
+    result = evaluate_live_simulation(activity_state=activity_state, mission_day=mission_day)
     assert result["cases"] == 30
-    assert result["known_condition_cases"] == 22
-    assert result["known_condition_matches"] >= 20
-    assert result["unsupported_cases"] == result["correct_abstentions"] == 8
-    assert all(case["mode"] == "MODE_B_NOVEL_ANOMALY" for case in result["failures"])
+    assert result["known_condition_cases"] == result["known_condition_matches"] == 22, result["failures"]
+    assert result["unsupported_cases"] == result["correct_abstentions"] == 8, result["failures"]
 
 
 def test_simulator_label_cannot_force_abstention_for_known_evidence(engine):
@@ -168,12 +168,3 @@ def test_validity_check_rejects_incorrect_pack_without_silently_repairing_it(eng
     result = renal_response(engine)
     result["prescriptions"][0]["checs_pack"] = "FAKE"
     assert not _check_mode_a_validity(engine, result)
-
-
-@pytest.mark.parametrize("activity_state", ["SLEEP", "ARED_EXERCISE"])
-def test_unmapped_conditions_remain_abstentions_across_activity_baselines(activity_state):
-    from backend.evaluate_blind_seeds import evaluate_live_simulation
-
-    result = evaluate_live_simulation(activity_state=activity_state, mission_day=3)
-    assert result["cases"] == 30
-    assert result["unsupported_cases"] == result["correct_abstentions"] == 8

@@ -1538,20 +1538,31 @@ class LocalMedicalRAGEngine:
         # --- Sleep Deprivation / Circadian / Panic (SCENARIO_6 / CPG-31 / CPG-32) ---
         if sid in ("SCENARIO_6_CIRCADIAN_SLEEP", "CPG-32"):
             if (
+                effective_co2 >= 2.6 or rad_level >= 0.25
+                or e.donki_spe_active or abnormal_infection_temp
+            ):
+                return -0.15
+            if (
                 sid == "CPG-32"
                 and "sleepiness" in sym
                 and any(k in sym for k in ("attention lapse", "slowed cognition"))
-                and hrv_valid and v.hrv_ms <= 50.0
-                and effective_co2 < 2.6 and rad_level < 0.25
+                and ("sleep periods" in sym or (hrv_valid and v.hrv_ms <= 50.0))
             ):
                 return 0.85
-            if act == "SLEEP" and ((hr_valid and v.heart_rate >= 62.0) or (hrv_valid and v.hrv_ms <= 22.0) or (temp_valid and v.core_temp_c >= 37.5)):
+            sleep_complaint = any(k in sym for k in (
+                "cant sleep", "can't sleep", "cannot sleep", "awakenings", "sleepiness",
+                "sleep depriv", "circadian", "sleep fragmentation", "insomnia",
+            ))
+            if not sleep_complaint:
+                return 0.0
+            if act == "SLEEP" and (
+                (hr_valid and v.heart_rate >= 62.0)
+                or (hrv_valid and v.hrv_ms <= 22.0)
+                or (temp_valid and v.core_temp_c >= 37.5)
+            ):
                 return 0.83 if sid == "SCENARIO_6_CIRCADIAN_SLEEP" else 0.78
-            if any(k in sym for k in ("sleepiness", "sleep depriv", "attention lapse", "irritability", "slowed cognition", "circadian", "sleep fragmentation", "insomnia")):
-                if ((hr_valid and v.heart_rate >= 76.0) or (hrv_valid and v.hrv_ms <= 46.0)) and effective_co2 < 2.6 and rad_level < 0.25:
-                    return 0.85 if sid == "CPG-32" else 0.78
-            if hrv_valid and v.hrv_ms <= 22.0 and effective_co2 < 2.8 and rad_level < 0.2 and "bends" not in sym:
-                return 0.25
+            if (hr_valid and v.heart_rate >= 76.0) or (hrv_valid and v.hrv_ms <= 46.0):
+                return 0.85 if sid == "CPG-32" else 0.78
             return 0.0
 
         if sid == "CPG-31":
@@ -1629,6 +1640,11 @@ class LocalMedicalRAGEngine:
         if sid == "CPG-12":
             if effective_co2 >= 2.8 or rad_level >= 0.25:
                 return -0.10
+            if (
+                "carbon monoxide detector" in sym and "alarm" in sym
+                and "headache" in sym and any(k in sym for k in ("dizziness", "nausea"))
+            ):
+                return 0.88
             if any(k in sym for k in ("carbon monoxide", "cohb", "carboxyhemoglobin", "smoke", "soot", "hoarseness", "fire")) and ((hr_valid and v.heart_rate >= 82.0) or (rr_valid and v.respiration_rate >= 18.0)):
                 return 0.87
             if (
@@ -1646,6 +1662,12 @@ class LocalMedicalRAGEngine:
                 return -0.10
             if any(k in sym for k in ("rlq", "appendic", "flank", "groin", "confused", "confusion")):
                 return -0.10
+            if (
+                any(k in sym for k in ("turning my head", "head movement"))
+                and any(k in sym for k in ("head still", "keeping still"))
+                and "nausea" in sym and any(k in sym for k in ("vomit", "disorientation"))
+            ):
+                return 0.85
             if (
                 any(k in sym for k in ("motion", "vestibular", "disorientation", "pallor", "malaise"))
                 and any(k in sym for k in ("nausea", "vomit", "emesis"))
@@ -1673,7 +1695,7 @@ class LocalMedicalRAGEngine:
                 return 0.86
             if (
                 abnormal_infection_temp and bp_valid and v.blood_pressure_sys <= 94.0
-                and rr_valid and v.respiration_rate >= 22.0
+                and ((rr_valid and v.respiration_rate >= 22.0) or (spo2_valid and v.spo2 <= 94.0))
                 and act != "EVA_SPACEWALK"
             ):
                 return 0.86
@@ -1704,7 +1726,8 @@ class LocalMedicalRAGEngine:
         if sid == "CPG-23":
             if (
                 "tooth pain" in sym and "swelling" in sym
-                and "chewing" in sym and temp_valid and v.core_temp_c >= 37.8
+                and "chewing" in sym and temp_valid
+                and (v.core_temp_c >= 37.8 or ("fever" in sym and v.core_temp_c >= 37.4))
             ):
                 return 0.85
             if (
