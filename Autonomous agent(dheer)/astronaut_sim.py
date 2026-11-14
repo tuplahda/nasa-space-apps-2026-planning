@@ -3,8 +3,9 @@ Autonomous Astronaut Agent (Digital Twin) Simulation Engine.
 
 Simulates Cmdr. Maya Lin (ASTRO-01) on a continuous 1000ms tick:
 - Sinus respiratory arrhythmia (+/- 3 bpm modulated by breathing rate).
-- Microgravity baseline adaptations across SLEEP, IVA_REST, ARED_EXERCISE, EVA_SPACEWALK.
-- Emergency crisis injection curves (hypercapnia, solar_flare, sans, decompression, dehydration).
+- Microgravity baseline adaptations across SLEEP, IVA_REST, ARED_EXERCISE, EVA_SPACEWALK
+  aligned with NASA-STD-3001 and ESA Space Fever findings (adapted post-FD75).
+- Integrated with data/simulation_scenario_seeds.json (6 quantitative trajectories + 24 seeds).
 - Closed-loop exponential washout recovery when countermeasures are administered.
 - Seamless hybrid dataset ingestion from data/nasa_official_dataset/ when available.
 
@@ -31,6 +32,7 @@ from backend.services.donki_service import donki_service
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 NASA_DATASET_DIR = DATA_DIR / "nasa_official_dataset"
 BASELINES_FILE = DATA_DIR / "nasa_baselines_and_thresholds.json"
+SEEDS_FILE = DATA_DIR / "simulation_scenario_seeds.json"
 
 
 class ActivityBaseline:
@@ -55,6 +57,7 @@ class ActivityBaseline:
         self.rr_base = rr_base
 
 
+# Microgravity baselines adjusted for Mission Day 84 (post-FD75 adaptation) per NASA-STD-3001 v2.0
 ACTIVITY_PROFILES: Dict[str, ActivityBaseline] = {
     "SLEEP": ActivityBaseline(
         hr_base=48.0,
@@ -62,7 +65,7 @@ ACTIVITY_PROFILES: Dict[str, ActivityBaseline] = {
         dbp_base=62.0,
         spo2_base=98.5,
         hrv_base=72.0,
-        temp_base=36.3,
+        temp_base=37.1,  # Post-FD75 sleep core temp (36.8-37.3)
         rr_base=12.0,
     ),
     "IVA_REST": ActivityBaseline(
@@ -71,7 +74,7 @@ ACTIVITY_PROFILES: Dict[str, ActivityBaseline] = {
         dbp_base=70.0,
         spo2_base=98.0,
         hrv_base=54.0,
-        temp_base=36.8,
+        temp_base=37.6,  # Post-FD75 space fever resting baseline (37.4-38.0)
         rr_base=14.0,
     ),
     "ARED_EXERCISE": ActivityBaseline(
@@ -80,7 +83,7 @@ ACTIVITY_PROFILES: Dict[str, ActivityBaseline] = {
         dbp_base=78.0,
         spo2_base=96.8,
         hrv_base=20.0,
-        temp_base=37.8,
+        temp_base=38.8,  # ARED heavy exercise thermal range (38.2-39.6)
         rr_base=28.0,
     ),
     "EVA_SPACEWALK": ActivityBaseline(
@@ -89,7 +92,7 @@ ACTIVITY_PROFILES: Dict[str, ActivityBaseline] = {
         dbp_base=76.0,
         spo2_base=97.5,
         hrv_base=32.0,
-        temp_base=37.2,
+        temp_base=38.0,  # EVA operational range (37.6-38.8)
         rr_base=20.0,
     ),
 }
@@ -127,10 +130,40 @@ class AstronautSimulationEngine:
         # Mission Elapsed Time base (Day 84, 10:15:00)
         self.met_seconds: int = (84 * 86400) + (10 * 3600) + (15 * 60)
 
+        # Loaded scenario seeds and trajectories
+        self.trajectory_library: Dict[str, Any] = {}
+        self.seed_library: Dict[str, Any] = {}
+        self._load_scenario_seeds()
+
         # Baseline overrides if external official NASA dataset is discovered
         self.external_dataset_loaded: bool = False
         self.external_rows: List[Dict[str, Any]] = []
         self._check_and_load_external_nasa_dataset()
+
+    def _load_scenario_seeds(self) -> None:
+        """Load quantitative crisis trajectories and synthetic scenario seeds."""
+        if not SEEDS_FILE.exists():
+            return
+        try:
+            with open(SEEDS_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            trajs = data.get("quantitative_crisis_trajectories_and_symptom_logs", [])
+            for t in trajs:
+                tid = t.get("trajectory_id", "").lower()
+                self.trajectory_library[tid] = t
+                legacy = t.get("linked_legacy_scenario", "").lower()
+                if legacy:
+                    self.trajectory_library[legacy] = t
+
+            seeds = data.get("synthetic_scenario_seeds_24", [])
+            for s in seeds:
+                sid = s.get("seed_id", "").lower()
+                self.seed_library[sid] = s
+                name = s.get("name", "").lower()
+                if name:
+                    self.seed_library[name] = s
+        except Exception:
+            pass
 
     def _check_and_load_external_nasa_dataset(self) -> None:
         """
@@ -174,7 +207,8 @@ class AstronautSimulationEngine:
     def trigger_scenario(self, scenario_name: str) -> Dict[str, Any]:
         """
         Inject a crisis scenario into the digital twin.
-        Supported: 'nominal', 'hypercapnia', 'solar_flare', 'sans', 'decompression', 'dehydration'
+        Supports core trajectories ('hypercapnia', 'solar_flare', 'sans', 'decompression',
+        'heat_strain', 'orthostatic_intolerance') as well as 24 seed IDs ('SEED-TOX-01', etc.).
         """
         normalized = scenario_name.lower().strip()
         if normalized in ("nominal", "normal", "healthy", "baseline"):
@@ -272,21 +306,20 @@ class AstronautSimulationEngine:
         rr_base = baseline.rr_base
 
         # Sinus respiratory arrhythmia oscillation (+/- 3 bpm modulated by respiration rate)
-        # Frequency in Hz = respiration_rate / 60
         resp_freq_hz = rr_base / 60.0
         sinus_arrhythmia = 3.0 * math.sin(2.0 * math.pi * resp_freq_hz * self.tick_count)
 
-        # Subtle organic noise (+/- 0.4 bpm, +/- 0.3 mmHg, +/- 0.03 deg C)
+        # Subtle organic noise (+/- 0.4 bpm, +/- 0.3 mmHg, +/- 0.02 deg C)
         noise_hr = random.uniform(-0.4, 0.4)
         noise_bp = random.uniform(-0.3, 0.3)
-        noise_temp = random.uniform(-0.03, 0.03)
+        noise_temp = random.uniform(-0.02, 0.02)
 
         # Environmental defaults
         cabin_co2 = 2.4  # nominal mmHg
         cabin_ppo2 = 160.0
         suit_pressure = 4.3 if self.activity_state == "EVA_SPACEWALK" else 14.7
         space_weather = donki_service.get_space_weather(
-            force_active_flare=(self.active_scenario == "solar_flare")
+            force_active_flare=(self.active_scenario in ("solar_flare", "traj-ars-spe"))
         )
         ambient_radiation = space_weather.ambient_radiation_msv_h
         donki_spe_active = space_weather.spe_active
@@ -295,39 +328,40 @@ class AstronautSimulationEngine:
 
         # Scenario-specific physiological shifts
         p = self.scenario_progression
+        scen = self.active_scenario
 
-        if self.active_scenario == "hypercapnia":
-            # CO2 rises up to 12.8 mmHg
+        if scen in ("hypercapnia", "traj-hypercapnia", "scenario_1_hypercapnia"):
             cabin_co2 = 2.4 + (10.4 * p)
             delta_co2 = max(0.0, cabin_co2 - 2.0)
-            # Official Layer 1 physiological equations from data/rag_protocols_8_scenarios.json
             rr_base += 0.45 * delta_co2
             hr_base += 1.8 * delta_co2
             sbp_base += 1.4 * delta_co2
             dbp_base += 0.6 * delta_co2
             hrv_base = max(10.0, hrv_base - (2.2 * delta_co2))
-            if p > 0.6:
+            if p < 0.4:
                 symptom_log = (
-                    "Mild throbbing frontal headache behind temples; slight exertional dyspnea."
+                    "Woke up with a dull frontal pressure headache and mild facial warmth; sleep felt fragmented."
                 )
-            if p > 0.85:
+            elif p < 0.8:
                 symptom_log = (
-                    "Severe throbbing headache, facial flushing, lethargy, trigeminal dysesthesia."
+                    "Frontal headache is throbbing now with mild nausea, malaise, and strange tingling along cheek and jaw; breathing feels deeper at rest."
+                )
+            else:
+                symptom_log = (
+                    "Severe air hunger and chest heaving, pounding headache, dizzy and losing track of checklist steps."
                 )
 
-        elif self.active_scenario == "solar_flare":
+        elif scen in ("solar_flare", "traj-ars-spe", "scenario_4_solar_radiation_ars"):
             ambient_radiation = 0.065 + (4.785 * p)
             donki_spe_active = True
             hr_base += 14.0 * p
             rr_base += 4.0 * p
             hrv_base = max(12.0, hrv_base - (15.0 * p))
-            if p > 0.5:
-                symptom_log = (
-                    "Personal dosimeter warning alarm active; subtle metallic taste on tongue; visual phosphenes."
-                )
+            symptom_log = (
+                "Personal dosimeter warning alarm active; subtle metallic taste on tongue; visual phosphenes."
+            )
 
-        elif self.active_scenario == "sans":
-            # Neuro-ocular syndrome: cephalad fluid shift, mild blood pressure elevation
+        elif scen in ("sans", "traj-sans", "scenario_2_sans"):
             sbp_base += 12.0 * p
             dbp_base += 6.0 * p
             hr_base += 4.0 * p
@@ -335,8 +369,7 @@ class AstronautSimulationEngine:
                 "Progressive hyperopic blur when reading checklists; globe tightness and mild retrobulbar fullness."
             )
 
-        elif self.active_scenario == "decompression":
-            # Suit/cabin pressure loss down to 3.2 psi
+        elif scen in ("decompression", "hypoxia", "traj-hypoxia", "scenario_3_decompression_hypoxia"):
             suit_pressure = 4.3 - (1.1 * p)
             spo2_base = max(76.0, spo2_base - (17.5 * p))
             hr_base += 38.0 * p
@@ -345,13 +378,38 @@ class AstronautSimulationEngine:
                 "Suit pressure drop alert; ear tympanic pain, acute dyspnea, and hypoxic lightheadedness."
             )
 
-        elif self.active_scenario == "dehydration":
+        elif scen in ("heat_strain", "traj-eva-heat-strain"):
+            temp_base = min(39.2, temp_base + (1.2 * p))
+            hr_base += 26.0 * p
+            rr_base += 6.0 * p
+            hrv_base = max(14.0, hrv_base - (18.0 * p))
+            symptom_log = (
+                "Spacesuit internal temperature rising rapidly; heavy profuse sweating in LCVG, heart pounding against ribs."
+            )
+
+        elif scen in ("orthostatic_intolerance", "traj-orthostatic-intolerance"):
+            sbp_base = max(86.0, sbp_base - (24.0 * p))
+            dbp_base = max(52.0, dbp_base - (16.0 * p))
+            hr_base += 34.0 * p
+            hrv_base = max(12.0, hrv_base - (24.0 * p))
+            symptom_log = (
+                "Profound dizziness and graying vision upon standing; extreme lightheadedness, nausea."
+            )
+
+        elif scen in ("dehydration",):
             sbp_base = max(88.0, sbp_base - (20.0 * p))
             hr_base += 28.0 * p
             hrv_base = max(14.0, hrv_base - (22.0 * p))
             symptom_log = (
                 "Orthostatic tachycardia on movement; profound dry oral mucosa and general lethargy."
             )
+
+        # Generic seed fallback if a specific SEED-* was requested
+        elif scen in self.seed_library:
+            seed_info = self.seed_library[scen]
+            hr_base += 20.0 * p
+            rr_base += 6.0 * p
+            symptom_log = f"Reported anomaly: {seed_info.get('name', 'Unspecified issue')}. Somatic discomfort noted."
 
         # Override symptom log during recovery
         if self.is_recovering:
@@ -391,7 +449,7 @@ class AstronautSimulationEngine:
         )
 
         specialized = None
-        if self.active_scenario == "sans":
+        if scen in ("sans", "traj-sans", "scenario_2_sans"):
             rnfl = 95.0 + (18.0 * math.log(1.0 + (max(0, self.mission_day - 15) / 30.0)))
             specialized = SpecializedDiagnostics(
                 oct_rnfl_thickness_um=round(rnfl, 1),
