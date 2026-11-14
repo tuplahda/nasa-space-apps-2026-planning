@@ -20,7 +20,7 @@ import logging
 import os
 from threading import Event, RLock, Thread
 from time import monotonic
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Literal
 from urllib.parse import parse_qs, urlparse
 
 os.environ.setdefault("SystemRoot", r"C:\Windows")
@@ -300,6 +300,25 @@ def generate_report_from_payload(payload: Dict[str, Any] | None = None) -> Dict[
         latest_earth_report = report
         return report
     return get_or_create_latest_earth_report()
+
+
+def prepare_earth_report_download(report: Dict[str, Any], output_format: str) -> tuple[bytes, str, str]:
+    """Return attachment bytes, filename, and content type while preserving text as the default."""
+    normalized_format = str(output_format or "txt").strip().lower()
+    if normalized_format == "txt":
+        return (
+            str(report.get("report_text") or "").encode("utf-8"),
+            str(report.get("filename") or "ares_med_earth_report.txt"),
+            "text/plain; charset=utf-8",
+        )
+    if normalized_format == "pdf":
+        from backend.services.report_pdf import render_earth_report_pdf
+
+        content = render_earth_report_pdf(report)
+        source_filename = os.path.basename(str(report.get("filename") or "ares_med_earth_report.txt"))
+        filename = f"{os.path.splitext(source_filename)[0]}.pdf"
+        return content, filename, "application/pdf"
+    raise ValueError("Unsupported report format. Use 'txt' or 'pdf'.")
 
 
 @_simulation_locked
@@ -690,20 +709,25 @@ if FASTAPI_AVAILABLE:
         return simulation_response("/api/reports/latest")[1]
 
     @app.get("/api/reports/latest/download", tags=["Earth Uplink Reports"])
-    async def download_latest_earth_report_endpoint() -> Response:
-        """Download the latest auto-generated Earth uplink report as a text file attachment."""
+    async def download_latest_earth_report_endpoint(format: Literal["txt", "pdf"] = "txt") -> Response:
+        """Download the latest auto-generated Earth uplink report as text or PDF."""
         report = get_or_create_latest_earth_report()
         if report.get("status") == "pending":
             return JSONResponse(report, status_code=409)
+        try:
+            content, filename, media_type = prepare_earth_report_download(report, format)
+        except RuntimeError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
         return Response(
-            content=report["report_text"],
-            media_type="text/plain; charset=utf-8",
-            headers={"Content-Disposition": f'attachment; filename="{report["filename"]}"'},
+            content=content,
+            media_type=media_type,
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
 
     @app.post("/api/reports/download", tags=["Earth Uplink Reports"])
     async def download_custom_earth_report_endpoint(
         payload: Dict[str, Any] | None = Body(default=None),
+        format: Literal["txt", "pdf"] = "txt",
     ) -> Response:
         """Generate and download an Earth uplink report for telemetry or latest assessment."""
         try:
@@ -712,10 +736,14 @@ if FASTAPI_AVAILABLE:
             raise HTTPException(status_code=422, detail="Invalid telemetry payload.") from exc
         if report.get("status") == "pending":
             return JSONResponse(report, status_code=409)
+        try:
+            content, filename, media_type = prepare_earth_report_download(report, format)
+        except RuntimeError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
         return Response(
-            content=report["report_text"],
-            media_type="text/plain; charset=utf-8",
-            headers={"Content-Disposition": f'attachment; filename="{report["filename"]}"'},
+            content=content,
+            media_type=media_type,
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
 
     @app.post("/api/treatments/apply", tags=["Simulation Control"])
@@ -936,8 +964,11 @@ class AresMedStdlibRequestHandler(BaseHTTPRequestHandler):
 
     def _send_text_download(self, status_code: int, text: str, filename: str) -> None:
         body = text.encode("utf-8")
+        self._send_download(status_code, body, filename, "text/plain; charset=utf-8")
+
+    def _send_download(self, status_code: int, body: bytes, filename: str, media_type: str) -> None:
         self.send_response(status_code)
-        self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self.send_header("Content-Type", media_type)
         self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
         self.send_header("Content-Length", str(len(body)))
         self._send_cors_headers()
@@ -965,7 +996,16 @@ class AresMedStdlibRequestHandler(BaseHTTPRequestHandler):
             if report.get("status") == "pending":
                 self._send_json(409, report)
                 return
-            self._send_text_download(200, report["report_text"], report["filename"])
+            output_format = parse_qs(parsed.query).get("format", ["txt"])[0]
+            try:
+                content, filename, media_type = prepare_earth_report_download(report, output_format)
+            except ValueError as exc:
+                self._send_json(400, {"detail": str(exc)})
+                return
+            except RuntimeError as exc:
+                self._send_json(503, {"detail": str(exc)})
+                return
+            self._send_download(200, content, filename, media_type)
             return
         status, snapshot = simulation_response(parsed.path)
         if status != 404:
@@ -1030,7 +1070,16 @@ class AresMedStdlibRequestHandler(BaseHTTPRequestHandler):
             if report.get("status") == "pending":
                 self._send_json(409, report)
                 return
-            self._send_text_download(200, report["report_text"], report["filename"])
+            output_format = parse_qs(parsed.query).get("format", ["txt"])[0]
+            try:
+                content, filename, media_type = prepare_earth_report_download(report, output_format)
+            except ValueError as exc:
+                self._send_json(400, {"detail": str(exc)})
+                return
+            except RuntimeError as exc:
+                self._send_json(503, {"detail": str(exc)})
+                return
+            self._send_download(200, content, filename, media_type)
             return
 
         if parsed.path == "/api/scenarios/cure":
