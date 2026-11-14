@@ -21,6 +21,7 @@ import json
 import math
 from pathlib import Path
 import random
+from copy import copy
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -177,9 +178,11 @@ class AstronautSimulationEngine:
         self.recovery_start: float = 0.0
         self.incident_id: int = 0
         self._treatment_options: set[str] = set()
+        self._treatment_policy_key = None
         self._latest_packet: Optional[TelemetryPacket] = None
         self._readiness_score: Optional[int] = None
         self._readiness_tick: int = -1
+        self._readiness_detector = None
 
         # Mission Elapsed Time base (Day 84, 10:15:00)
         self.met_seconds: int = (84 * 86400) + (10 * 3600) + (15 * 60)
@@ -293,10 +296,12 @@ class AstronautSimulationEngine:
         elif self._latest_packet is not None and self._readiness_tick != self.tick_count:
             from backend.services.anomaly_detector import EdgeAnomalyDetector
 
-            observation = TelemetryPacket.model_validate(self._latest_packet.model_dump())
+            if self._readiness_detector is None:
+                self._readiness_detector = EdgeAnomalyDetector()
+            observation = copy(self._latest_packet)
             observation.active_scenario_id = None
             observation.stateless_evaluation = True
-            assessment = EdgeAnomalyDetector().evaluate_packet(observation)
+            assessment = self._readiness_detector.evaluate_packet(observation)
             self._readiness_score = assessment.readiness_score_0_100
             self._readiness_tick = self.tick_count
         # Determine time of day from mission elapsed time
@@ -348,6 +353,7 @@ class AstronautSimulationEngine:
         if normalized in ("nominal", "normal", "healthy", "baseline"):
             self.incident_id += 1
             self._treatment_options.clear()
+            self._treatment_policy_key = None
             self.active_scenario = "nominal"
             self.target_progression = 0.0
             self.scenario_progression = 0.0
@@ -366,6 +372,7 @@ class AstronautSimulationEngine:
             return {"status": "error", "message": "Unknown simulation scenario."}
         self.incident_id += 1
         self._treatment_options.clear()
+        self._treatment_policy_key = None
         if self.active_scenario != normalized:
             self.scenario_progression = 0.0
         self.active_scenario = normalized
@@ -378,9 +385,10 @@ class AstronautSimulationEngine:
             "message": f"Injected scenario: {normalized}. Vitals trending into crisis.",
         }
 
-    def set_treatment_options(self, treatments: List[str]) -> None:
+    def set_treatment_options(self, treatments: List[str], policy_key=None) -> None:
         """Register exact countermeasure names from the current filtered RAG decision."""
         self._treatment_options = {" ".join(value.lower().split()) for value in treatments if value.strip()}
+        self._treatment_policy_key = policy_key
 
     def apply_treatment(self, treatment_name: str) -> Dict[str, Any]:
         """
@@ -441,6 +449,7 @@ class AstronautSimulationEngine:
                 self.active_scenario = "nominal"
                 self.active_treatment = None
                 self._treatment_options.clear()
+                self._treatment_policy_key = None
         else:
             if self.scenario_progression < self.target_progression:
                 self.scenario_progression = min(

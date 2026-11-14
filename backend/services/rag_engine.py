@@ -26,12 +26,16 @@ real-time clinical triage (<1ms execution, 100% air-gapped, zero external DB/Doc
 """
 
 import csv
+from collections import OrderedDict
+from copy import deepcopy
+from functools import wraps
 import hashlib
 import json
 import math
 from pathlib import Path
 import re
 import time
+from threading import RLock
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from backend.models.telemetry import AnomalyAssessment, TelemetryPacket
@@ -454,6 +458,15 @@ def _cosine_similarity_sparse(vec_a: Dict[str, float], vec_b: Dict[str, float]) 
     return max(0.0, min(1.0, dot))
 
 
+def _knowledge_locked(method):
+    """Serialize knowledge reloads and cache/index access across server threads."""
+    @wraps(method)
+    def locked(self, *args, **kwargs):
+        with self._knowledge_lock:
+            return method(self, *args, **kwargs)
+    return locked
+
+
 class LocalMedicalRAGEngine:
     """
     High-Speed, 100% Offline, Zero-Hallucination NASA Level V RAG Medical Officer Engine.
@@ -461,6 +474,11 @@ class LocalMedicalRAGEngine:
     """
 
     def __init__(self) -> None:
+        self._knowledge_lock = RLock()
+        self._medication_name_split = re.compile(
+            r"\s+\d+(?:[.,]\d+)?(?:-\d+(?:[.,]\d+)?)?\s*(?:mg|mcg|g|mL|L)\b|\s+(?:PO|IV|IM|SC|ODT)\b",
+            re.IGNORECASE,
+        )
         self.protocols: List[Dict[str, Any]] = []
         self.protocol_by_id: Dict[str, Dict[str, Any]] = {}
         self.arxiv_citations: List[Dict[str, Any]] = []
@@ -473,7 +491,13 @@ class LocalMedicalRAGEngine:
         self.research_notes_loaded: bool = False
         self.dynamic_docs_loaded: List[str] = []
         self.candidate_rag_buffer: List[Dict[str, Any]] = []
-        self.diagnosis_cache: Dict[str, Dict[str, Any]] = {}
+        self.diagnosis_cache: OrderedDict[str, Dict[str, Any]] = OrderedDict()
+        self._evidence_cache: OrderedDict = OrderedDict()
+        self._treatment_options_cache: OrderedDict = OrderedDict()
+        self._protocol_medications: Dict[str, List[Dict[str, Any]]] = {}
+        self._protocol_prescriptions: Dict[str, List[Dict[str, Any]]] = {}
+        self._formulary_patterns: Dict[str, re.Pattern] = {}
+        self._knowledge_revision: int = 0
 
         # Pre-computed BM25 & Trigram Vector indices
         self._doc_tokens: Dict[str, List[str]] = {}
@@ -484,6 +508,7 @@ class LocalMedicalRAGEngine:
 
         # Unified local Vector Database across all processed datasets (0% LLM hallucination)
         self.vector_store: Dict[str, Dict[str, Any]] = {}
+        self._chunk_ids_by_type: Dict[str, List[str]] = {}
         self._chunk_trigram_vecs: Dict[str, Dict[str, float]] = {}
         self._chunk_term_freqs: Dict[str, Dict[str, int]] = {}
         self._chunk_tokens: Dict[str, List[str]] = {}
@@ -504,6 +529,7 @@ class LocalMedicalRAGEngine:
         self.valid_subpacks: set[str] = set(VALID_CHECS_SUBPACKS)
         self.reload_knowledge_base()
 
+    @_knowledge_locked
     def reload_knowledge_base(self) -> Dict[str, Any]:
         """Load core NASA datasets, research chunks, and dynamic files, then build indices."""
         self.protocols = []
@@ -516,6 +542,9 @@ class LocalMedicalRAGEngine:
         self.valid_subpacks = set(VALID_CHECS_SUBPACKS)
         self.dynamic_docs_loaded = []
         self.diagnosis_cache.clear()
+        self._evidence_cache.clear()
+        self._treatment_options_cache.clear()
+        self._knowledge_revision += 1
         self.vector_store = {}
         self._chunk_trigram_vecs = {}
         self._chunk_term_freqs = {}
@@ -579,6 +608,7 @@ class LocalMedicalRAGEngine:
                 self.arxiv_citations = json.load(af)
 
         self._load_dynamic_official_protocols()
+        self._build_medication_index()
         self._build_hybrid_search_index()
 
         return {
@@ -589,6 +619,42 @@ class LocalMedicalRAGEngine:
             "arxiv_citations_count": len(self.arxiv_citations),
             "bm25_vocabulary_size": len(self._idf),
         }
+
+    def _build_medication_index(self) -> None:
+        """Parse static CHeCS entries and compile name boundaries once per reload."""
+        self._formulary_patterns = {
+            name: re.compile(r"(?<!\w)" + re.escape(name) + r"(?!\w)", re.IGNORECASE)
+            for name in list(self.formulary_by_name)[:MAX_CHUNKS]
+        }
+        self._protocol_medications = {}
+        self._protocol_prescriptions = {}
+        for sid, proto in list(self.protocol_by_id.items())[:MAX_PROTOCOLS]:
+            meds = self._normalize_contract_checs_medications(proto.get("checs_medications", []))
+            self._protocol_medications[sid] = meds
+            source = STRUCTURED_CHECS_PRESCRIPTIONS.get(sid, meds)
+            self._protocol_prescriptions[sid] = [self._parse_and_validate_medication(item) for item in source]
+
+    def _cache_get(self, cache: OrderedDict, key: Any) -> Any:
+        """Read and promote an entry; callers hold the knowledge lock."""
+        value = cache.get(key)
+        if value is not None:
+            cache.move_to_end(key)
+        return value
+
+    def _cache_put(self, cache: OrderedDict, key: Any, value: Any) -> None:
+        """Keep the newest MAX_CACHE_ENTRIES without discarding the whole cache."""
+        cache[key] = value
+        cache.move_to_end(key)
+        if len(cache) > MAX_CACHE_ENTRIES:
+            cache.popitem(last=False)
+
+    def _protocol_medications_verified(self, sid: str, medications: List[Any]) -> bool:
+        """Reuse startup validation, retaining validation for ad hoc protocol inputs."""
+        parsed = self._protocol_prescriptions.get(sid)
+        if parsed is None:
+            source = STRUCTURED_CHECS_PRESCRIPTIONS.get(sid, medications)
+            parsed = [self._parse_and_validate_medication(item) for item in source]
+        return all(item.get("formulary_verified") for item in parsed)
 
     def _parse_research_markdown_chunks(self) -> None:
         """Parse `data/nasa_space_medicine_research.md` into `[Source: ...]` tagged chunks."""
@@ -984,7 +1050,11 @@ class LocalMedicalRAGEngine:
             tok: math.log(1.0 + (n_chunks - df + 0.5) / (df + 0.5))
             for tok, df in chunk_df.items()
         }
+        self._chunk_ids_by_type = {}
+        for cid, record in self.vector_store.items():
+            self._chunk_ids_by_type.setdefault(record["doc_type"], []).append(cid)
 
+    @_knowledge_locked
     def query_vector_store(
         self,
         query_text: str,
@@ -1000,9 +1070,11 @@ class LocalMedicalRAGEngine:
         k1, b = 1.5, 0.75
         scored: List[Tuple[float, str, Dict[str, Any]]] = []
 
-        for cid, record in self.vector_store.items():
-            if doc_types is not None and record.get("doc_type") not in doc_types:
-                continue
+        candidates = self.vector_store if doc_types is None else (
+            cid for kind in sorted(doc_types) for cid in self._chunk_ids_by_type.get(kind, ())
+        )
+        for cid in candidates:
+            record = self.vector_store[cid]
             vec_sim = _cosine_similarity_sparse(q_vec, self._chunk_trigram_vecs.get(cid, {}))
             tf_map = self._chunk_term_freqs.get(cid, {})
             doc_len = float(len(self._chunk_tokens.get(cid, [])) or 1)
@@ -1020,7 +1092,7 @@ class LocalMedicalRAGEngine:
         scored.sort(key=lambda row: (-row[0], row[1]))
         results: List[Dict[str, Any]] = []
         for score, _cid, rec in scored[: max(1, top_k)]:
-            out = dict(rec)
+            out = deepcopy(rec)
             out["score"] = score
             results.append(out)
         return results
@@ -1130,9 +1202,7 @@ class LocalMedicalRAGEngine:
 
         # Verify all prescribed medications validate against checs_formulary.json & valid subpacks
         sid = str(proto.get("scenario_id", ""))
-        prescriptions = STRUCTURED_CHECS_PRESCRIPTIONS.get(sid)
-        meds_to_verify = prescriptions if prescriptions is not None else meds
-        if not all(self._parse_and_validate_medication(m).get("formulary_verified") for m in meds_to_verify):
+        if not self._protocol_medications_verified(sid, meds):
             return False
 
         if packet is not None:
@@ -1229,19 +1299,18 @@ class LocalMedicalRAGEngine:
         raw = json.dumps(key_obj, sort_keys=True)
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
+    @_knowledge_locked
     def diagnose(
         self, packet: TelemetryPacket, assessment: AnomalyAssessment
     ) -> Dict[str, Any]:
-        """
-        Execute the 2-Mode Clinical Decision Protocol in <1ms (SLA <50ms).
-        Returns Mode A (Confidence >= 0.75) or Mode B (Confidence < 0.75).
-        """
+        """Execute the existing Mode A (>= 0.75) / Mode B (< 0.75) protocol."""
         start_ns = time.perf_counter_ns()
         clean_symptoms = sanitize_symptom_log(packet.symptom_log)
         cache_key = self._build_cache_key(packet, clean_symptoms)
 
-        if cache_key in self.diagnosis_cache and not packet.force_mode_b:
-            cached = dict(self.diagnosis_cache[cache_key])
+        stored = self._cache_get(self.diagnosis_cache, cache_key) if not packet.force_mode_b else None
+        if stored is not None:
+            cached = deepcopy(stored)
             cached["execution_time_ms"] = round((time.perf_counter_ns() - start_ns) / 1_000_000.0, 3)
             cached["cache_hit"] = True
             return cached
@@ -1288,9 +1357,7 @@ class LocalMedicalRAGEngine:
 
         response["execution_time_ms"] = round((time.perf_counter_ns() - start_ns) / 1_000_000.0, 3)
         response["rag_metrics"]["retrieval_latency_ms"] = elapsed_ms
-        if len(self.diagnosis_cache) >= MAX_CACHE_ENTRIES:
-            self.diagnosis_cache.clear()
-        self.diagnosis_cache[cache_key] = dict(response)
+        self._cache_put(self.diagnosis_cache, cache_key, deepcopy(response))
         return response
 
     def _has_unmapped_presentation(self, packet: TelemetryPacket, symptoms: str) -> bool:
@@ -1847,7 +1914,20 @@ class LocalMedicalRAGEngine:
         matches.sort(key=lambda row: (-row[0], row[1]))
         return [row[2] for row in matches[:2]]
 
+    @_knowledge_locked
     def _get_retrieved_evidence_chunks(
+        self, scenario_id: str, proto: Dict[str, Any], clean_symptoms: str
+    ) -> List[str]:
+        """Reuse immutable evidence for identical symptoms until knowledge reloads."""
+        key = (scenario_id, clean_symptoms)
+        cached = self._cache_get(self._evidence_cache, key)
+        if cached is not None:
+            return list(cached)
+        chunks = self._collect_retrieved_evidence_chunks(scenario_id, proto, clean_symptoms)
+        self._cache_put(self._evidence_cache, key, tuple(chunks))
+        return chunks
+
+    def _collect_retrieved_evidence_chunks(
         self, scenario_id: str, proto: Dict[str, Any], clean_symptoms: str
     ) -> List[str]:
         """Return tagged protocol, research, citation, and matching official text evidence."""
@@ -1887,7 +1967,10 @@ class LocalMedicalRAGEngine:
                     f"{paper.get('title', '')}: {paper.get('key_finding_quote', '')}"
                 )
 
-        # Attach matched CHeCS formulary, onboard hardware, lab intervals, and vector-store hits
+        return self._append_reference_evidence(chunks, proto, clean_symptoms)
+
+    def _append_reference_evidence(self, chunks, proto, clean_symptoms) -> List[str]:
+        """Attach the same medication, hardware, and ranked reference evidence."""
         med_names = [
             str(m.get("medication") or m.get("drug") or "").lower()
             for m in proto.get("checs_medications", [])
@@ -1991,12 +2074,13 @@ class LocalMedicalRAGEngine:
             f"{source_rule.get('source_url', '')}" if source_rule else "No verified NASA rule is mapped to this project protocol."
         )
 
-        checs_medications = self._normalize_contract_checs_medications(proto.get("checs_medications", []))
-        structured_list = STRUCTURED_CHECS_PRESCRIPTIONS.get(scenario_id)
-        if structured_list is not None:
-            raw_prescriptions = [self._parse_and_validate_medication(p) for p in structured_list]
-        else:
-            raw_prescriptions = [self._parse_and_validate_medication(m) for m in checs_medications]
+        checs_medications = self._protocol_medications.get(scenario_id)
+        if checs_medications is None:
+            checs_medications = self._normalize_contract_checs_medications(proto.get("checs_medications", []))
+        raw_prescriptions = self._protocol_prescriptions.get(scenario_id)
+        if raw_prescriptions is None:
+            source = STRUCTURED_CHECS_PRESCRIPTIONS.get(scenario_id, checs_medications)
+            raw_prescriptions = [self._parse_and_validate_medication(item) for item in source]
         lockout_list = [str(x) for x in proto.get("drug_lockouts", []) if str(x).strip()]
         raw_contraindications = SCENARIO_CONTRAINDICATIONS.get(
             scenario_id,
@@ -2006,15 +2090,17 @@ class LocalMedicalRAGEngine:
                 if m.get("contraindication")
             ],
         )
+        policy = self._medication_safety_policy(packet)
         prescriptions, checs_meds, contraindications = self._apply_deterministic_safety_filter(
             raw_prescriptions,
             checs_medications,
             raw_contraindications,
             packet,
             assessment,
+            policy,
         )
         contract_checs_meds = self._normalize_contract_checs_medications(checs_meds)
-        blocked_medications, _ = self._medication_safety_policy(packet)
+        blocked_medications, _ = policy
         safe_steps = [step for step in raw_steps if not any(
             marker in str(step).lower() for marker in blocked_medications
         )]
@@ -2355,9 +2441,10 @@ class LocalMedicalRAGEngine:
         contraindications: List[str],
         packet: TelemetryPacket,
         assessment: AnomalyAssessment,
+        policy: Optional[Tuple[List[str], List[str]]] = None,
     ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[str]]:
         """Apply one medication policy to prescriptions and the medication catalog."""
-        blocked, warnings = self._medication_safety_policy(packet)
+        blocked, warnings = policy if policy is not None else self._medication_safety_policy(packet)
         filtered: List[List[Dict[str, Any]]] = []
         for entries, field in ((prescriptions, "medication"), (checs_meds, "drug")):
             safe_entries: List[Dict[str, Any]] = []
@@ -2376,36 +2463,40 @@ class LocalMedicalRAGEngine:
             filtered.append(safe_entries)
         return filtered[0], filtered[1], list(dict.fromkeys(contraindications + warnings))
 
+    @_knowledge_locked
     def get_treatment_options(
-        self, scenario_id: str, packet: TelemetryPacket, assessment: AnomalyAssessment
+        self, scenario_id: str, packet: TelemetryPacket, assessment: AnomalyAssessment,
+        policy: Optional[Tuple[List[str], List[str]]] = None,
     ) -> List[str]:
         """Return exact active-condition medication names after current safety filtering."""
+        policy = policy if policy is not None else self._medication_safety_policy(packet)
+        key = (scenario_id, tuple(policy[0]))
+        cached = self._cache_get(self._treatment_options_cache, key)
+        if cached is not None:
+            return list(cached)
         family = (scenario_id,)
         if scenario_id in ("CPG-06", "SCENARIO_2_SANS"):
             family = ("CPG-06", "SCENARIO_2_SANS")
         options = set()
         for protocol_id in family:
-            proto = self.protocol_by_id.get(protocol_id, {})
-            medications = self._normalize_contract_checs_medications(proto.get("checs_medications", []))
-            source = STRUCTURED_CHECS_PRESCRIPTIONS.get(protocol_id, medications)
-            prescriptions = [self._parse_and_validate_medication(item) for item in source]
-            safe, _, _ = self._apply_deterministic_safety_filter(prescriptions, medications, [], packet, assessment)
+            medications = self._protocol_medications.get(protocol_id, [])
+            prescriptions = self._protocol_prescriptions.get(protocol_id, [])
+            safe, _, _ = self._apply_deterministic_safety_filter(prescriptions, medications, [], packet, assessment, policy)
             for medication in safe:
                 if not medication.get("formulary_verified"):
                     continue
                 name = str(medication.get("medication", ""))
                 options.add(name)
                 # Separate a source medication name from its stated dose or route.
-                prefix = re.split(
-                    r"\s+\d+(?:[.,]\d+)?(?:-\d+(?:[.,]\d+)?)?\s*(?:mg|mcg|g|mL|L)\b|\s+(?:PO|IV|IM|SC|ODT)\b",
-                    name, maxsplit=1, flags=re.IGNORECASE,
-                )[0].strip()
+                prefix = self._medication_name_split.split(name, maxsplit=1)[0].strip()
                 if prefix:
                     options.add(prefix)
-                for canonical in self.formulary_by_name:
-                    if re.search(r"(?<!\w)" + re.escape(canonical) + r"(?!\w)", name, re.IGNORECASE):
+                for canonical, pattern in self._formulary_patterns.items():
+                    if pattern.search(name):
                         options.add(canonical)
-        return sorted(options)
+        result = tuple(sorted(options))
+        self._cache_put(self._treatment_options_cache, key, result)
+        return list(result)
 
     def _is_nominal_asymptomatic(
         self,

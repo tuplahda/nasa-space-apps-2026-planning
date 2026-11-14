@@ -12,13 +12,13 @@ Complies strictly with JPL Power-of-Ten safety rules and contains zero emojis.
 """
 
 import asyncio
-from copy import deepcopy
 from contextlib import asynccontextmanager
+from functools import wraps
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 import logging
 import os
-from threading import Event, Lock, Thread
+from threading import Event, RLock, Thread
 from time import monotonic
 from typing import Any, Dict, List
 from urllib.parse import parse_qs, urlparse
@@ -85,9 +85,20 @@ manager = ConnectionManager()
 
 
 latest_telemetry: Dict[str, Any] | None = None
-offline_simulation_lock = Lock()
+simulation_lock = RLock()
+offline_simulation_lock = simulation_lock
 
 
+def _simulation_locked(method):
+    """Keep synchronous simulation operations atomic; never hold across an await."""
+    @wraps(method)
+    def locked(*args, **kwargs):
+        with simulation_lock:
+            return method(*args, **kwargs)
+    return locked
+
+
+@_simulation_locked
 def run_simulation_command(action: Any, payload: Dict[str, Any]) -> Dict[str, Any]:
     """Validate controls consistently across REST, WebSocket, and offline HTTP."""
     if action == "trigger_scenario":
@@ -99,20 +110,73 @@ def run_simulation_command(action: Any, payload: Dict[str, Any]) -> Dict[str, An
     return {"status": "error", "message": "Unknown simulation command."}
 
 
+@_simulation_locked
+def cure_simulation() -> Dict[str, Any]:
+    """Apply the existing recovery alias under the shared state lock."""
+    return astronaut_sim.cure_scenario()
+
+
 def command_status(result: Dict[str, Any]) -> int:
     return 400 if result["status"] == "error" else 200
 
 
+def simulation_state_snapshot() -> Dict[str, Any]:
+    """Read state while the caller holds simulation_lock."""
+    return {
+        "astronaut_id": astronaut_sim.astronaut_id,
+        "name": astronaut_sim.name,
+        "activity_state": astronaut_sim.activity_state,
+        "active_scenario": astronaut_sim.active_scenario,
+        "is_recovering": astronaut_sim.is_recovering,
+        "active_treatment": astronaut_sim.active_treatment,
+        "scenario_progression": round(astronaut_sim.scenario_progression, 3),
+        "tick_count": astronaut_sim.tick_count,
+        "external_dataset_loaded": astronaut_sim.external_dataset_loaded,
+    }
+
+
+@_simulation_locked
+def simulation_response(path: str):
+    """Capture shared state atomically, then let callers serialize/send unlocked."""
+    if path == "/health":
+        return 200, {
+            "status": "NOMINAL",
+            "system": "A.R.E.S. Med Level V Clinical Engine & Simulation",
+            "operation_mode": "100%_OFFLINE_AIR_GAPPED_READY",
+            "active_astronaut": astronaut_sim.name,
+            "activity_state": astronaut_sim.activity_state,
+            "active_scenario": astronaut_sim.active_scenario,
+        }
+    if path == "/api/simulation/state":
+        return 200, simulation_state_snapshot()
+    if path in ("/api/telemetry/current", "/api/astronaut/status"):
+        if latest_telemetry is None:
+            return 503, {"message": "Telemetry is starting."}
+        return 200, latest_telemetry
+    if path == "/api/scenarios/list":
+        return 200, astronaut_sim.list_available_scenarios()
+    if path == "/api/simulation/schedule":
+        return 200, astronaut_sim.get_routine_schedule()
+    if path == "/api/space-weather":
+        report = donki_service.get_space_weather(force_active_flare=(astronaut_sim.active_scenario == "solar_flare"))
+        return 200, report.to_dict()
+    return 404, {"title": "Not Found", "status": 404}
+
+
 def recovery_diagnosis(
-    recorded: Dict[str, Any], packet: TelemetryPacket, assessment: AnomalyAssessment, status: str
+    recorded: Dict[str, Any], packet: TelemetryPacket, assessment: AnomalyAssessment, status: str,
+    policy=None,
 ) -> Dict[str, Any]:
     """Carry recorded context through recovery while applying current safety lockouts."""
-    context = deepcopy(recorded)
+    # Copy on write: citations/quotes and protocol metadata remain read-only.
+    context = dict(recorded)
+    context["rag_metrics"] = dict(recorded["rag_metrics"])
+    policy = policy if policy is not None else rag_engine._medication_safety_policy(packet)
     prescriptions, medications, contraindications = rag_engine._apply_deterministic_safety_filter(
         context.get("prescriptions", []), context.get("checs_medications", []),
-        context.get("contraindications_locked", []), packet, assessment,
+        context.get("contraindications_locked", []), packet, assessment, policy,
     )
-    blocked, _ = rag_engine._medication_safety_policy(packet)
+    blocked, _ = policy
     checklist = [step for step in context.get("action_checklist", [])
                  if not any(name in step["action"].lower() for name in blocked)]
     context.update({
@@ -139,6 +203,18 @@ def recovery_diagnosis(
     return context
 
 
+def refresh_treatment_options(decision, packet, assessment, policy=None) -> None:
+    """Refresh a condition's countermeasures only when its lockout policy changes."""
+    policy = policy if policy is not None else rag_engine._medication_safety_policy(packet)
+    key = (rag_engine._knowledge_revision, decision["scenario_id"], tuple(policy[0]), tuple(policy[1]))
+    if astronaut_sim._treatment_policy_key == key:
+        return
+    options = rag_engine.get_treatment_options(decision["scenario_id"], packet, assessment, policy)
+    options.extend(str(step["action"]) for step in decision.get("action_checklist", []))
+    astronaut_sim.set_treatment_options(options, policy_key=key)
+
+
+@_simulation_locked
 def advance_telemetry() -> Dict[str, Any]:
     """Advance the shared simulation and publish one snapshot for all readers."""
     global latest_telemetry
@@ -165,11 +241,10 @@ def advance_telemetry() -> Dict[str, Any]:
         assessment.trigger_rag_consultation = False
         status = "ACTIVE" if astronaut_sim.is_recovering else "COMPLETE"
         if same_incident and previous.get("rag_diagnosis"):
-            payload["rag_diagnosis"] = recovery_diagnosis(previous["rag_diagnosis"], packet, assessment, status)
+            policy = rag_engine._medication_safety_policy(packet)
+            payload["rag_diagnosis"] = recovery_diagnosis(previous["rag_diagnosis"], packet, assessment, status, policy)
             if astronaut_sim.is_recovering:
-                options = rag_engine.get_treatment_options(payload["rag_diagnosis"]["scenario_id"], packet, assessment)
-                options.extend(str(step["action"]) for step in payload["rag_diagnosis"].get("action_checklist", []))
-                astronaut_sim.set_treatment_options(options)
+                refresh_treatment_options(payload["rag_diagnosis"], packet, assessment, policy)
     payload["recovery_status"] = status
     payload["anomaly_assessment"] = assessment.model_dump()
     payload["routine_schedule"] = astronaut_sim.get_routine_schedule(assessment.readiness_score_0_100)
@@ -179,11 +254,10 @@ def advance_telemetry() -> Dict[str, Any]:
         try:
             decision = rag_engine.diagnose(packet, assessment)
             payload["rag_diagnosis"] = decision
-            options = []
             if decision.get("mode") == "MODE_A_KNOWN_CONDITION":
-                options.extend(rag_engine.get_treatment_options(decision["scenario_id"], packet, assessment))
-                options.extend(str(step["action"]) for step in decision.get("action_checklist", []))
-            astronaut_sim.set_treatment_options(options)
+                refresh_treatment_options(decision, packet, assessment)
+            else:
+                astronaut_sim.set_treatment_options([])
         except Exception:
             logger.exception("Diagnosis failed for a simulation tick")
 
@@ -213,10 +287,13 @@ def run_offline_weather(stop: Event) -> None:
 async def broadcast_telemetry_loop() -> None:
     """Broadcast one shared frame per second."""
     clock = asyncio.get_running_loop()
+    await asyncio.sleep(1.0)
     while True:
         started = clock.time()
         try:
-            await manager.broadcast(json.dumps(advance_telemetry()))
+            payload = advance_telemetry()
+            if manager.active_connections:
+                await manager.broadcast(json.dumps(payload))
         except Exception:
             logger.exception("Simulation tick failed")
         await asyncio.sleep(max(0.0, 1.0 - (clock.time() - started)))
@@ -227,8 +304,7 @@ def run_offline_telemetry(stop: Event) -> None:
     while not stop.is_set():
         started = monotonic()
         try:
-            with offline_simulation_lock:
-                advance_telemetry()
+            advance_telemetry()
         except Exception:
             logger.exception("Simulation tick failed")
         stop.wait(max(0.0, 1.0 - (monotonic() - started)))
@@ -242,6 +318,7 @@ if FASTAPI_AVAILABLE:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         # Start background 1Hz simulation loop
+        advance_telemetry()
         sim_task = asyncio.create_task(broadcast_telemetry_loop())
         weather_task = asyncio.create_task(refresh_weather_loop())
         try:
@@ -287,14 +364,7 @@ if FASTAPI_AVAILABLE:
     @app.get("/health", tags=["System Health"])
     async def health_check() -> Dict[str, str]:
         """Health check endpoint for mission control readiness."""
-        return {
-            "status": "NOMINAL",
-            "system": "A.R.E.S. Med Level V Clinical Engine & Simulation",
-            "operation_mode": "100%_OFFLINE_AIR_GAPPED_READY",
-            "active_astronaut": astronaut_sim.name,
-            "activity_state": astronaut_sim.activity_state,
-            "active_scenario": astronaut_sim.active_scenario,
-        }
+        return simulation_response("/health")[1]
 
     @app.websocket("/ws/telemetry")
     async def websocket_telemetry_endpoint(websocket: WebSocket) -> None:
@@ -306,8 +376,9 @@ if FASTAPI_AVAILABLE:
         """
         await manager.connect(websocket)
         try:
-            if latest_telemetry is not None:
-                await websocket.send_text(json.dumps(latest_telemetry))
+            status, snapshot = simulation_response("/api/telemetry/current")
+            if status == 200:
+                await websocket.send_text(json.dumps(snapshot))
 
             while True:
                 data_text = await websocket.receive_text()
@@ -352,22 +423,12 @@ if FASTAPI_AVAILABLE:
     @app.post("/api/scenarios/cure", tags=["Simulation Control"])
     async def cure_scenario_endpoint() -> Dict[str, Any]:
         """Convenience alias for recovery initiation."""
-        return astronaut_sim.cure_scenario()
+        return cure_simulation()
 
     @app.get("/api/simulation/state", tags=["Simulation Control"])
     async def simulation_state_endpoint() -> Dict[str, Any]:
         """Retrieve current astronaut state machine telemetry parameters."""
-        return {
-            "astronaut_id": astronaut_sim.astronaut_id,
-            "name": astronaut_sim.name,
-            "activity_state": astronaut_sim.activity_state,
-            "active_scenario": astronaut_sim.active_scenario,
-            "is_recovering": astronaut_sim.is_recovering,
-            "active_treatment": astronaut_sim.active_treatment,
-            "scenario_progression": round(astronaut_sim.scenario_progression, 3),
-            "tick_count": astronaut_sim.tick_count,
-            "external_dataset_loaded": astronaut_sim.external_dataset_loaded,
-        }
+        return simulation_response("/api/simulation/state")[1]
 
     @app.post("/api/simulation/activity", tags=["Simulation Control"])
     async def set_activity_endpoint(payload: Dict[str, Any]) -> JSONResponse:
@@ -379,27 +440,23 @@ if FASTAPI_AVAILABLE:
     @app.get("/api/telemetry/current", tags=["Simulation Control"])
     async def current_telemetry_endpoint() -> JSONResponse:
         """Read the latest simulation snapshot without advancing the clock."""
-        if latest_telemetry is None:
-            return JSONResponse({"message": "Telemetry is starting."}, status_code=503)
-        return JSONResponse(latest_telemetry)
+        status, snapshot = simulation_response("/api/telemetry/current")
+        return JSONResponse(snapshot, status_code=status)
 
     @app.get("/api/scenarios/list", tags=["Simulation Control"])
     async def list_scenarios_endpoint() -> List[Dict[str, str]]:
         """List all available crisis trajectories and 24 scenario seeds."""
-        return astronaut_sim.list_available_scenarios()
+        return simulation_response("/api/scenarios/list")[1]
 
     @app.get("/api/simulation/schedule", tags=["Simulation Control"])
     async def simulation_schedule_endpoint() -> Dict[str, Any]:
         """Get daily flight operational schedule and active block."""
-        return astronaut_sim.get_routine_schedule()
+        return simulation_response("/api/simulation/schedule")[1]
 
     @app.get("/api/space-weather", tags=["Space Weather"])
     async def space_weather_endpoint() -> Dict[str, Any]:
         """Get live or air-gapped NASA DONKI space weather report."""
-        rep = donki_service.get_space_weather(
-            force_active_flare=(astronaut_sim.active_scenario == "solar_flare")
-        )
-        return rep.to_dict()
+        return simulation_response("/api/space-weather")[1]
 
 else:
     app = None  # type: ignore
@@ -562,59 +619,17 @@ class AresMedStdlibRequestHandler(BaseHTTPRequestHandler):
         if parsed.path in ("/", "/docs", "/redoc"):
             self._send_html(200, render_offline_api_docs())
             return
-        if parsed.path == "/health":
-            self._send_json(
-                200,
-                {
-                    "status": "NOMINAL",
-                    "system": "A.R.E.S. Med Level V Clinical Engine & Simulation",
-                    "operation_mode": "100%_OFFLINE_AIR_GAPPED_READY",
-                    "active_astronaut": astronaut_sim.name,
-                    "activity_state": astronaut_sim.activity_state,
-                    "active_scenario": astronaut_sim.active_scenario,
-                },
-            )
-            return
-        if parsed.path == "/api/simulation/state":
-            self._send_json(
-                200,
-                {
-                    "astronaut_id": astronaut_sim.astronaut_id,
-                    "name": astronaut_sim.name,
-                    "activity_state": astronaut_sim.activity_state,
-                    "active_scenario": astronaut_sim.active_scenario,
-                    "is_recovering": astronaut_sim.is_recovering,
-                    "active_treatment": astronaut_sim.active_treatment,
-                    "scenario_progression": round(astronaut_sim.scenario_progression, 3),
-                    "tick_count": astronaut_sim.tick_count,
-                    "external_dataset_loaded": astronaut_sim.external_dataset_loaded,
-                },
-            )
-            return
-        if parsed.path in ("/api/telemetry/current", "/api/astronaut/status"):
-            snapshot = latest_telemetry
-            if snapshot is None:
-                self._send_json(503, {"message": "Telemetry is starting."})
-            else:
-                self._send_json(200, snapshot)
-            return
-        if parsed.path == "/api/scenarios/list":
-            self._send_json(200, astronaut_sim.list_available_scenarios())
-            return
-        if parsed.path == "/api/simulation/schedule":
-            self._send_json(200, astronaut_sim.get_routine_schedule())
-            return
-        if parsed.path == "/api/space-weather":
-            rep = donki_service.get_space_weather(
-                force_active_flare=(astronaut_sim.active_scenario == "solar_flare")
-            )
-            self._send_json(200, rep.to_dict())
+        status, snapshot = simulation_response(parsed.path)
+        if status != 404:
+            self._send_json(status, snapshot)
             return
         if parsed.path == "/api/diagnose/buffer-status":
             qs = parse_qs(parsed.query)
             astro_id = qs.get("astronaut_id", [DEMO_ASTRONAUT_ID])[0]
-            mgr = anomaly_detector.get_or_create_buffer(astro_id)
-            self._send_json(200, mgr.get_snapshot_summary())
+            with simulation_lock:
+                mgr = anomaly_detector.get_or_create_buffer(astro_id)
+                snapshot = mgr.get_snapshot_summary()
+            self._send_json(200, snapshot)
             return
         if parsed.path == "/api/diagnose/protocols":
             self._send_json(
@@ -650,20 +665,19 @@ class AresMedStdlibRequestHandler(BaseHTTPRequestHandler):
             "/api/simulation/activity": "set_activity",
         }.get(parsed.path)
         if action:
-            with offline_simulation_lock:
-                result = run_simulation_command(action, data)
+            result = run_simulation_command(action, data)
             self._send_json(command_status(result), result)
             return
 
         if parsed.path == "/api/scenarios/cure":
-            with offline_simulation_lock:
-                result = astronaut_sim.cure_scenario()
+            result = cure_simulation()
             self._send_json(command_status(result), result)
             return
 
         if parsed.path == "/api/diagnose":
             try:
-                result = execute_diagnosis_pipeline(data)
+                with simulation_lock:
+                    result = execute_diagnosis_pipeline(data)
                 self._send_json(200, result)
             except (ValueError, TypeError):
                 self._send_json(422, {"detail": [{"loc": ["body"], "type": "value_error",
@@ -688,11 +702,13 @@ class AresMedStdlibRequestHandler(BaseHTTPRequestHandler):
                                                 "msg": "Invalid telemetry payload."}]})
                 return
             try:
-                packet.active_scenario_id = None
-                packet.stateless_evaluation = False
-                assessment = anomaly_detector.evaluate_packet(packet)
-                rag_out = rag_engine.diagnose(packet, assessment) if assessment.trigger_rag_consultation else None
-                self._send_json(200, build_contract_b_response(assessment, packet, rag_out))
+                with simulation_lock:
+                    packet.active_scenario_id = None
+                    packet.stateless_evaluation = False
+                    assessment = anomaly_detector.evaluate_packet(packet)
+                    rag_out = rag_engine.diagnose(packet, assessment) if assessment.trigger_rag_consultation else None
+                    result = build_contract_b_response(assessment, packet, rag_out)
+                self._send_json(200, result)
             except Exception as error:
                 logger.exception("Tick evaluation failed")
                 self._send_json(500, {"title": "Tick evaluation failed", "status": 500,

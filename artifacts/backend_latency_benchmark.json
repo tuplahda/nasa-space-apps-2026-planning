@@ -1,0 +1,210 @@
+{
+  "baseline_commit": "53014f6",
+  "pairs": 5,
+  "samples": {
+    "baseline": [
+      {
+        "method": "Seed 1729; 100 mixed crisis/recovery ticks; 50 cold ASGI POSTs; startup excluded; local weather",
+        "ticks": {
+          "calls": 100,
+          "mean_wall_ms": 1.331631,
+          "p95_wall_ms": 2.573,
+          "mean_cpu_ms": 1.40625,
+          "clinical_digest": "5e9bec999a04612730164e1f869141a6e12fa0053e5056a00c2489b397ce553e"
+        },
+        "cold_diagnose": {
+          "calls": 50,
+          "mean_wall_ms": 2.809826,
+          "p95_wall_ms": 3.791,
+          "mean_cpu_ms": 2.1875,
+          "clinical_digest": "40804e942592e16132bc9a1feb8bf7aee098135889af932d6953b2bd4b6be6b1"
+        }
+      },
+      {
+        "method": "Seed 1729; 100 mixed crisis/recovery ticks; 50 cold ASGI POSTs; startup excluded; local weather",
+        "ticks": {
+          "calls": 100,
+          "mean_wall_ms": 1.318128,
+          "p95_wall_ms": 2.4872,
+          "mean_cpu_ms": 1.25,
+          "clinical_digest": "5e9bec999a04612730164e1f869141a6e12fa0053e5056a00c2489b397ce553e"
+        },
+        "cold_diagnose": {
+          "calls": 50,
+          "mean_wall_ms": 2.291662,
+          "p95_wall_ms": 3.0312,
+          "mean_cpu_ms": 2.1875,
+          "clinical_digest": "40804e942592e16132bc9a1feb8bf7aee098135889af932d6953b2bd4b6be6b1"
+        }
+      },
+      {
+        "method": "Seed 1729; 100 mixed crisis/recovery ticks; 50 cold ASGI POSTs; startup excluded; local weather",
+        "ticks": {
+          "calls": 100,
+          "mean_wall_ms": 1.331546,
+          "p95_wall_ms": 2.6315,
+          "mean_cpu_ms": 1.40625,
+          "clinical_digest": "5e9bec999a04612730164e1f869141a6e12fa0053e5056a00c2489b397ce553e"
+        },
+        "cold_diagnose": {
+          "calls": 50,
+          "mean_wall_ms": 2.2145960000000002,
+          "p95_wall_ms": 2.7838,
+          "mean_cpu_ms": 2.5,
+          "clinical_digest": "40804e942592e16132bc9a1feb8bf7aee098135889af932d6953b2bd4b6be6b1"
+        }
+      },
+      {
+        "method": "Seed 1729; 100 mixed crisis/recovery ticks; 50 cold ASGI POSTs; startup excluded; local weather",
+        "ticks": {
+          "calls": 100,
+          "mean_wall_ms": 1.57663,
+          "p95_wall_ms": 2.9182,
+          "mean_cpu_ms": 1.5625,
+          "clinical_digest": "5e9bec999a04612730164e1f869141a6e12fa0053e5056a00c2489b397ce553e"
+        },
+        "cold_diagnose": {
+          "calls": 50,
+          "mean_wall_ms": 3.536654,
+          "p95_wall_ms": 4.4066,
+          "mean_cpu_ms": 3.75,
+          "clinical_digest": "40804e942592e16132bc9a1feb8bf7aee098135889af932d6953b2bd4b6be6b1"
+        }
+      },
+      {
+        "method": "Seed 1729; 100 mixed crisis/recovery ticks; 50 cold ASGI POSTs; startup excluded; local weather",
+        "ticks": {
+          "calls": 100,
+          "mean_wall_ms": 1.818904,
+          "p95_wall_ms": 2.9396,
+          "mean_cpu_ms": 1.40625,
+          "clinical_digest": "5e9bec999a04612730164e1f869141a6e12fa0053e5056a00c2489b397ce553e"
+        },
+        "cold_diagnose": {
+          "calls": 50,
+          "mean_wall_ms": 3.261272,
+          "p95_wall_ms": 4.0721,
+          "mean_cpu_ms": 3.125,
+          "clinical_digest": "40804e942592e16132bc9a1feb8bf7aee098135889af932d6953b2bd4b6be6b1"
+        }
+      }
+    ],
+    "optimized": [
+      {
+        "method": "Seed 1729; 100 mixed crisis/recovery ticks; 50 cold ASGI POSTs; startup excluded; local weather",
+        "ticks": {
+          "calls": 100,
+          "mean_wall_ms": 1.41943,
+          "p95_wall_ms": 3.2099,
+          "mean_cpu_ms": 1.5625,
+          "clinical_digest": "5e9bec999a04612730164e1f869141a6e12fa0053e5056a00c2489b397ce553e"
+        },
+        "cold_diagnose": {
+          "calls": 50,
+          "mean_wall_ms": 2.734992,
+          "p95_wall_ms": 3.5897,
+          "mean_cpu_ms": 2.8125,
+          "clinical_digest": "40804e942592e16132bc9a1feb8bf7aee098135889af932d6953b2bd4b6be6b1"
+        }
+      },
+      {
+        "method": "Seed 1729; 100 mixed crisis/recovery ticks; 50 cold ASGI POSTs; startup excluded; local weather",
+        "ticks": {
+          "calls": 100,
+          "mean_wall_ms": 0.764926,
+          "p95_wall_ms": 1.7135,
+          "mean_cpu_ms": 0.78125,
+          "clinical_digest": "5e9bec999a04612730164e1f869141a6e12fa0053e5056a00c2489b397ce553e"
+        },
+        "cold_diagnose": {
+          "calls": 50,
+          "mean_wall_ms": 3.02192,
+          "p95_wall_ms": 4.5003,
+          "mean_cpu_ms": 2.8125,
+          "clinical_digest": "40804e942592e16132bc9a1feb8bf7aee098135889af932d6953b2bd4b6be6b1"
+        }
+      },
+      {
+        "method": "Seed 1729; 100 mixed crisis/recovery ticks; 50 cold ASGI POSTs; startup excluded; local weather",
+        "ticks": {
+          "calls": 100,
+          "mean_wall_ms": 0.855089,
+          "p95_wall_ms": 1.9353,
+          "mean_cpu_ms": 0.625,
+          "clinical_digest": "5e9bec999a04612730164e1f869141a6e12fa0053e5056a00c2489b397ce553e"
+        },
+        "cold_diagnose": {
+          "calls": 50,
+          "mean_wall_ms": 2.660784,
+          "p95_wall_ms": 3.7278,
+          "mean_cpu_ms": 2.1875,
+          "clinical_digest": "40804e942592e16132bc9a1feb8bf7aee098135889af932d6953b2bd4b6be6b1"
+        }
+      },
+      {
+        "method": "Seed 1729; 100 mixed crisis/recovery ticks; 50 cold ASGI POSTs; startup excluded; local weather",
+        "ticks": {
+          "calls": 100,
+          "mean_wall_ms": 0.722121,
+          "p95_wall_ms": 1.5004,
+          "mean_cpu_ms": 0.625,
+          "clinical_digest": "5e9bec999a04612730164e1f869141a6e12fa0053e5056a00c2489b397ce553e"
+        },
+        "cold_diagnose": {
+          "calls": 50,
+          "mean_wall_ms": 2.795258,
+          "p95_wall_ms": 3.3586,
+          "mean_cpu_ms": 1.875,
+          "clinical_digest": "40804e942592e16132bc9a1feb8bf7aee098135889af932d6953b2bd4b6be6b1"
+        }
+      },
+      {
+        "method": "Seed 1729; 100 mixed crisis/recovery ticks; 50 cold ASGI POSTs; startup excluded; local weather",
+        "ticks": {
+          "calls": 100,
+          "mean_wall_ms": 0.985175,
+          "p95_wall_ms": 2.1523,
+          "mean_cpu_ms": 0.9375,
+          "clinical_digest": "5e9bec999a04612730164e1f869141a6e12fa0053e5056a00c2489b397ce553e"
+        },
+        "cold_diagnose": {
+          "calls": 50,
+          "mean_wall_ms": 3.599302,
+          "p95_wall_ms": 4.5327,
+          "mean_cpu_ms": 3.125,
+          "clinical_digest": "40804e942592e16132bc9a1feb8bf7aee098135889af932d6953b2bd4b6be6b1"
+        }
+      }
+    ]
+  },
+  "median_per_run_means": {
+    "ticks": {
+      "baseline": {
+        "mean_wall_ms": 1.331631,
+        "p95_wall_ms": 2.6315,
+        "mean_cpu_ms": 1.40625
+      },
+      "optimized": {
+        "mean_wall_ms": 0.855089,
+        "p95_wall_ms": 1.9353,
+        "mean_cpu_ms": 0.78125
+      },
+      "wall_reduction_pct": 35.78634020986294,
+      "clinical_digest": "5e9bec999a04612730164e1f869141a6e12fa0053e5056a00c2489b397ce553e"
+    },
+    "cold_diagnose": {
+      "baseline": {
+        "mean_wall_ms": 2.809826,
+        "p95_wall_ms": 3.791,
+        "mean_cpu_ms": 2.5
+      },
+      "optimized": {
+        "mean_wall_ms": 2.795258,
+        "p95_wall_ms": 3.7278,
+        "mean_cpu_ms": 2.8125
+      },
+      "wall_reduction_pct": 0.5184662680180252,
+      "clinical_digest": "40804e942592e16132bc9a1feb8bf7aee098135889af932d6953b2bd4b6be6b1"
+    }
+  }
+}
