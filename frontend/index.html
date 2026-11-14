@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#07111b" />
+    <title>A.R.E.S. Med | Crew Health Console</title>
+
+
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="space-backdrop" aria-hidden="true"></div>
+    <main class="console">
+      <header class="topbar">
+        <a class="brand" href="#" aria-label="A.R.E.S. Med home">
+          <span class="brand-mark" aria-hidden="true"><span></span></span>
+          <span class="brand-copy">
+            <strong>A.R.E.S. <em>MED</em></strong>
+            <small>CREW HEALTH CONSOLE</small>
+          </span>
+        </a>
+
+        <div class="mission-clock" aria-label="Mission elapsed time">
+          <span class="eyebrow">MISSION ELAPSED</span>
+          <strong id="met-timer">—</strong>
+          <span class="clock-divider"></span>
+          <span class="eyebrow">DAY <b id="mission-day">—</b></span>
+        </div>
+
+        <div class="top-controls">
+          <label class="case-picker">
+            <span class="eyebrow">TELEMETRY CASE</span>
+            <select id="case-select" aria-label="Choose a telemetry case">
+              <option value="nominal">Nominal rest</option>
+              <option value="hypercapnia">EVA / elevated CO₂</option>
+              <option value="solar">Solar event</option>
+              <option value="zero-day">Unclassified anomaly</option>
+            </select>
+          </label>
+          <button class="run-button" id="run-assessment" type="button">
+            <span class="run-icon" aria-hidden="true">&#9655;</span>
+            Simulate crisis
+          </button>
+          <button id="data-mode" class="mode-button" type="button" title="Switch between the backend astronaut agent and the local demonstration">Use local demo</button>
+          <div class="api-state" id="api-state" role="status" aria-live="polite">
+            <span class="state-light"></span>
+            <span id="api-state-label">CHECKING API</span>
+          </div>
+        </div>
+      </header>
+
+      <section class="dashboard-grid" aria-label="Crew health overview">
+        <aside class="telemetry-column">
+          <section class="panel telemetry-panel">
+            <div class="panel-heading">
+              <div>
+                <span class="eyebrow">BIO-MONITOR</span>
+                <h1>Vitals &amp; environment</h1>
+              </div>
+              <span class="data-badge" id="data-badge">WAITING</span>
+            </div>
+
+            <div class="vital-grid">
+              <article class="vital-card heart-card">
+                <div class="vital-title"><span class="vital-icon heart-icon" aria-hidden="true">&#9829;</span><span>Heart rate</span></div>
+                <div class="vital-reading"><strong id="hr-val">—</strong><span>bpm</span></div>
+                <svg class="micro-trace heart-trace" viewBox="0 0 160 24" preserveAspectRatio="none" aria-hidden="true">
+                  <path d="" />
+                </svg>
+              </article>
+              <article class="vital-card bp-card">
+                <div class="vital-title"><span class="vital-icon bp-icon" aria-hidden="true">&#8597;</span><span>Blood pressure</span></div>
+                <div class="vital-reading"><strong id="bp-val">—</strong><span>mmHg</span></div>
+                <div class="vital-note">SYSTOLIC / DIASTOLIC</div>
+              </article>
+              <article class="vital-card lung-card">
+                <div class="vital-title"><span class="vital-icon lung-icon" aria-hidden="true">◉</span><span>Blood oxygen</span></div>
+                <div class="vital-reading"><strong id="spo2-val">—</strong><span>% SpO₂</span></div>
+                <div class="meter"><span id="spo2-meter"></span></div>
+              </article>
+              <article class="vital-card">
+                <div class="vital-title"><span class="vital-icon resp-icon" aria-hidden="true">⌁</span><span>Respiration</span></div>
+                <div class="vital-reading"><strong id="rr-val">—</strong><span>breaths/min</span></div>
+                <div class="vital-note">RESPIRATORY RATE</div>
+              </article>
+            </div>
+
+            <div class="section-divider"></div>
+            <div class="subsection-heading">
+              <span class="eyebrow">SECONDARY BIOMETRICS</span>
+              <span class="telemetry-rate">1 Hz PACKET SCHEMA</span>
+            </div>
+            <div class="secondary-metrics">
+              <div class="secondary-metric"><span>Heart variability</span><strong><b id="hrv-val">—</b><small>ms</small></strong></div>
+              <div class="secondary-metric"><span>Core temperature</span><strong><b id="temp-val">—</b><small>°C</small></strong></div>
+              <div class="secondary-metric"><span>Cabin CO₂</span><strong><b id="co2-val">—</b><small>mmHg</small></strong></div>
+              <div class="secondary-metric"><span>Radiation</span><strong><b id="rad-val">—</b><small>mSv/h</small></strong></div>
+              <div class="secondary-metric"><span>Suit pressure</span><strong><b id="suit-pressure-val">—</b><small>psi</small></strong></div>
+              <div class="secondary-metric"><span>Activity</span><strong class="activity-value" id="activity-badge">—</strong></div>
+            </div>
+          </section>
+
+          <section class="panel crew-panel">
+            <div class="crew-avatar" aria-hidden="true">—</div>
+            <div class="crew-copy">
+              <span class="eyebrow">CREW MEMBER</span>
+              <strong id="astronaut-name">—</strong>
+              <small id="astronaut-id">—</small>
+            </div>
+            <span class="crew-indicator" title="Crew telemetry selected"></span>
+          </section>
+        </aside>
+
+        <section class="panel body-panel" aria-labelledby="body-panel-title">
+          <div class="panel-heading body-heading">
+            <div>
+              <span class="eyebrow">ANATOMICAL TELEMETRY</span>
+              <h2 id="body-panel-title">Crew health model</h2>
+            </div>
+            <span class="model-badge"><span class="model-dot"></span> ORGAN STATUS</span>
+          </div>
+
+          <div class="body-stage">
+            <div class="body-halo" aria-hidden="true"></div>
+            <div class="body-callout callout-head">
+              <span class="organ-pin pin-sans" id="pin-brain"></span>
+              <span><b>SANS-01</b><small id="head-organ-value">—</small></span>
+            </div>
+            <div class="body-callout callout-heart">
+              <span class="organ-pin pin-cv" id="pin-heart"></span>
+              <span><b>CV-02</b><small id="heart-organ-value">—</small></span>
+            </div>
+            <div class="body-callout callout-lungs">
+              <span class="organ-pin pin-eclss" id="pin-lungs"></span>
+              <span><b>ECLSS-03</b><small id="lungs-organ-value">—</small></span>
+            </div>
+            <div class="body-callout callout-core">
+              <span class="organ-pin pin-rad" id="pin-core"></span>
+              <span><b>RAD-04</b><small id="core-organ-value">—</small></span>
+            </div>
+
+            <div id="body-canvas" aria-label="Interactive anatomical model"></div>
+            <p id="model-status" role="status">Loading anatomical model…</p>
+            <div class="model-tools"><button id="reset-view" type="button">Reset view</button><button id="auto-rotate" type="button" aria-pressed="true">Auto rotate</button></div>
+          </div>
+
+          <div id="selected-region" role="status">Select an organ or region label to inspect telemetry.</div>
+          <div class="body-legend">
+            <span><i class="legend-dot nominal"></i>NOMINAL</span>
+            <span><i class="legend-dot warning"></i>ATTENTION</span>
+            <span><i class="legend-dot critical"></i>CRITICAL</span>
+            <small>PIN COLORS FROM EDGE ASSESSMENT</small>
+          </div>
+        </section>
+
+        <aside class="clinical-column">
+          <section class="panel clinical-panel" aria-labelledby="clinical-title">
+            <div class="panel-heading clinical-heading">
+              <div>
+                <span class="eyebrow">ONBOARD CLINICAL ENGINE</span>
+                <h2 id="clinical-title">Assessment</h2>
+              </div>
+              <span class="engine-mark" aria-hidden="true">AI</span>
+            </div>
+
+            <div class="mars-banner" id="comms-delay-banner">
+              <span class="mars-icon" aria-hidden="true">⌁</span>
+              <span><b>DELAY-TOLERANT CARE</b><small id="comms-detail">Earth medical uplink · delay unavailable</small></span>
+              <span class="uplink-light"></span>
+            </div>
+
+            <div class="diagnosis-card" id="diagnosis-card" aria-live="polite">
+              <div class="diagnosis-topline">
+                <span class="result-mode" id="result-mode">AWAITING ASSESSMENT</span>
+                <span class="result-severity" id="result-severity">—</span>
+              </div>
+              <h3 id="diagnosis-title">Telemetry ready</h3>
+              <p id="diagnosis-summary">Choose a case and simulate a crisis to see the onboard clinical engine result.</p>
+              <div class="confidence-row">
+                <span>ENGINE CONFIDENCE</span>
+                <strong id="confidence-value">—</strong>
+              </div>
+              <div class="confidence-track"><span id="confidence-meter"></span></div>
+            </div>
+
+            <div id="assessment-details" class="assessment-details"></div>
+            <p id="clinical-error" class="clinical-error" role="alert" hidden></p>
+            <div class="clinical-detail">
+              <div class="detail-title">
+                <span class="eyebrow">RECOMMENDED ACTIONS</span>
+                <span id="action-count">0</span>
+              </div>
+              <ol class="action-list" id="treatment-checklist">
+                <li class="empty-action">Actions from the assessment will appear here.</li>
+              </ol>
+            </div>
+
+            <button id="apply-treatment" class="recovery-button" type="button" disabled>Start simulated recovery</button>
+            <p id="checklist-status" role="status">Checklist records operator acknowledgement only.</p>
+            <div class="citation" id="nasa-citation">
+              <span class="citation-mark" aria-hidden="true">§</span>
+              <span><b>CLINICAL SOURCE</b><small id="citation-text">Verified NASA citation unavailable until returned by the backend.</small></span>
+            </div>
+            <p class="clinical-disclaimer">Simulation decision support only · unverified project clinical content. Confirm actions with mission medical protocol.</p>
+          </section>
+        </aside>
+      </section>
+
+      <footer class="statusbar">
+        <div class="symptom-feed">
+          <span class="feed-dot"></span>
+          <span class="eyebrow">CREW REPORT</span>
+          <span id="symptom-feed">Waiting for telemetry.</span>
+        </div>
+        <div class="statusbar-right">
+          <span id="packet-source">WAITING FOR TELEMETRY</span>
+          <span class="footer-divider"></span>
+          <span id="assessment-latency">ENGINE STANDBY</span>
+        </div>
+      </footer>
+    </main>
+    <script type="importmap">{"imports":{"three":"./vendor/three/three.module.js","three/addons/":"./vendor/three/addons/"}}</script>
+    <script type="module" src="js/app.js"></script>
+  </body>
+</html>

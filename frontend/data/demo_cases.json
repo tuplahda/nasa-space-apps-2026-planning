@@ -1,0 +1,1145 @@
+{
+  "notice": "OFFLINE DEMONSTRATION ONLY. Snapshot of repository diagnosis examples and local deterministic pipeline. Not NASA-verified medical assessments.",
+  "cases": {
+    "hypercapnia": {
+      "packet": {
+        "timestamp": "2026-11-14T10:15:30Z",
+        "met": "042:14:30:12",
+        "mission_day": 84,
+        "astronaut_id": "ASTRO-01",
+        "name": "Cmdr. Alex Vance",
+        "activity_state": "EVA_SPACEWALK",
+        "vitals": {
+          "heart_rate": 118,
+          "blood_pressure_sys": 142,
+          "blood_pressure_dia": 92,
+          "spo2": 95.8,
+          "hrv_ms": 22.4,
+          "core_temp_c": 37.6,
+          "respiration_rate": 20
+        },
+        "environment": {
+          "cabin_co2_mmhg": 12.8,
+          "ambient_radiation_msv_h": 0.054,
+          "suit_pressure_psi": 4.3
+        },
+        "symptom_log": "Throbbing frontal headache, facial flushing, air feels sluggish and short of breath.",
+        "force_mode_b": false
+      },
+      "assessment": {
+        "diagnosis_id": "DIAG-2026-PNIA",
+        "mode": "MODE_A_KNOWN_CONDITION",
+        "scenario_id": "SCENARIO_1_HYPERCAPNIA",
+        "confidence": 0.99,
+        "diagnosis": "Acute and Chronic Hypercapnia (CO2 Toxicity & ECLSS Scrubbing Degradation)",
+        "condition": "Acute and Chronic Hypercapnia (CO2 Toxicity & ECLSS Scrubbing Degradation)",
+        "diagnosis_title": "Acute and Chronic Hypercapnia (CO2 Toxicity & ECLSS Scrubbing Degradation)",
+        "severity": "CLASS_1_EMERGENCY",
+        "nasa_direct_quote": "The system shall limit the average one-hour CO2 partial pressure (ppCO2) in the habitable volume to no more than 3 mmHg.",
+        "source_document": "NASA-STD-3001 Volume 2, Revision F (2026-07-14)",
+        "clinical_protocol_source": "rag_protocols_8_scenarios.json",
+        "clinical_protocol_verification_status": "UNVERIFIED_SIMULATION_CONTENT",
+        "nasa_source_summary": "NASA-STD-3001 Volume 2, Revision F (2026-07-14), 6.2.1.3, p. 51 \u2014 https://standards.nasa.gov/system/files/tmp/NASA-STD-3001%20Vol%202%20Rev%20F.pdf#page=51",
+        "nasa_citations": [
+          "NASA-STD-3001 Vol 2 Rev F, 6.2.1.3 [V2 6004] (The habitable system must limit average cabin CO2 partial pressure to 3 mmHg over one hour).",
+          "OCHMO-TB-004 Rev D, pp. 8-9 (The technical brief describes ISS carbon dioxide removal systems)."
+        ],
+        "nasa_citation": {
+          "standard_id": "V2 6004",
+          "document": "NASA-STD-3001 Volume 2, Revision F (2026-07-14)",
+          "section": "6.2.1.3, p. 51",
+          "url": "https://standards.nasa.gov/system/files/tmp/NASA-STD-3001%20Vol%202%20Rev%20F.pdf#page=51"
+        },
+        "checs_subpack": "CMP / TIMP / RSP",
+        "prescriptions": [
+          {
+            "medication": "100% Normobaric O2",
+            "drug": "100% Normobaric O2",
+            "checs_pack": "TIMP / RSP",
+            "pack": "TIMP / RSP",
+            "route": "Respiratory Support Pack (RSP) via demand mask",
+            "dosage": "15 L/min continuous for 30 minutes (if ppCO2 > 5.0 mmHg or trigeminal symptoms)",
+            "formulary_verified": true,
+            "formulary_med_id": null,
+            "contraindication": "",
+            "contraindication_warning": ""
+          },
+          {
+            "medication": "Acetaminophen 650mg (or Ibuprofen 400mg)",
+            "drug": "Acetaminophen 650mg (or Ibuprofen 400mg)",
+            "checs_pack": "CMP",
+            "pack": "CMP",
+            "route": "Oral (PO)",
+            "dosage": "Acetaminophen 325-650 mg PO or Ibuprofen 400-600 mg PO (every 6 hours PRN for hypercapnic cephalea)",
+            "formulary_verified": true,
+            "formulary_med_id": "CHECS-001",
+            "contraindication": "",
+            "contraindication_warning": ""
+          }
+        ],
+        "checs_medications": [
+          {
+            "drug": "Ibuprofen 400-600 mg PO or Acetaminophen 325-650 mg PO",
+            "pack": "Convenience Medications Pack (CMP)",
+            "contraindication": "STRICT CONTRAINDICATION: Do NOT administer opioids (Hydrocodone/Hydromorphone) \u2014 suppresses central respiratory drive and worsens CO2 retention.",
+            "contraindication_warning": "STRICT CONTRAINDICATION: Do NOT administer opioids (Hydrocodone/Hydromorphone) \u2014 suppresses central respiratory drive and worsens CO2 retention."
+          }
+        ],
+        "hardware_and_diagnostics": [
+          "Deploy portable inter-module ventilation fans and run ECLSS diagnostics on CDRA 4BMS zeolite / CAMRAS amine beds.",
+          "If ppCO2 > 5.0 mmHg or trigeminal symptoms: deploy 100% O2 via demand mask (RSP) and run i-STAT venous blood gas (MDP)."
+        ],
+        "contraindications_locked": [
+          "OPIOIDS (Morphine/Fentanyl/Hydrocodone/Hydromorphone) \u2014 PROHIBITED: Suppresses central respiratory drive and worsens CO2 retention / respiratory acidosis",
+          "OPIOIDS & SEDATIVES \u2014 PROHIBITED by the project hypercapnia/hypoxia lockout."
+        ],
+        "action_checklist": [
+          {
+            "step": 1,
+            "action": "Relocate crewmember out of low-ventilation compartment (Crew Quarters / Glovebox) immediately.",
+            "critical": true,
+            "completed": false
+          },
+          {
+            "step": 2,
+            "action": "Deploy portable inter-module ventilation fans and run ECLSS diagnostics on CDRA 4BMS zeolite / CAMRAS amine beds.",
+            "critical": true,
+            "completed": false
+          },
+          {
+            "step": 3,
+            "action": "If ppCO2 > 5.0 mmHg or trigeminal symptoms: deploy 100% O2 via demand mask (RSP) and run i-STAT venous blood gas (MDP).",
+            "critical": true,
+            "completed": false
+          },
+          {
+            "step": 4,
+            "action": "Administer Ibuprofen 400 mg PO or Acetaminophen 650 mg PO from CMP (avoid opioids).",
+            "critical": false,
+            "completed": false
+          },
+          {
+            "step": 5,
+            "action": "Suspend 75% VO2max ARED exercise and shift crew diet toward higher fat (RQ -> 0.85) to cut metabolic CO2 production by 20%.",
+            "critical": false,
+            "completed": false
+          }
+        ],
+        "action_plan": [
+          {
+            "step": 1,
+            "action": "Relocate crewmember out of low-ventilation compartment (Crew Quarters / Glovebox) immediately.",
+            "critical": true,
+            "completed": false
+          },
+          {
+            "step": 2,
+            "action": "Deploy portable inter-module ventilation fans and run ECLSS diagnostics on CDRA 4BMS zeolite / CAMRAS amine beds.",
+            "critical": true,
+            "completed": false
+          },
+          {
+            "step": 3,
+            "action": "If ppCO2 > 5.0 mmHg or trigeminal symptoms: deploy 100% O2 via demand mask (RSP) and run i-STAT venous blood gas (MDP).",
+            "critical": true,
+            "completed": false
+          },
+          {
+            "step": 4,
+            "action": "Administer Ibuprofen 400 mg PO or Acetaminophen 650 mg PO from CMP (avoid opioids).",
+            "critical": false,
+            "completed": false
+          },
+          {
+            "step": 5,
+            "action": "Suspend 75% VO2max ARED exercise and shift crew diet toward higher fat (RQ -> 0.85) to cut metabolic CO2 production by 20%.",
+            "critical": false,
+            "completed": false
+          }
+        ],
+        "autonomous_checklist": [
+          {
+            "step": 1,
+            "action": "Relocate crewmember out of low-ventilation compartment (Crew Quarters / Glovebox) immediately.",
+            "critical": true,
+            "completed": false
+          },
+          {
+            "step": 2,
+            "action": "Deploy portable inter-module ventilation fans and run ECLSS diagnostics on CDRA 4BMS zeolite / CAMRAS amine beds.",
+            "critical": true,
+            "completed": false
+          },
+          {
+            "step": 3,
+            "action": "If ppCO2 > 5.0 mmHg or trigeminal symptoms: deploy 100% O2 via demand mask (RSP) and run i-STAT venous blood gas (MDP).",
+            "critical": true,
+            "completed": false
+          },
+          {
+            "step": 4,
+            "action": "Administer Ibuprofen 400 mg PO or Acetaminophen 650 mg PO from CMP (avoid opioids).",
+            "critical": false,
+            "completed": false
+          },
+          {
+            "step": 5,
+            "action": "Suspend 75% VO2max ARED exercise and shift crew diet toward higher fat (RQ -> 0.85) to cut metabolic CO2 production by 20%.",
+            "critical": false,
+            "completed": false
+          }
+        ],
+        "triggering_vitals": [
+          "Diastolic BP: 92.0 mmHg (Expected \u03bcg: 70-84 mmHg | > 85 mmHg (Warning Max))",
+          "Cabin CO2: 12.8 mmHg (Expected \u03bcg: < 2.0 mmHg | > 12.5 mmHg (Suit Limit))"
+        ],
+        "retrieved_evidence_chunks": [
+          "[Project protocol: rag_protocols_8_scenarios.json | SCENARIO_1_HYPERCAPNIA | unverified clinical simulation] Acute and Chronic Hypercapnia (CO2 Toxicity & ECLSS Scrubbing Degradation)",
+          "[NASA source: NASA-STD-3001 Volume 2, Revision F (2026-07-14) | 6.2.1.3, p. 51 | https://standards.nasa.gov/system/files/tmp/NASA-STD-3001%20Vol%202%20Rev%20F.pdf#page=51 | V2 6004] The system shall limit the average one-hour CO2 partial pressure (ppCO2) in the habitable volume to no more than 3 mmHg.",
+          "[Source: nasa_space_medicine_research.md | Scenario 1: Acute & Chronic Hypercapnia ($\\text{CO}_2$ Toxicity & ECLSS Scrubbing Degradation)] - **Layer 1 Math ($\\Delta\\text{CO}_2(t) = \\max(0, pp\\text{CO}_2(t) - 2.0)$, $pp\\text{CO}_2(t) = 2.0 + r_{\\text{leak}} \\cdot t$):**   - $RR(t) = RR_{\\text{base}} + 0.45 \\cdot \\Delta\\text{CO}_2(t) + \\epsilon_t$   - $\\dot{V}_E(t) = \\dot{V}_{E,\\text{base}} + 0.89 \\cdot \\Delta\\text{CO}_2(t)$   - $HR(t) = HR_{\\text{base}} + 1.8 \\cdot \\Delta\\text{CO}_2(t)$   - $SBP(t) = SBP_{\\text{base}} + 1.4 \\cdot \\Delta\\text{CO}_2(t)$, $DBP(t) = DBP_{\\text{base}} + 0.6 \\cdot \\Delta\\text{CO}_2(t)$   - $HRV_{\\text{RMSSD}}(t) = HRV_{\\text{base}} - 2.2 \\cdot \\Delta\\text{CO}_2(t)$   - $\\text{Cognitive Throughput}(t) = ",
+          "[Source: arxiv_literature_citations.json | arXiv:2609.00256v2] NSIDDx: A Design Framework for Neuro-Symbolic, Practitioner-First Differential Diagnosis in Low-Resource Settings: Demonstrates that open-ended LLM+RAG pipelines produce unverifiable outputs on uncommon clinical presentations, whereas a Neuro-Symbolic pipeline (combining deterministic clinical rules with RAG) ensures verifiable differential diagnosis in isolated settings.",
+          "[Source: checs_formulary.json | CHECS-001] Acetaminophen Analgesic Antipyretic CMP 325-650 mg PO headache fever pain. Lockout: hepatic injury, elevated AST/ALT. Safe alternative when NSAIDs are locked out due to renal stones or thrombocytopenia.",
+          "[Source: nasa_space_medicine_research.md | RESEARCH_SCENARIO_1] SCENARIO_1: [Source: nasa_space_medicine_research.md | Scenario 1: Acute & Chronic Hypercapnia ($\\text{CO}_2$ Toxicity & ECLSS Scrubbing Degradation)] - **Layer 1 Math ($\\Delta\\text{CO}_2(t) = \\max(0, pp\\text{CO}_2(t) - 2.0)$, $pp\\text{CO}_2(t) = 2.0 + r_{\\text{leak}} \\cdot t$):**   - $RR(t) = RR_{\\text{base}} + 0.45 \\cdot \\Delta\\text{CO}_2(t) + \\epsilon_t$   - $\\dot{V}_E(t) = \\dot{V}_{E,\\text{base}} + 0.89 \\cdot \\Delta\\text{CO}_2(t)$   - $HR(t) = HR_{\\text{base}} + 1.8 \\cdot \\Delta\\text{CO}_2(t)$   - $SBP(t) = SBP_{\\text{base}} + 1.4 \\cdot \\Delta\\text{CO}_2(t)$, $DBP(t) = DBP_{\\text{base}} + 0.6 \\cdot \\Delta\\text{CO}_2(t)$   - $HRV_{\\text{RMSSD}}(t) = HRV_{\\text{base}} - 2.2 \\cdot \\Delta\\text{CO}_2(t)$   - $\\text{Cognitive Throughput}(t) = ",
+          "[Source: checs_formulary.json | CHECS-005] Hydromorphone (): Hydromorphone Opioid TIMP 1-2 mg IV IM severe trauma burns surgical pain. Lockout: severe hypercapnia, elevated ppCO2, hypotension. Reduced IM bioavailability in microgravity, prefer IV.",
+          "[Source: checs_formulary.json | CHECS-004] Hydrocodone/Acetaminophen (): Hydrocodone APAP Acetaminophen Opioid OMP 5/325 mg PO moderate severe trauma pain. Lockout: hypercapnia, elevated ppCO2, respiratory depression, hepatic injury, active EVA."
+        ],
+        "clinical_reasoning": "Evaluated under EVA_SPACEWALK (Adapted Microgravity Baseline, FD 84). Matched SCENARIO_1_HYPERCAPNIA with 99% 3-signal neuro-symbolic confidence (Symbolic=0.86, BM25=0.75, TrigramVec=0.53). Sanitized Symptom Log: 'Throbbing frontal headache, facial flushing, air feels sluggish and short of breath.'.",
+        "organ_hud_status": {
+          "SANS-01": "RED",
+          "CV-02": "AMBER",
+          "ECLSS-03": "RED",
+          "RAD-04": "CYAN"
+        },
+        "risk_score_0_100": 78,
+        "readiness_score_0_100": 22,
+        "execution_time_ms": 2.567,
+        "cache_hit": false,
+        "source_mode": "DETERMINISTIC_LOCAL_KNOWLEDGE_BASE",
+        "source_verification_status": "NOT_EXTERNALLY_VERIFIED",
+        "rag_metrics": {
+          "retrieval_latency_ms": 1.202,
+          "protocols_evaluated": 40,
+          "evidence_chunks_used": 8,
+          "signal_breakdown": {
+            "symbolic": 0.86,
+            "bm25_lexical": 0.75,
+            "trigram_vector": 0.53,
+            "fused": 0.99
+          }
+        },
+        "retrieval_scores": {
+          "SCENARIO_1_HYPERCAPNIA": 0.99,
+          "SCENARIO_2_SANS": 0.05,
+          "SCENARIO_3_ORTHOSTATIC_INTOLERANCE": 0.05,
+          "SCENARIO_4_SOLAR_RADIATION_ARS": 0.282,
+          "SCENARIO_5_EVA_THERMAL_DCS": 0.199,
+          "SCENARIO_6_CIRCADIAN_SLEEP": 0.05,
+          "SCENARIO_7_IJV_THROMBOSIS_ARRHYTHMIA": 0.58,
+          "SCENARIO_8_SAS_URINARY_RETENTION": 0.28,
+          "CPG-01": 0.197,
+          "CPG-02": 0.548,
+          "CPG-03": 0.154,
+          "CPG-04": 0.422,
+          "CPG-05": 0.05,
+          "CPG-06": 0.171,
+          "CPG-07": 0.99,
+          "CPG-08": 0.115,
+          "CPG-09": 0.05,
+          "CPG-10": 0.05,
+          "CPG-11": 0.05,
+          "CPG-12": 0.063,
+          "CPG-13": 0.05,
+          "CPG-14": 0.05,
+          "CPG-15": 0.05,
+          "CPG-16": 0.216,
+          "CPG-17": 0.124,
+          "CPG-18": 0.282,
+          "CPG-19": 0.05,
+          "CPG-20": 0.05,
+          "CPG-21": 0.181,
+          "CPG-22": 0.09,
+          "CPG-23": 0.255,
+          "CPG-24": 0.165,
+          "CPG-25": 0.198,
+          "CPG-26": 0.167,
+          "CPG-27": 0.174,
+          "CPG-28": 0.05,
+          "CPG-29": 0.168,
+          "CPG-30": 0.163,
+          "CPG-31": 0.05,
+          "CPG-32": 0.05
+        },
+        "total_pipeline_latency_ms": 3.348,
+        "layer2_assessment": {
+          "astronaut_id": "ASTRO-01",
+          "normalized_activity_state": "EVA_SPACEWALK",
+          "mission_day": 84,
+          "alert_level": "CRITICAL_RED",
+          "nasa_priority_class": "CLASS_1_EMERGENCY",
+          "risk_score_0_100": 78,
+          "readiness_score_0_100": 22,
+          "domain_scores": {
+            "hemodynamic_30pct": 50,
+            "respiratory_thermal_25pct": 6,
+            "autonomic_neuro_ocular_20pct": 6,
+            "environmental_radiation_25pct": 79
+          },
+          "context_evaluated": "EVA_SPACEWALK (Adapted Microgravity Baseline, FD 84)",
+          "space_fever_adapted": true,
+          "seu_candidates_filtered": [],
+          "breached_parameters": [
+            {
+              "parameter": "dbp_mmHg",
+              "display_name": "Diastolic BP",
+              "value": 92.0,
+              "threshold": 85.0,
+              "unit": "mmHg",
+              "expected_ug_range": "70-84 mmHg",
+              "threshold_breached": "> 85 mmHg (Warning Max)",
+              "severity": "WARNING_YELLOW",
+              "standard_ref": "Project physiology baseline",
+              "rolling_avg_10s": 92.0,
+              "slew_rate_per_sec": 0.0,
+              "debounced": true
+            },
+            {
+              "parameter": "cabin_ppCO2_mmHg",
+              "display_name": "Cabin CO2",
+              "value": 12.8,
+              "threshold": 12.5,
+              "unit": "mmHg",
+              "expected_ug_range": "< 2.0 mmHg",
+              "threshold_breached": "> 12.5 mmHg (Suit Limit)",
+              "severity": "CRITICAL_RED",
+              "standard_ref": "Project CO2 alert (NASA V2 6004 uses a 1-hour average)",
+              "rolling_avg_10s": 12.8,
+              "slew_rate_per_sec": 0.0,
+              "debounced": true
+            }
+          ],
+          "triggering_vitals_summary": [
+            "Diastolic BP: 92.0 mmHg (Expected \u03bcg: 70-84 mmHg | > 85 mmHg (Warning Max))",
+            "Cabin CO2: 12.8 mmHg (Expected \u03bcg: < 2.0 mmHg | > 12.5 mmHg (Suit Limit))"
+          ],
+          "organ_hud_status": {
+            "SANS-01": "RED",
+            "CV-02": "AMBER",
+            "ECLSS-03": "RED",
+            "RAD-04": "CYAN"
+          },
+          "trigger_rag_consultation": true
+        },
+        "comms_status": null,
+        "cabin_environment": {
+          "cabin_pressure_kPa": null,
+          "cabin_temp_C": null
+        }
+      }
+    },
+    "solar": {
+      "packet": {
+        "timestamp": "2026-11-14T11:00:00Z",
+        "met": "042:15:15:00",
+        "mission_day": 84,
+        "astronaut_id": "ASTRO-01",
+        "name": "Cmdr. Alex Vance",
+        "activity_state": "EVA_SPACEWALK",
+        "vitals": {
+          "heart_rate": 98,
+          "blood_pressure_sys": 96,
+          "blood_pressure_dia": 64,
+          "spo2": 97.0,
+          "hrv_ms": 19.0,
+          "core_temp_c": 38.4,
+          "respiration_rate": 18
+        },
+        "environment": {
+          "cabin_co2_mmhg": 2.1,
+          "ambient_radiation_msv_h": 4.2,
+          "suit_pressure_psi": 4.3,
+          "donki_spe_active": true
+        },
+        "symptom_log": "Sudden anorexia, severe nausea, throwing up repeatedly, acute fatigue.",
+        "force_mode_b": false
+      },
+      "assessment": {
+        "diagnosis_id": "DIAG-2026-_ARS",
+        "mode": "MODE_A_KNOWN_CONDITION",
+        "scenario_id": "SCENARIO_4_SOLAR_RADIATION_ARS",
+        "confidence": 0.99,
+        "diagnosis": "Acute Radiation Syndrome (ARS) from Solar Particle Event (SPE)",
+        "condition": "Acute Radiation Syndrome (ARS) from Solar Particle Event (SPE)",
+        "diagnosis_title": "Acute Radiation Syndrome (ARS) from Solar Particle Event (SPE)",
+        "severity": "CLASS_1_EMERGENCY",
+        "nasa_direct_quote": "All crewmember radiation exposures shall be minimized using the ALARA principle.",
+        "source_document": "NASA-STD-3001 Volume 1, Revision C",
+        "clinical_protocol_source": "rag_protocols_8_scenarios.json",
+        "clinical_protocol_verification_status": "UNVERIFIED_SIMULATION_CONTENT",
+        "nasa_source_summary": "NASA-STD-3001 Volume 1, Revision C, 4.8.1 \u2014 https://standards.nasa.gov/sites/default/files/standards/NASA/C/nasa-std-3001-vol-1-rev-c-signature.pdf",
+        "nasa_citations": [
+          "NASA-STD-3001 Vol 1 Rev C, 4.8.1 [V1 4029] (Crew radiation protection uses the ALARA principle).",
+          "NASA-STD-3001 Vol 1 Rev C, 4.8.3 [V1 4031] (The system design must protect the crew against a specified solar particle reference event).",
+          "NASA CCMC DONKI, About and Catalogs (The research catalog records solar flares and solar energetic particle events)."
+        ],
+        "nasa_citation": {
+          "standard_id": "V1 4029",
+          "document": "NASA-STD-3001 Volume 1, Revision C",
+          "section": "4.8.1",
+          "url": "https://standards.nasa.gov/sites/default/files/standards/NASA/C/nasa-std-3001-vol-1-rev-c-signature.pdf"
+        },
+        "checs_subpack": "OMP / TIMP / ISP",
+        "prescriptions": [
+          {
+            "medication": "Ondansetron 4-8 mg ODT/IV + 0.9% Normal Saline IV",
+            "drug": "Ondansetron 4-8 mg ODT/IV + 0.9% Normal Saline IV",
+            "checs_pack": "OMP / TIMP / ISP",
+            "pack": "OMP / TIMP / ISP",
+            "route": "Oral / IV via ISP",
+            "dosage": "Ondansetron 4-8 mg ODT/IV + 0.9% Normal Saline IV rehydration with i-STAT electrolytes",
+            "formulary_verified": true,
+            "formulary_med_id": "CHECS-019",
+            "contraindication": "",
+            "contraindication_warning": ""
+          }
+        ],
+        "checs_medications": [
+          {
+            "drug": "Ondansetron 4-8 mg ODT/IV, Levofloxacin 500 mg PO, Valacyclovir, Fluconazole, Acetaminophen",
+            "pack": "OMP & TIMP",
+            "contraindication": "STRICT CONTRAINDICATION: Avoid Aspirin and NSAIDs (Ibuprofen/Ketorolac) \u2014 radiation thrombocytopenia creates severe GI hemorrhage risk.",
+            "contraindication_warning": "STRICT CONTRAINDICATION: Avoid Aspirin and NSAIDs (Ibuprofen/Ketorolac) \u2014 radiation thrombocytopenia creates severe GI hemorrhage risk."
+          }
+        ],
+        "hardware_and_diagnostics": [
+          "Administer Ondansetron 4-8 mg ODT/IV (OMP/TIMP) and initiate 0.9% Normal Saline IV rehydration (ISP) with i-STAT electrolytes.",
+          "Perform serial C2M2 offline Complete Blood Count (CBC) assays every 6 hours to track Andrews lymphocyte depletion kinetics."
+        ],
+        "contraindications_locked": [
+          "NSAIDs & ASPIRIN (Ibuprofen/Ketorolac/Aspirin) \u2014 PROHIBITED: Radiation thrombocytopenia creates severe GI hemorrhage risk",
+          "NSAIDs, ASPIRIN & ANTICOAGULANTS \u2014 PROHIBITED by the project radiation/bleeding-risk lockout."
+        ],
+        "action_checklist": [
+          {
+            "step": 1,
+            "action": "In this exercise, simulate EVA termination and shelter entry when the scenario injects a solar event and local dosimetry alert.",
+            "critical": true,
+            "completed": false
+          },
+          {
+            "step": 2,
+            "action": "Administer Ondansetron 4-8 mg ODT/IV (OMP/TIMP) and initiate 0.9% Normal Saline IV rehydration (ISP) with i-STAT electrolytes.",
+            "critical": true,
+            "completed": false
+          },
+          {
+            "step": 3,
+            "action": "Perform serial C2M2 offline Complete Blood Count (CBC) assays every 6 hours to track Andrews lymphocyte depletion kinetics.",
+            "critical": true,
+            "completed": false
+          }
+        ],
+        "action_plan": [
+          {
+            "step": 1,
+            "action": "In this exercise, simulate EVA termination and shelter entry when the scenario injects a solar event and local dosimetry alert.",
+            "critical": true,
+            "completed": false
+          },
+          {
+            "step": 2,
+            "action": "Administer Ondansetron 4-8 mg ODT/IV (OMP/TIMP) and initiate 0.9% Normal Saline IV rehydration (ISP) with i-STAT electrolytes.",
+            "critical": true,
+            "completed": false
+          },
+          {
+            "step": 3,
+            "action": "Perform serial C2M2 offline Complete Blood Count (CBC) assays every 6 hours to track Andrews lymphocyte depletion kinetics.",
+            "critical": true,
+            "completed": false
+          }
+        ],
+        "autonomous_checklist": [
+          {
+            "step": 1,
+            "action": "In this exercise, simulate EVA termination and shelter entry when the scenario injects a solar event and local dosimetry alert.",
+            "critical": true,
+            "completed": false
+          },
+          {
+            "step": 2,
+            "action": "Administer Ondansetron 4-8 mg ODT/IV (OMP/TIMP) and initiate 0.9% Normal Saline IV rehydration (ISP) with i-STAT electrolytes.",
+            "critical": true,
+            "completed": false
+          },
+          {
+            "step": 3,
+            "action": "Perform serial C2M2 offline Complete Blood Count (CBC) assays every 6 hours to track Andrews lymphocyte depletion kinetics.",
+            "critical": true,
+            "completed": false
+          }
+        ],
+        "triggering_vitals": [
+          "Systolic BP: 96.0 mmHg (Expected \u03bcg: 125-150 mmHg | < 98 mmHg (Warning Min))",
+          "Ambient Radiation: 4.2 mSv/h (Expected \u03bcg: < 0.06 mSv/h | >= 2.0 mSv/h (SPE Crisis))"
+        ],
+        "retrieved_evidence_chunks": [
+          "[Project protocol: rag_protocols_8_scenarios.json | SCENARIO_4_SOLAR_RADIATION_ARS | unverified clinical simulation] Acute Radiation Syndrome (ARS) from Solar Particle Event (SPE)",
+          "[NASA source: NASA-STD-3001 Volume 1, Revision C | 4.8.1 | https://standards.nasa.gov/sites/default/files/standards/NASA/C/nasa-std-3001-vol-1-rev-c-signature.pdf | V1 4029] All crewmember radiation exposures shall be minimized using the ALARA principle.",
+          "[NASA source: NASA-STD-3001 Volume 1, Revision C | 4.8.3 | https://standards.nasa.gov/sites/default/files/standards/NASA/C/nasa-std-3001-vol-1-rev-c-signature.pdf | V1 4031] Shielding design must keep effective dose below 250 mSv for the reference solar particle event based on the October 1989 events.",
+          "[Source: nasa_space_medicine_research.md | Scenario 4: Acute Radiation Syndrome (ARS) from Solar Particle Event (SPE)] - **Layer 1 Math:**   - $\\dot{D}_{\\text{BFO}}(t) = \\dot{D}_{\\text{GCR}} + A_{\\text{SPE}} \\cdot ((t - t_0)/\\tau)^{k-1} \\exp(-((t - t_0)/\\tau)^k)$ (`20\u2013150 mGy-Eq/hr` unshielded EVA)   - $CBT(t) = CBT_{\\text{base}} + 1.2 \\cdot (1 - e^{-(t - t_{\\text{onset}})/3.0})\\text{ }^\\circ\\text{C}$   - $HR(t) = HR_{\\text{base}} + 28 \\cdot (1 - e^{-(t - t_{\\text{onset}})/2.0})\\text{ bpm}$, $SBP(t) = SBP_{\\text{base}} - 16 \\cdot (1 - e^{-(t - t_{\\text{onset}})/4.0})\\text{ mmHg}$   - Andrews Lymphocyte Depletion: $\\text{ALC}(t) = 2100 \\cdot \\exp(-0.035 \\cdot D_{\\text{BFO, Sv}} \\cdot (t - t_0))\\text{ cells/}\\mu",
+          "[Source: arxiv_literature_citations.json | arXiv:2609.00256v2] NSIDDx: A Design Framework for Neuro-Symbolic, Practitioner-First Differential Diagnosis in Low-Resource Settings: Demonstrates that open-ended LLM+RAG pipelines produce unverifiable outputs on uncommon clinical presentations, whereas a Neuro-Symbolic pipeline (combining deterministic clinical rules with RAG) ensures verifiable differential diagnosis in isolated settings.",
+          "[Source: arxiv_literature_citations.json | arXiv:2208.00892v2] Crewed Missions to Mars: Modeling the Impact of Astrophysical Charged Particles on Astronauts and Their Health: Models Galactic Cosmic Ray (GCR) and Solar Particle Event (SPE) organ doses during Mars transit and surface operations, quantifying Acute Radiation Syndrome (ARS) risks.",
+          "[Source: checs_formulary.json | CHECS-001] Acetaminophen Analgesic Antipyretic CMP 325-650 mg PO headache fever pain. Lockout: hepatic injury, elevated AST/ALT. Safe alternative when NSAIDs are locked out due to renal stones or thrombocytopenia.",
+          "[Source: checs_formulary.json | CHECS-019] Ondansetron (): Ondansetron Antiemetic OMP 4-8 mg ODT nausea vomiting. Preferred over promethazine when alertness needed. Caution: QTc prolongation.",
+          "[Source: nasa_std_3001_rules.json (NASA-STD-3001 Volume 1, Revision C) | RULE_V1 4031] V1 4031 4.8.3: Shielding design must keep effective dose below 250 mSv for the reference solar particle event based on the October 1989 events.",
+          "[Source: checs_formulary.json | CHECS-021] Loperamide (): Loperamide Antidiarrheal CMP 2 mg PO gastroenteritis diarrhea. Lockout: radiation GI syndrome ARS, dysentery, bloody stool, small bowel obstruction SBO."
+        ],
+        "clinical_reasoning": "Evaluated under EVA_SPACEWALK (Adapted Microgravity Baseline, FD 84). Matched SCENARIO_4_SOLAR_RADIATION_ARS with 99% 3-signal neuro-symbolic confidence (Symbolic=0.87, BM25=0.75, TrigramVec=0.476). Sanitized Symptom Log: 'Sudden anorexia, severe nausea, throwing up repeatedly, acute fatigue.'.",
+        "organ_hud_status": {
+          "SANS-01": "CYAN",
+          "CV-02": "AMBER",
+          "ECLSS-03": "CYAN",
+          "RAD-04": "RED"
+        },
+        "risk_score_0_100": 78,
+        "readiness_score_0_100": 22,
+        "execution_time_ms": 1.896,
+        "cache_hit": false,
+        "source_mode": "DETERMINISTIC_LOCAL_KNOWLEDGE_BASE",
+        "source_verification_status": "NOT_EXTERNALLY_VERIFIED",
+        "rag_metrics": {
+          "retrieval_latency_ms": 0.64,
+          "protocols_evaluated": 40,
+          "evidence_chunks_used": 10,
+          "signal_breakdown": {
+            "symbolic": 0.87,
+            "bm25_lexical": 0.75,
+            "trigram_vector": 0.476,
+            "fused": 0.99
+          }
+        },
+        "retrieval_scores": {
+          "SCENARIO_1_HYPERCAPNIA": 0.283,
+          "SCENARIO_2_SANS": 0.05,
+          "SCENARIO_3_ORTHOSTATIC_INTOLERANCE": 0.347,
+          "SCENARIO_4_SOLAR_RADIATION_ARS": 0.99,
+          "SCENARIO_5_EVA_THERMAL_DCS": 0.05,
+          "SCENARIO_6_CIRCADIAN_SLEEP": 0.05,
+          "SCENARIO_7_IJV_THROMBOSIS_ARRHYTHMIA": 0.255,
+          "SCENARIO_8_SAS_URINARY_RETENTION": 0.502,
+          "CPG-01": 0.395,
+          "CPG-02": 0.191,
+          "CPG-03": 0.158,
+          "CPG-04": 0.237,
+          "CPG-05": 0.05,
+          "CPG-06": 0.05,
+          "CPG-07": 0.05,
+          "CPG-08": 0.05,
+          "CPG-09": 0.99,
+          "CPG-10": 0.05,
+          "CPG-11": 0.05,
+          "CPG-12": 0.05,
+          "CPG-13": 0.48,
+          "CPG-14": 0.05,
+          "CPG-15": 0.05,
+          "CPG-16": 0.334,
+          "CPG-17": 0.05,
+          "CPG-18": 0.167,
+          "CPG-19": 0.05,
+          "CPG-20": 0.05,
+          "CPG-21": 0.182,
+          "CPG-22": 0.05,
+          "CPG-23": 0.05,
+          "CPG-24": 0.163,
+          "CPG-25": 0.192,
+          "CPG-26": 0.186,
+          "CPG-27": 0.16,
+          "CPG-28": 0.05,
+          "CPG-29": 0.676,
+          "CPG-30": 0.186,
+          "CPG-31": 0.05,
+          "CPG-32": 0.242
+        },
+        "total_pipeline_latency_ms": 2.219,
+        "layer2_assessment": {
+          "astronaut_id": "ASTRO-01",
+          "normalized_activity_state": "EVA_SPACEWALK",
+          "mission_day": 84,
+          "alert_level": "CRITICAL_RED",
+          "nasa_priority_class": "CLASS_1_EMERGENCY",
+          "risk_score_0_100": 78,
+          "readiness_score_0_100": 22,
+          "domain_scores": {
+            "hemodynamic_30pct": 50,
+            "respiratory_thermal_25pct": 6,
+            "autonomic_neuro_ocular_20pct": 6,
+            "environmental_radiation_25pct": 85
+          },
+          "context_evaluated": "EVA_SPACEWALK (Adapted Microgravity Baseline, FD 84)",
+          "space_fever_adapted": true,
+          "seu_candidates_filtered": [],
+          "breached_parameters": [
+            {
+              "parameter": "sbp_mmHg",
+              "display_name": "Systolic BP",
+              "value": 96.0,
+              "threshold": 98.0,
+              "unit": "mmHg",
+              "expected_ug_range": "125-150 mmHg",
+              "threshold_breached": "< 98 mmHg (Warning Min)",
+              "severity": "WARNING_YELLOW",
+              "standard_ref": "Project physiology baseline",
+              "rolling_avg_10s": 96.0,
+              "slew_rate_per_sec": 0.0,
+              "debounced": true
+            },
+            {
+              "parameter": "ambient_radiation_msv_h",
+              "display_name": "Ambient Radiation",
+              "value": 4.2,
+              "threshold": 2.0,
+              "unit": "mSv/h",
+              "expected_ug_range": "< 0.06 mSv/h",
+              "threshold_breached": ">= 2.0 mSv/h (SPE Crisis)",
+              "severity": "CRITICAL_RED",
+              "standard_ref": "Project radiation alert threshold",
+              "rolling_avg_10s": 4.2,
+              "slew_rate_per_sec": 0.0,
+              "debounced": true
+            }
+          ],
+          "triggering_vitals_summary": [
+            "Systolic BP: 96.0 mmHg (Expected \u03bcg: 125-150 mmHg | < 98 mmHg (Warning Min))",
+            "Ambient Radiation: 4.2 mSv/h (Expected \u03bcg: < 0.06 mSv/h | >= 2.0 mSv/h (SPE Crisis))"
+          ],
+          "organ_hud_status": {
+            "SANS-01": "CYAN",
+            "CV-02": "AMBER",
+            "ECLSS-03": "CYAN",
+            "RAD-04": "RED"
+          },
+          "trigger_rag_consultation": true
+        },
+        "comms_status": null,
+        "cabin_environment": {
+          "cabin_pressure_kPa": null,
+          "cabin_temp_C": null
+        }
+      }
+    },
+    "zero-day": {
+      "packet": {
+        "timestamp": "2026-11-14T14:20:00Z",
+        "met": "042:18:35:00",
+        "mission_day": 84,
+        "astronaut_id": "ASTRO-01",
+        "name": "Cmdr. Alex Vance",
+        "activity_state": "IVA_REST",
+        "vitals": {
+          "heart_rate": 114,
+          "blood_pressure_sys": 84,
+          "blood_pressure_dia": 52,
+          "spo2": 89.2,
+          "hrv_ms": 14.0,
+          "core_temp_c": 38.9,
+          "respiration_rate": 24
+        },
+        "environment": {
+          "cabin_co2_mmhg": 2.0,
+          "ambient_radiation_msv_h": 0.054
+        },
+        "symptom_log": "Unexplained metallic taste, peripheral tingling, sudden weakness.",
+        "force_mode_b": false
+      },
+      "assessment": {
+        "diagnosis_id": "DIAG-2026-ZERODAY",
+        "mode": "MODE_B_NOVEL_ANOMALY",
+        "scenario_id": "MODE_B_ZERO_DAY",
+        "confidence": 0.44,
+        "diagnosis": "Unclassified Novel Anomaly \u2014 Symptom-Based Stabilization Active",
+        "condition": "Unclassified Novel Anomaly \u2014 Symptom-Based Stabilization Active",
+        "diagnosis_title": "Unclassified Novel Anomaly \u2014 Symptom-Based Stabilization Active",
+        "severity": "CLASS_1_EMERGENCY",
+        "abstention_reason": "Clinical match confidence 44% is below verified threshold (75%). Certified Abstention active (zero disease hallucination). Zero-Day Protocol initiated.",
+        "nasa_direct_quote": "",
+        "source_document": "Project-defined Mode B stabilization protocol",
+        "source_verification_status": "PROJECT_PROTOCOL_NOT_NASA_REQUIREMENT",
+        "nasa_citation": {
+          "document": "",
+          "section": "",
+          "url": ""
+        },
+        "abc_vital_stabilization": {
+          "target_breach": "SpO2: 89.2% (Critical Hypoxemia) | SBP: 84.0 mmHg (Hypotension) | Core Temp: 38.9 \u00b0C (Hyperthermia)",
+          "protocol": "Deploy 100% O2 via Respiratory Support Pack (RSP) demand mask; Initiate 0.9% Normal Saline 500mL IV bolus via Intravenous Support Pack (ISP) and position in supine Trendelenburg; Deploy active cooling garment (LCVG) + administer Acetaminophen 650mg PO via CMP."
+        },
+        "point_of_care_orders": [
+          {
+            "order": "Run i-STAT Blood Gas / Chem-8 cartridge (pCO2, pH, Lactate, K+).",
+            "hardware": "MDP Portable i-STAT"
+          },
+          {
+            "order": "Run C2M2 Complete Blood Count (WBC, Platelets, Hematocrit).",
+            "hardware": "C2M2 Hematology Analyzer"
+          },
+          {
+            "order": "Capture 12-lead ECG waveform for arrhythmia/conduction screen.",
+            "hardware": "Bio-Monitor / CMRS 12-Lead ECG"
+          },
+          {
+            "order": "Perform AI-guided thoracic & optic nerve ultrasound.",
+            "hardware": "Ultrasound-2 Onboard Unit"
+          }
+        ],
+        "hardware_and_diagnostics": [
+          "MDP Portable i-STAT: Run i-STAT Blood Gas / Chem-8 cartridge (pCO2, pH, Lactate, K+).",
+          "C2M2 Hematology Analyzer: Run C2M2 Complete Blood Count (WBC, Platelets, Hematocrit).",
+          "Bio-Monitor / CMRS 12-Lead ECG: Capture 12-lead ECG waveform for arrhythmia/conduction screen.",
+          "Ultrasound-2 Onboard Unit: Perform AI-guided thoracic & optic nerve ultrasound."
+        ],
+        "drug_lockout_warning": "CRITICAL SAFETY LOCKOUT: Opioids, NSAIDs, and Anticoagulants are LOCKED OUT until i-STAT and CBC results are confirmed.",
+        "safety_warning": "CRITICAL SAFETY LOCKOUT: Opioids, NSAIDs, and Anticoagulants are LOCKED OUT until i-STAT and CBC results are confirmed.",
+        "contraindications_locked": [
+          "OPIOIDS (Morphine/Fentanyl/Hydromorphone) \u2014 LOCKED OUT pending i-STAT blood gas",
+          "NSAIDs & ASPIRIN (Ibuprofen/Ketorolac) \u2014 LOCKED OUT pending C2M2 platelet count",
+          "ANTICOAGULANTS (Enoxaparin/Apixaban) \u2014 LOCKED OUT pending Ultrasound & coagulation panel"
+        ],
+        "telemetry_uplink": {
+          "store_and_forward_priority": "EMERGENCY",
+          "uplink_target": "Houston Flight Surgeon Console (20m 14s delay)",
+          "save_candidate_to_local_rag": true,
+          "candidates_queued": 1,
+          "candidate_storage_status": "IN_MEMORY_ONLY_PENDING_REVIEW",
+          "candidate_indexed_for_retrieval": false
+        },
+        "retrieved_evidence_chunks": [
+          "Clinical Decision Protocol (Mode B < 0.75) & arXiv:2610.07570v1 (Certified Abstention): Do NOT invent, guess, or hallucinate a speculative disease name; execute the 4-Step Zero-Day Space Medicine Protocol (ABC Vital Stabilization, MDP Point-of-Care Diagnostics, High-Risk Drug Lockout, and Priority Earth Uplink).",
+          "[Source: rag_protocols_expanded.json | PROTO_CPG-25] Herpes Zoster (Shingles) / Latent Viral Reactivation: CPG-25 Herpes Zoster shingles latent viral reactivation VZV Valacyclovir 1 g PO TID hydration. CPG-25 Herpes Zoster shingles latent viral reactivation VZV Valacyclovir 1 g PO TID hydration. Painful unilateral dermatomal vesicular rash, prodromal burning/tingling Painful unilateral dermatomal vesicular rash, prodromal burning/tingling herpes zoster shingles dermatomal vesicular rash burning",
+          "[Source: rag_protocols_8_scenarios.json | PROTO_SCENARIO_3_ORTHOSTATIC_INTOLERANCE] Orthostatic Intolerance and Gravitational Transition Pre-Syncope: Postural lightheadedness, dizziness, palpitations, weakness, mild visual blurring. Tunnel vision ('graying out'), diaphoresis, epigastric nausea, tinnitus, impending syncope.  orthostatic presyncope syncope lightheadedness dizziness tunnel vision graying diaphoresis postural standing hypotension tinnitus fainting",
+          "[Source: rag_protocols_8_scenarios.json | PROTO_SCENARIO_4_SOLAR_RADIATION_ARS] Acute Radiation Syndrome (ARS) from Solar Particle Event (SPE): Sudden anorexia, severe nausea, retching, repetitive vomiting, acute fatigue. Throbbing headache, parotid gland tenderness, watery diarrhea, cutaneous erythema.  solar flare radiation spe ars donki anorexia retching vomiting emesis lymphocyte parotid erythema storm shelter diarrhea dosimetry"
+        ],
+        "action_checklist": [
+          {
+            "step": 1,
+            "action": "Deploy 100% O2 via Respiratory Support Pack (RSP) demand mask.",
+            "critical": true,
+            "completed": false
+          },
+          {
+            "step": 2,
+            "action": "Initiate 0.9% Normal Saline 500mL IV bolus via Intravenous Support Pack (ISP) and position in supine Trendelenburg.",
+            "critical": true,
+            "completed": false
+          },
+          {
+            "step": 3,
+            "action": "Draw 2 drops capillary blood into i-STAT Chem-8 cartridge and run C2M2 CBC.",
+            "critical": true,
+            "completed": false
+          },
+          {
+            "step": 4,
+            "action": "Confirm high-risk drug lockout (Opioids/NSAIDs/Anticoagulants) active on Med-Kit keypad and queue EMERGENCY packet to Houston.",
+            "critical": true,
+            "completed": false
+          }
+        ],
+        "action_plan": [
+          {
+            "step": 1,
+            "action": "Deploy 100% O2 via Respiratory Support Pack (RSP) demand mask.",
+            "critical": true,
+            "completed": false
+          },
+          {
+            "step": 2,
+            "action": "Initiate 0.9% Normal Saline 500mL IV bolus via Intravenous Support Pack (ISP) and position in supine Trendelenburg.",
+            "critical": true,
+            "completed": false
+          },
+          {
+            "step": 3,
+            "action": "Draw 2 drops capillary blood into i-STAT Chem-8 cartridge and run C2M2 CBC.",
+            "critical": true,
+            "completed": false
+          },
+          {
+            "step": 4,
+            "action": "Confirm high-risk drug lockout (Opioids/NSAIDs/Anticoagulants) active on Med-Kit keypad and queue EMERGENCY packet to Houston.",
+            "critical": true,
+            "completed": false
+          }
+        ],
+        "autonomous_checklist": [
+          {
+            "step": 1,
+            "action": "Deploy 100% O2 via Respiratory Support Pack (RSP) demand mask.",
+            "critical": true,
+            "completed": false
+          },
+          {
+            "step": 2,
+            "action": "Initiate 0.9% Normal Saline 500mL IV bolus via Intravenous Support Pack (ISP) and position in supine Trendelenburg.",
+            "critical": true,
+            "completed": false
+          },
+          {
+            "step": 3,
+            "action": "Draw 2 drops capillary blood into i-STAT Chem-8 cartridge and run C2M2 CBC.",
+            "critical": true,
+            "completed": false
+          },
+          {
+            "step": 4,
+            "action": "Confirm high-risk drug lockout (Opioids/NSAIDs/Anticoagulants) active on Med-Kit keypad and queue EMERGENCY packet to Houston.",
+            "critical": true,
+            "completed": false
+          }
+        ],
+        "triggering_vitals": [
+          "Heart Rate: 114.0 bpm (Expected \u03bcg: 52-68 bpm | > 100 bpm (Critical Max))",
+          "Systolic BP: 84.0 mmHg (Expected \u03bcg: 105-116 mmHg | < 90 mmHg (Critical Min))",
+          "Diastolic BP: 52.0 mmHg (Expected \u03bcg: 65-74 mmHg | < 55 mmHg (Critical Min))",
+          "SpO2: 89.2 % (Expected \u03bcg: 96-99 % | < 90 % (Critical Min))",
+          "HRV (RMSSD): 14.0 ms (Expected \u03bcg: 28-52 ms | < 15 ms (Critical Min))",
+          "Core Body Temp: 38.9 \u00b0C (Expected \u03bcg: 37.4-38.0 \u00b0C | > 38.5 \u00b0C (Critical Max))",
+          "Respiration Rate: 24.0 breaths/min (Expected \u03bcg: 11-15 breaths/min | > 18 breaths/min (Warning Max))"
+        ],
+        "organ_hud_status": {
+          "SANS-01": "RED",
+          "CV-02": "RED",
+          "ECLSS-03": "RED",
+          "RAD-04": "RED"
+        },
+        "risk_score_0_100": 82,
+        "readiness_score_0_100": 18,
+        "execution_time_ms": 0.596,
+        "cache_hit": false,
+        "source_mode": "CERTIFIED_ABSTENTION_ZERO_DAY_PROTOCOL",
+        "rag_metrics": {
+          "retrieval_latency_ms": 0.082,
+          "protocols_evaluated": 40,
+          "evidence_chunks_used": 4,
+          "signal_breakdown": {
+            "reason": "unclassified_multi_system_hypoxia_hypotension"
+          }
+        },
+        "retrieval_scores": {
+          "contradictory_multi_organ_breach": 0.44
+        },
+        "total_pipeline_latency_ms": 0.887,
+        "layer2_assessment": {
+          "astronaut_id": "ASTRO-01",
+          "normalized_activity_state": "IVA_REST",
+          "mission_day": 84,
+          "alert_level": "CRITICAL_RED",
+          "nasa_priority_class": "CLASS_1_EMERGENCY",
+          "risk_score_0_100": 78,
+          "readiness_score_0_100": 22,
+          "domain_scores": {
+            "hemodynamic_30pct": 100,
+            "respiratory_thermal_25pct": 100,
+            "autonomic_neuro_ocular_20pct": 81,
+            "environmental_radiation_25pct": 4
+          },
+          "context_evaluated": "IVA_REST (Adapted Microgravity Baseline, FD 84)",
+          "space_fever_adapted": true,
+          "seu_candidates_filtered": [],
+          "breached_parameters": [
+            {
+              "parameter": "hr_bpm",
+              "display_name": "Heart Rate",
+              "value": 114.0,
+              "threshold": 100.0,
+              "unit": "bpm",
+              "expected_ug_range": "52-68 bpm",
+              "threshold_breached": "> 100 bpm (Critical Max)",
+              "severity": "CRITICAL_RED",
+              "standard_ref": "Project physiology baseline",
+              "rolling_avg_10s": 114.0,
+              "slew_rate_per_sec": 0.0,
+              "debounced": true
+            },
+            {
+              "parameter": "sbp_mmHg",
+              "display_name": "Systolic BP",
+              "value": 84.0,
+              "threshold": 90.0,
+              "unit": "mmHg",
+              "expected_ug_range": "105-116 mmHg",
+              "threshold_breached": "< 90 mmHg (Critical Min)",
+              "severity": "CRITICAL_RED",
+              "standard_ref": "Project physiology baseline",
+              "rolling_avg_10s": 84.0,
+              "slew_rate_per_sec": 0.0,
+              "debounced": true
+            },
+            {
+              "parameter": "dbp_mmHg",
+              "display_name": "Diastolic BP",
+              "value": 52.0,
+              "threshold": 55.0,
+              "unit": "mmHg",
+              "expected_ug_range": "65-74 mmHg",
+              "threshold_breached": "< 55 mmHg (Critical Min)",
+              "severity": "CRITICAL_RED",
+              "standard_ref": "Project physiology baseline",
+              "rolling_avg_10s": 52.0,
+              "slew_rate_per_sec": 0.0,
+              "debounced": true
+            },
+            {
+              "parameter": "spo2_pct",
+              "display_name": "SpO2",
+              "value": 89.2,
+              "threshold": 90.0,
+              "unit": "%",
+              "expected_ug_range": "96-99 %",
+              "threshold_breached": "< 90 % (Critical Min)",
+              "severity": "CRITICAL_RED",
+              "standard_ref": "NASA-STD-3001 V2 6003 (oxygen requirement context)",
+              "rolling_avg_10s": 89.2,
+              "slew_rate_per_sec": 0.0,
+              "debounced": true
+            },
+            {
+              "parameter": "hrv_rmssd_ms",
+              "display_name": "HRV (RMSSD)",
+              "value": 14.0,
+              "threshold": 15.0,
+              "unit": "ms",
+              "expected_ug_range": "28-52 ms",
+              "threshold_breached": "< 15 ms (Critical Min)",
+              "severity": "CRITICAL_RED",
+              "standard_ref": "Project physiology baseline",
+              "rolling_avg_10s": 14.0,
+              "slew_rate_per_sec": 0.0,
+              "debounced": true
+            },
+            {
+              "parameter": "cbt_C",
+              "display_name": "Core Body Temp",
+              "value": 38.9,
+              "threshold": 38.5,
+              "unit": "\u00b0C",
+              "expected_ug_range": "37.4-38.0 \u00b0C",
+              "threshold_breached": "> 38.5 \u00b0C (Critical Max)",
+              "severity": "CRITICAL_RED",
+              "standard_ref": "NASA-STD-3001 V2 6012 (thermal design context)",
+              "rolling_avg_10s": 38.9,
+              "slew_rate_per_sec": 0.0,
+              "debounced": true
+            },
+            {
+              "parameter": "rr_bpm",
+              "display_name": "Respiration Rate",
+              "value": 24.0,
+              "threshold": 18.0,
+              "unit": "breaths/min",
+              "expected_ug_range": "11-15 breaths/min",
+              "threshold_breached": "> 18 breaths/min (Warning Max)",
+              "severity": "WARNING_YELLOW",
+              "standard_ref": "Project physiology baseline",
+              "rolling_avg_10s": 24.0,
+              "slew_rate_per_sec": 0.0,
+              "debounced": true
+            }
+          ],
+          "triggering_vitals_summary": [
+            "Heart Rate: 114.0 bpm (Expected \u03bcg: 52-68 bpm | > 100 bpm (Critical Max))",
+            "Systolic BP: 84.0 mmHg (Expected \u03bcg: 105-116 mmHg | < 90 mmHg (Critical Min))",
+            "Diastolic BP: 52.0 mmHg (Expected \u03bcg: 65-74 mmHg | < 55 mmHg (Critical Min))",
+            "SpO2: 89.2 % (Expected \u03bcg: 96-99 % | < 90 % (Critical Min))",
+            "HRV (RMSSD): 14.0 ms (Expected \u03bcg: 28-52 ms | < 15 ms (Critical Min))",
+            "Core Body Temp: 38.9 \u00b0C (Expected \u03bcg: 37.4-38.0 \u00b0C | > 38.5 \u00b0C (Critical Max))",
+            "Respiration Rate: 24.0 breaths/min (Expected \u03bcg: 11-15 breaths/min | > 18 breaths/min (Warning Max))"
+          ],
+          "organ_hud_status": {
+            "SANS-01": "RED",
+            "CV-02": "RED",
+            "ECLSS-03": "RED",
+            "RAD-04": "RED"
+          },
+          "trigger_rag_consultation": true
+        },
+        "comms_status": null,
+        "cabin_environment": {
+          "cabin_pressure_kPa": null,
+          "cabin_temp_C": null
+        }
+      }
+    },
+    "nominal": {
+      "packet": {
+        "timestamp": "2026-11-14T10:15:30Z",
+        "met": "042:14:30:12",
+        "mission_day": 84,
+        "astronaut_id": "ASTRO-01",
+        "name": "Cmdr. Alex Vance",
+        "activity_state": "IVA_REST",
+        "vitals": {
+          "heart_rate": 62,
+          "blood_pressure_sys": 112,
+          "blood_pressure_dia": 70,
+          "spo2": 98,
+          "hrv_ms": 42,
+          "core_temp_c": 37.6,
+          "respiration_rate": 13
+        },
+        "environment": {
+          "cabin_co2_mmhg": 2.2,
+          "ambient_radiation_msv_h": 0.054,
+          "suit_pressure_psi": 4.3
+        },
+        "symptom_log": "No symptoms",
+        "force_mode_b": false
+      },
+      "assessment": {
+        "diagnosis_id": "DIAG-2026-NOMINAL",
+        "mode": "NOMINAL_TELEMETRY",
+        "scenario_id": "NOMINAL_BASELINE",
+        "confidence": 0.99,
+        "diagnosis": "Nominal Microgravity Telemetry Status",
+        "condition": "Nominal Microgravity Telemetry Status",
+        "diagnosis_title": "Nominal Microgravity Telemetry Status",
+        "severity": "NOMINAL",
+        "nasa_direct_quote": "",
+        "source_document": "Project telemetry thresholds",
+        "source_verification_status": "NOT_EXTERNALLY_VERIFIED",
+        "nasa_citations": [],
+        "nasa_citation": {
+          "document": "",
+          "section": "",
+          "url": ""
+        },
+        "checs_subpack": "NONE",
+        "prescriptions": [],
+        "checs_medications": [],
+        "hardware_and_diagnostics": [],
+        "contraindications_locked": [],
+        "action_checklist": [
+          {
+            "step": 1,
+            "action": "Continue continuous 1 Hz Bio-Monitor telemetry surveillance and routine mission schedule.",
+            "critical": false,
+            "completed": true
+          }
+        ],
+        "action_plan": [
+          {
+            "step": 1,
+            "action": "Continue continuous 1 Hz Bio-Monitor telemetry surveillance and routine mission schedule.",
+            "critical": false,
+            "completed": true
+          }
+        ],
+        "autonomous_checklist": [
+          {
+            "step": 1,
+            "action": "Continue continuous 1 Hz Bio-Monitor telemetry surveillance and routine mission schedule.",
+            "critical": false,
+            "completed": true
+          }
+        ],
+        "triggering_vitals": [
+          "HR: 62.0 bpm | BP: 112.0/70.0 mmHg | SpO2: 98.0%"
+        ],
+        "retrieved_evidence_chunks": [],
+        "clinical_reasoning": "Evaluated under IVA_REST (Adapted Microgravity Baseline, FD 84). Zero threshold breaches detected. Sanitized Symptom Log: 'No symptoms'.",
+        "organ_hud_status": {
+          "SANS-01": "CYAN",
+          "CV-02": "CYAN",
+          "ECLSS-03": "CYAN",
+          "RAD-04": "CYAN"
+        },
+        "risk_score_0_100": 6,
+        "readiness_score_0_100": 94,
+        "execution_time_ms": 1.434,
+        "cache_hit": false,
+        "source_mode": "DETERMINISTIC_LOCAL_KNOWLEDGE_BASE",
+        "rag_metrics": {
+          "retrieval_latency_ms": 1.417,
+          "protocols_evaluated": 40,
+          "evidence_chunks_used": 0
+        },
+        "retrieval_scores": {
+          "SCENARIO_1_HYPERCAPNIA": 0.05,
+          "SCENARIO_2_SANS": 0.294,
+          "SCENARIO_3_ORTHOSTATIC_INTOLERANCE": 0.05,
+          "SCENARIO_4_SOLAR_RADIATION_ARS": 0.05,
+          "SCENARIO_5_EVA_THERMAL_DCS": 0.05,
+          "SCENARIO_6_CIRCADIAN_SLEEP": 0.05,
+          "SCENARIO_7_IJV_THROMBOSIS_ARRHYTHMIA": 0.05,
+          "SCENARIO_8_SAS_URINARY_RETENTION": 0.05,
+          "CPG-01": 0.05,
+          "CPG-02": 0.05,
+          "CPG-03": 0.05,
+          "CPG-04": 0.05,
+          "CPG-05": 0.05,
+          "CPG-06": 0.25,
+          "CPG-07": 0.05,
+          "CPG-08": 0.05,
+          "CPG-09": 0.05,
+          "CPG-10": 0.05,
+          "CPG-11": 0.05,
+          "CPG-12": 0.05,
+          "CPG-13": 0.05,
+          "CPG-14": 0.05,
+          "CPG-15": 0.05,
+          "CPG-16": 0.05,
+          "CPG-17": 0.05,
+          "CPG-18": 0.05,
+          "CPG-19": 0.05,
+          "CPG-20": 0.05,
+          "CPG-21": 0.05,
+          "CPG-22": 0.05,
+          "CPG-23": 0.05,
+          "CPG-24": 0.05,
+          "CPG-25": 0.05,
+          "CPG-26": 0.05,
+          "CPG-27": 0.05,
+          "CPG-28": 0.05,
+          "CPG-29": 0.05,
+          "CPG-30": 0.05,
+          "CPG-31": 0.05,
+          "CPG-32": 0.05
+        },
+        "total_pipeline_latency_ms": 2.06,
+        "layer2_assessment": {
+          "astronaut_id": "ASTRO-01",
+          "normalized_activity_state": "IVA_REST",
+          "mission_day": 84,
+          "alert_level": "NOMINAL",
+          "nasa_priority_class": "NOMINAL",
+          "risk_score_0_100": 6,
+          "readiness_score_0_100": 94,
+          "domain_scores": {
+            "hemodynamic_30pct": 8,
+            "respiratory_thermal_25pct": 6,
+            "autonomic_neuro_ocular_20pct": 6,
+            "environmental_radiation_25pct": 4
+          },
+          "context_evaluated": "IVA_REST (Adapted Microgravity Baseline, FD 84)",
+          "space_fever_adapted": true,
+          "seu_candidates_filtered": [],
+          "breached_parameters": [],
+          "triggering_vitals_summary": [
+            "HR: 62.0 bpm | BP: 112.0/70.0 mmHg | SpO2: 98.0%"
+          ],
+          "organ_hud_status": {
+            "SANS-01": "CYAN",
+            "CV-02": "CYAN",
+            "ECLSS-03": "CYAN",
+            "RAD-04": "CYAN"
+          },
+          "trigger_rag_consultation": false
+        },
+        "comms_status": null,
+        "cabin_environment": {
+          "cabin_pressure_kPa": null,
+          "cabin_temp_C": null
+        }
+      }
+    }
+  }
+}
