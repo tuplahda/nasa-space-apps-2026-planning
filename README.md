@@ -73,7 +73,7 @@ Each member has a dedicated, self-contained guide with their tasks, data files, 
 | **Dheer** | **Autonomous Astronaut Agent** *(Physiological Simulator & Space Weather)* | Antigravity (Gemini Pro) | 👉 **[`team-guides/DHEER-GUIDE.md`](./team-guides/DHEER-GUIDE.md)** |
 | **Yohan** | **Whole RAG System** *(Anomaly Detector & Level V AI Medical Officer)* | Antigravity (Gemini Pro) | 👉 **[`team-guides/YOHAN-GUIDE.md`](./team-guides/YOHAN-GUIDE.md)** |
 | **Tivesh** | **Frontend Entirely** *(Mission Control Console, 3D Body HUD & Charts)* | ChatGPT Plus / Claude | 👉 **[`team-guides/TIVESH-GUIDE.md`](./team-guides/TIVESH-GUIDE.md)** |
-| **Roy** | **Jack of All Trades** *(Integration, Backend/AI Assistant & Pitch Lead)* | DeepSeek / ChatGPT Plus | 👉 **[`team-guides/ROY-GUIDE.md`](./team-guides/ROY-GUIDE.md)** |
+| **Roy** | **Jack of All Trades** *(Integration, Backend/AI Assistant & Pitch Lead)* | ChatGPT Plus | 👉 **[`team-guides/ROY-GUIDE.md`](./team-guides/ROY-GUIDE.md)** |
 
 ---
 
