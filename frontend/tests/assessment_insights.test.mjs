@@ -83,6 +83,23 @@ test('action request freezes its actual before snapshot; completion requires nom
   assert.equal(m.events.filter(event=>event.key==='complete').length,1);
 });
 
+test('partial and remaining treatment administrations record exact matching timestamps on the incident timeline',()=>{
+  const m=new IncidentInsights(),p=packet();m.observe(p);m.receiveAssessment(assessment(),p);
+  const firstAt='2026-11-15T06:00:03Z',secondAt='2026-11-15T06:00:08Z';
+  const before=packet(2);before.vitals.heart_rate=118;
+  m.requestAction(before,firstAt,{partial:true,acknowledgedSteps:[1,2],totalSteps:4});
+  const mid=packet(5);mid.vitals.heart_rate=104;m.observe(mid);
+  m.requestAction(mid,secondAt,{partial:false,acknowledgedSteps:[1,2,3,4],totalSteps:4});
+  const actionEvents=m.events.filter(e=>e.key.startsWith('action-'));
+  assert.equal(actionEvents.length,2);
+  assert.equal(actionEvents[0].label,'Partial treatment administered (2/4 tasks)');
+  assert.equal(actionEvents[0].timestamp,firstAt);
+  assert.equal(actionEvents[1].label,'Remaining treatment administered (4/4 tasks)');
+  assert.equal(actionEvents[1].timestamp,secondAt);
+  assert.equal(m.lastActionAt,secondAt);
+  assert.equal(m.comparison().find(row=>row.key==='heart_rate').before,118);
+});
+
 test('missing, unreliable and SEU-filtered channels never generate invented values or deltas; zero is valid',()=>{
   const oxygen=METRICS.find(row=>row.key==='spo2'),radiation=METRICS.find(row=>row.key==='ambient_radiation_msv_h');
   const p=packet();p.unreliable_channels=['spo2_pct'];p.environment.ambient_radiation_msv_h=0;

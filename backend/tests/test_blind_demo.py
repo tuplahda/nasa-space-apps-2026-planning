@@ -100,3 +100,33 @@ def test_recovery_and_previous_incident_are_distinct(simulator):
         frame = server.advance_telemetry()
     assert frame["blind_incident"]["phase"] == "complete"
     assert frame["blind_incident"]["recovery_cause"] == "operator"
+
+
+def test_partial_then_remaining_treatment_updates_organ_hud_before_full_recovery(simulator):
+    engine, incident_id, frames = run_seed(simulator, 2, duration=20)
+    action_id = frames[-1]["blind_incident"]["actions"][0]["id"]
+    steps = frames[-1]["rag_diagnosis"]["action_checklist"]
+    partial_steps = [steps[0]["step"], steps[1]["step"]]
+    res_partial = server.run_simulation_command(
+        "apply_treatment",
+        {"incident_id": incident_id, "action_id": action_id, "acknowledged_steps": partial_steps, "partial": True},
+    )
+    assert res_partial["status"] == "ok"
+    assert res_partial["partial"] is True
+    assert "SANS-01" in res_partial["treated_regions"]
+    assert not engine.is_recovering
+    next_frame = server.advance_telemetry()
+    assert next_frame["blind_incident"]["phase"] == "assessed"
+    assert next_frame["anomaly_assessment"]["organ_hud_status"]["SANS-01"] == "CYAN"
+    assert next_frame["anomaly_assessment"]["organ_hud_status"]["ECLSS-03"] == "RED"
+    all_steps = [s["step"] for s in steps]
+    res_full = server.run_simulation_command(
+        "apply_treatment",
+        {"incident_id": incident_id, "action_id": action_id, "acknowledged_steps": all_steps, "partial": False},
+    )
+    assert res_full["status"] == "ok"
+    assert engine.is_recovering
+    for _ in range(10):
+        next_frame = server.advance_telemetry()
+    assert next_frame["blind_incident"]["phase"] == "complete"
+    assert next_frame["anomaly_assessment"]["organ_hud_status"]["ECLSS-03"] == "CYAN"

@@ -72,7 +72,7 @@ export class IncidentInsights {
   constructor() { this.reset(null); }
   reset(scope) {
     this.scope=scope;this.events=[];this.seen=new Set();this.current=null;this.assessment=null;
-    this.consultation=null;this.evidence=null;this.before=null;this.after=null;
+    this.consultation=null;this.evidence=null;this.before=null;this.after=null;this.lastActionAt=null;
     this.history=[];this.actionRequested=false;this.recoveryStarted=false;this.complete=false;this.stale=false;
   }
   event(key,label,packet=this.current,origin='telemetry',timestamp=packet?.timestamp) {
@@ -118,16 +118,20 @@ export class IncidentInsights {
     this.event('assessment','Assessment received',packet,'browser receipt',new Date().toISOString());
     return true;
   }
-  requestAction(packet, now=new Date().toISOString()) {
+  requestAction(packet, now=new Date().toISOString(), details=null) {
     if(scopeOf(packet)!==this.scope || !this.assessment || this.complete)return;
-    this.before=snapshot(packet);this.actionRequested=true;this.history=[];
-    this.event(`action-${this.events.length}`,'Simulated action requested',packet,'browser request',now);
+    const hadAction=this.actionRequested;
+    if(!hadAction){this.before=snapshot(packet);this.history=[];}
+    this.actionRequested=true;this.lastActionAt=now;
+    const countLabel=details?.acknowledgedSteps && details?.totalSteps?` (${details.acknowledgedSteps.length}/${details.totalSteps} tasks)`:'';
+    const label=details?.partial?`Partial treatment administered${countLabel}`:details && hadAction?`Remaining treatment administered${countLabel}`:`Simulated action requested${countLabel}`;
+    this.event(`action-${this.events.length}`,label,packet,'browser request',now);
   }
   failure(label, packet=this.current, now=new Date().toISOString()) {
     if(scopeOf(packet)!==this.scope)return;
     this.event(`failure-${this.events.length}`,label,this.current,'browser receipt',now);
     if(label==='Simulated action failed' && !this.recoveryStarted) {
-      this.actionRequested=false;this.before=snapshot(this.consultation);
+      this.actionRequested=false;this.lastActionAt=null;this.before=snapshot(this.consultation);
     }
   }
   comparison() {
@@ -155,12 +159,12 @@ export class InsightsView {
       this.render();
     }
   }
-  requestAction(packet) { this.model.requestAction(packet);this.render(); }
-  failure(label,packet) { this.model.failure(label,packet);this.render(); }
+  requestAction(packet,now,details) { this.model.requestAction(packet,now,details);this.render(); }
+  failure(label,packet,now) { this.model.failure(label,packet,now);this.render(); }
   markStale() {this.model.stale=true;this.render();}
   render() {
     const m=this.model;
-    const renderKey=JSON.stringify([m.scope,m.stale,m.complete,m.actionRequested,m.recoveryStarted,m.events,m.assessment?.diagnosis_id,m.before,m.after]);
+    const renderKey=JSON.stringify([m.scope,m.stale,m.complete,m.actionRequested,m.lastActionAt,m.recoveryStarted,m.events,m.assessment?.diagnosis_id,m.before,m.after]);
     if(renderKey===this.renderKey)return;
     this.renderKey=renderKey;
     const plain=document.getElementById('plain-assessment'),evidence=document.getElementById('evidence-card');
@@ -209,7 +213,7 @@ export class InsightsView {
         const values=[valueText(row.before,row),valueText(row.after,row),row.delta===null?'—':`${row.delta>0?'+':''}${row.delta.toFixed(row.digits)}`];
         values.forEach((value,column)=>{const cell=this.comparisonCells[index][column];if(cell.textContent!==value)cell.textContent=value;});
       }
-      document.getElementById('comparison-times').textContent=`Before: ${clock(m.before?.timestamp)} · latest: ${clock(m.after?.timestamp)}. Changes are numerical, not a clinical improvement score. Unavailable readings are shown as —.`;
+      document.getElementById('comparison-times').textContent=`Before: ${clock(m.lastActionAt || m.before?.timestamp)} · latest: ${clock(m.after?.timestamp)}. Changes are numerical, not a clinical improvement score. Unavailable readings are shown as —.`;
       this.renderTrend();
     }
     const eventSignature=JSON.stringify(m.events);

@@ -214,6 +214,8 @@ class AstronautSimulationEngine:
         self.blind_noise: Optional[random.Random] = None
         self.blind_recovery_cause: Optional[str] = None
         self.blind_recovery_rate = 0.35
+        self.administered_steps: set[str] = set()
+        self.treated_regions: set[str] = set()
 
         # Mission Elapsed Time base (Day 84, 10:15:00)
         self.met_seconds: int = (84 * 86400) + (10 * 3600) + (15 * 60)
@@ -430,6 +432,8 @@ class AstronautSimulationEngine:
         self.dynamic_perturbation.clear()
         self.dynamic_overrides.clear()
         self.dynamic_symptom_log = None
+        self.administered_steps.clear()
+        self.treated_regions.clear()
 
     def _start_temporary_crisis_recovery(self) -> None:
         """Automatically start biological recovery washout after a temporary crisis expires."""
@@ -447,6 +451,8 @@ class AstronautSimulationEngine:
         self.dynamic_perturbation.clear()
         self.dynamic_overrides.clear()
         self.dynamic_symptom_log = None
+        self.administered_steps.clear()
+        self.treated_regions.clear()
 
     def simulate_crisis(
         self,

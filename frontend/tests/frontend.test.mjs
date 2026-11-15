@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { registerHooks } from 'node:module';
 registerHooks({resolve(specifier,context,next){return next(specifier==='three'?new URL('../vendor/three/three.module.js',import.meta.url).href:specifier.startsWith('three/addons/')?new URL('../vendor/three/addons/'+specifier.slice(13),import.meta.url).href:specifier,context);}});
-const {validatePacket,diagnosisPayload,classify}=await import('../js/telemetry.js');
+const {validatePacket,diagnosisPayload,classify,resolveTreatedRegions}=await import('../js/telemetry.js');
 const {MockAdapter}=await import('../js/mock_data.js');
 const {Backend}=await import('../js/scenarios.js');
 const {TelemetryConnection}=await import('../js/websocket.js');
@@ -104,6 +104,46 @@ test('checklist acknowledgements survive stream refresh and recovery submits onc
   assert.ok(p.ready);assert.equal(submitted,0);assert.ok(p.checks[0].at);
   p.render({...a,execution_time_ms:4});assert.ok(p.checks.every(c=>c.input.checked));
   await Promise.all([p.recover(),p.recover()]);await p.recover();assert.equal(submitted,1);assert.ok(p.submitted);assert.match(nodes.get('checklist-status').textContent,/do not record treatment/);
+});
+test('partial checklist administration (2 of 4 tasks) heals headache/SANS-01 before lungs/ECLSS-03 and allows remaining tasks',async()=>{
+  const calls=[];const p=new MedicalPanel(async info=>{calls.push(info);});p.reset();
+  const fourStepAssessment={...structuredClone(data.cases.hypercapnia.assessment),action_checklist:[
+    {step:1,action:'Relocate crewmember out of low-ventilation compartment immediately.',critical:true},
+    {step:2,action:'Administer Acetaminophen 650 mg PO for frontal headache (avoid opioids).',critical:true},
+    {step:3,action:'Deploy portable ventilation fans and run ECLSS diagnostics on CDRA scrubber beds.',critical:true},
+    {step:4,action:'Deploy 100% O2 via demand mask (RSP) to restore lung oxygenation.',critical:true},
+  ],blindIncident:{id:9,phase:'assessed',actions:[{id:'restore_airflow',label:'Restore airflow'}]}};
+  p.render(fourStepAssessment);
+  assert.equal(p.submit.disabled,true);
+  // Check only 2 of the 4 critical tasks (relocate + headache analgesia).
+  p.checks[0].input.checked=true;p.checks[0].input.events.change();
+  p.checks[1].input.checked=true;p.checks[1].input.events.change();
+  assert.equal(p.ready,true);assert.equal(p.submit.disabled,false);
+  await p.recover();
+  assert.equal(calls.length,1);assert.equal(calls[0].partial,true);
+  assert.deepEqual(calls[0].acknowledgedSteps,[1,2]);assert.equal(calls[0].totalSteps,4);
+  assert.ok(p.checks[0].administered && p.checks[1].administered);
+  assert.ok(!p.checks[2].administered && !p.checks[3].administered);
+  assert.equal(p.checks[0].input.disabled,true);assert.equal(p.checks[2].input.disabled,false);
+  assert.equal(p.submitted,false);assert.equal(p.submit.disabled,true);
+  assert.match(p.checks[0].stamp.textContent,/^Administered /);
+  // 3D model organ statuses: headache (SANS-01) turns cyan while lungs (ECLSS-03) remain red.
+  const baseStatuses={'SANS-01':'red','ECLSS-03':'red','CV-02':'cyan','RAD-04':'cyan'};
+  const treated=resolveTreatedRegions(fourStepAssessment.action_checklist,calls[0].acknowledgedSteps,baseStatuses);
+  assert.deepEqual(treated,['SANS-01']);
+  const partialPacket={...structuredClone(data.cases.hypercapnia.packet),anomaly_assessment:{organ_hud_status:{'SANS-01':'RED','ECLSS-03':'RED','CV-02':'CYAN','RAD-04':'CYAN'}},treated_regions:treated};
+  const partialClassified=classify(partialPacket,baselines).statuses;
+  assert.equal(partialClassified['SANS-01'],'cyan');assert.equal(partialClassified['ECLSS-03'],'red');
+  // Now check the remaining 2 tasks and administer full recovery.
+  p.checks[2].input.checked=true;p.checks[2].input.events.change();
+  p.checks[3].input.checked=true;p.checks[3].input.events.change();
+  assert.equal(p.ready,true);assert.equal(p.submit.disabled,false);
+  await p.recover();
+  assert.equal(calls.length,2);assert.equal(calls[1].partial,false);
+  assert.deepEqual(calls[1].acknowledgedSteps,[1,2,3,4]);
+  assert.equal(p.submitted,true);assert.ok(p.checks.every(c=>c.administered && c.input.disabled));
+  const fullTreated=resolveTreatedRegions(fourStepAssessment.action_checklist,calls[1].acknowledgedSteps,baseStatuses);
+  assert.ok(fullTreated.includes('SANS-01') && fullTreated.includes('ECLSS-03'));
 });
 test('Mode B abstains and an unverified citation remains unavailable',()=>{
   const p=new MedicalPanel(async()=>{});p.render({...data.cases['zero-day'].assessment,demo:true});

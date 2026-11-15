@@ -115,6 +115,8 @@ def run_simulation_command(action: Any, payload: Dict[str, Any]) -> Dict[str, An
             return apply_blind_action(payload)
         if "incident_id" in payload or "action_id" in payload:
             return {"status": "error", "message": "The blind incident is no longer active."}
+        if payload.get("partial") is True and isinstance(payload.get("acknowledged_steps"), list):
+            return apply_partial_scenario_action(payload)
         return astronaut_sim.apply_treatment(payload.get("treatment") or payload.get("action"))
     if action == "set_activity":
         return astronaut_sim.set_activity_state(payload.get("activity_state") or payload.get("activity"))
@@ -250,6 +252,89 @@ def blind_actions(decision: Dict[str, Any]) -> List[Dict[str, Any]]:
              "kind": "simulation_only", "physical_effect_modeled": False}]
 
 
+REGION_KEYWORDS = {
+    "SANS-01": (
+        "headache", "cephalea", "acetaminophen", "ibuprofen", "analgesi", "pain",
+        "neuro", "brain", "ocular", "eye", "vision", "optic", "acetazolamide",
+        "dizz", "vestibular", "relocate", "rest", "sleep", "cns",
+    ),
+    "CV-02": (
+        "heart", "cardiac", "bp", "pressure", "saline", "fluid", "rehydrat",
+        "iv ", "orthostatic", "vascular", "thrombus", "ondansetron",
+        "circulation", "ared", "exercise",
+    ),
+    "RAD-04": (
+        "radiat", "solar", "spe ", "shelter", "shield", "dosimet", "alara",
+        "c2m2", "cbc", "lymphocyte", "alc", "thermal", "temp", "cool",
+        "lcvg", "heat", "hypotherm", "warm",
+    ),
+    "ECLSS-03": (
+        "lung", "respirat", "airway", "breath", "spo2", "oxygen", "o2", "co2",
+        "scrubber", "lioh", "cdra", "camras", "zeolite", "ventilat", "airflow",
+        "fan", "mask", "rsp", "broncho", "dyspnea", "repressur", "airlock",
+    ),
+}
+REGION_PRIORITY = ("SANS-01", "CV-02", "RAD-04", "ECLSS-03")
+
+
+def resolve_treated_regions(
+    steps: List[Dict[str, Any]], administered_step_ids: set[str], organ_hud_status: Dict[str, Any]
+) -> List[str]:
+    abnormal = [
+        region for region in REGION_PRIORITY
+        if str((organ_hud_status or {}).get(region, "")).upper()
+        in ("RED", "AMBER", "WARNING", "WARNING_YELLOW", "CRITICAL", "CRITICAL_RED")
+    ]
+    if not abnormal or not steps or not administered_step_ids:
+        return []
+    total_steps = len(steps)
+    admin_count = min(total_steps, len(administered_step_ids))
+    if admin_count >= total_steps:
+        return list(abnormal)
+    scores: Dict[str, Any] = {}
+    for priority_idx, region in enumerate(abnormal):
+        terms = REGION_KEYWORDS.get(region, ())
+        matched_total = 0
+        matched_admin = 0
+        for idx, step in enumerate(steps):
+            step_id = str(step.get("step", idx + 1))
+            action_text = f" {str(step.get('action', '')).lower()} "
+            if any(term in action_text for term in terms):
+                matched_total += 1
+                if step_id in administered_step_ids:
+                    matched_admin += 1
+        ratio = (matched_admin / matched_total) if matched_total > 0 else (1.0 if priority_idx == 0 else 0.0)
+        scores[region] = (ratio, -priority_idx)
+    ranked = sorted(abnormal, key=lambda r: scores[r], reverse=True)
+    if len(abnormal) == 1:
+        return []
+    target_count = max(1, min(len(abnormal) - 1, round((admin_count / total_steps) * len(abnormal))))
+    return ranked[:target_count]
+
+
+def apply_partial_scenario_action(payload: Dict[str, Any]) -> Dict[str, Any]:
+    snapshot = latest_telemetry or {}
+    steps = (snapshot.get("rag_diagnosis") or {}).get("action_checklist", [])
+    supplied = payload.get("acknowledged_steps") or []
+    if not isinstance(supplied, list) or not supplied or len(supplied) > 128:
+        return {"status": "error", "message": "Select at least one valid checklist step before administering treatment."}
+    astronaut_sim.administered_steps.update(str(v) for v in supplied)
+    organs = ((snapshot.get("anomaly_assessment") or {}).get("organ_hud_status") or {})
+    astronaut_sim.treated_regions = set(resolve_treated_regions(steps, astronaut_sim.administered_steps, organs))
+    for region in astronaut_sim.treated_regions:
+        if isinstance(snapshot.get("anomaly_assessment"), dict) and isinstance(snapshot["anomaly_assessment"].get("organ_hud_status"), dict):
+            snapshot["anomaly_assessment"]["organ_hud_status"][region] = "CYAN"
+        if isinstance(snapshot.get("rag_diagnosis"), dict) and isinstance(snapshot["rag_diagnosis"].get("organ_hud_status"), dict):
+            snapshot["rag_diagnosis"]["organ_hud_status"][region] = "CYAN"
+    return {
+        "status": "ok",
+        "action": "PARTIAL_TREATMENT_APPLIED",
+        "partial": True,
+        "administered_steps": sorted(astronaut_sim.administered_steps),
+        "treated_regions": sorted(astronaut_sim.treated_regions),
+    }
+
+
 def apply_blind_action(payload: Dict[str, Any]) -> Dict[str, Any]:
     snapshot = latest_telemetry or {}
     incident = snapshot.get("blind_incident") or {}
@@ -262,14 +347,48 @@ def apply_blind_action(payload: Dict[str, Any]) -> Dict[str, Any]:
     action = next((item for item in incident["actions"] if item["id"] == payload.get("action_id")), None)
     if action is None:
         return {"status": "error", "message": "This action is unavailable for the current assessment."}
+    steps = (snapshot.get("rag_diagnosis") or {}).get("action_checklist", [])
+    required = [(index, step) for index, step in enumerate(steps) if step.get("critical")] or list(enumerate(steps))
+    required_ids = {str(step.get("step", index + 1)) for index, step in required}
+    valid_ids = {str(step.get("step", index + 1)) for index, step in enumerate(steps)}
+    is_partial = False
     if "acknowledged_steps" in payload:
-        steps = (snapshot.get("rag_diagnosis") or {}).get("action_checklist", [])
-        required = [(index, step) for index, step in enumerate(steps) if step.get("critical")] or list(enumerate(steps))
         supplied = payload["acknowledged_steps"]
-        if (not isinstance(supplied, list) or len(supplied) > 128
-                or any(type(value) not in (int, str) for value in supplied)
-                or not {str(step.get("step", index + 1)) for index, step in required}.issubset({str(value) for value in supplied})):
+        if (not isinstance(supplied, list) or not supplied or len(supplied) > 128
+                or any(type(value) not in (int, str) for value in supplied)):
             return {"status": "error", "message": "Acknowledge the required current checklist steps before starting simulated recovery."}
+        supplied_ids = {str(value) for value in supplied}
+        if valid_ids and not supplied_ids.issubset(valid_ids):
+            return {"status": "error", "message": "Acknowledge the required current checklist steps before starting simulated recovery."}
+        new_steps = supplied_ids - astronaut_sim.administered_steps
+        if not new_steps:
+            return {"status": "error", "message": "These checklist steps have already been administered."}
+        astronaut_sim.administered_steps.update(supplied_ids)
+        is_partial = bool(payload.get("partial")) or (
+            bool(required_ids)
+            and not required_ids.issubset(astronaut_sim.administered_steps)
+            and len(astronaut_sim.administered_steps) < len(valid_ids)
+        )
+    if is_partial:
+        organs = ((snapshot.get("anomaly_assessment") or {}).get("organ_hud_status") or {})
+        astronaut_sim.treated_regions = set(resolve_treated_regions(steps, astronaut_sim.administered_steps, organs))
+        for region in astronaut_sim.treated_regions:
+            if isinstance(snapshot.get("anomaly_assessment"), dict) and isinstance(snapshot["anomaly_assessment"].get("organ_hud_status"), dict):
+                snapshot["anomaly_assessment"]["organ_hud_status"][region] = "CYAN"
+            if isinstance(snapshot.get("rag_diagnosis"), dict) and isinstance(snapshot["rag_diagnosis"].get("organ_hud_status"), dict):
+                snapshot["rag_diagnosis"]["organ_hud_status"][region] = "CYAN"
+        astronaut_sim.scenario_progression = max(0.45, astronaut_sim.scenario_progression * 0.85)
+        incident["administered_steps"] = sorted(astronaut_sim.administered_steps)
+        incident["treated_regions"] = sorted(astronaut_sim.treated_regions)
+        return {
+            "status": "ok",
+            "incident_id": astronaut_sim.incident_id,
+            "action_id": action["id"],
+            "partial": True,
+            "administered_steps": sorted(astronaut_sim.administered_steps),
+            "treated_regions": sorted(astronaut_sim.treated_regions),
+        }
+    astronaut_sim.treated_regions.clear()
     result = astronaut_sim.apply_treatment("standard countermeasure protocol")
     if result.get("action") == "TREATMENT_APPLIED":
         astronaut_sim.blind_recovery_cause = "operator"
@@ -511,6 +630,10 @@ def advance_telemetry() -> Dict[str, Any]:
             # Layer 2 may flag and display anomalous telemetry, but Layer 3 stays
             # idle until the operator explicitly asks the doctor to assess it.
             assessment.trigger_rag_consultation = False
+    if astronaut_sim.treated_regions and not astronaut_sim.is_recovering:
+        for region in astronaut_sim.treated_regions:
+            if region in assessment.organ_hud_status:
+                assessment.organ_hud_status[region] = "CYAN"
     payload["recovery_status"] = status
     payload["anomaly_assessment"] = assessment.model_dump()
     payload["routine_schedule"] = astronaut_sim.get_routine_schedule(assessment.readiness_score_0_100)
@@ -536,6 +659,11 @@ def advance_telemetry() -> Dict[str, Any]:
         # Clone before adding delivery metadata; prior decision/cache entries
         # remain read-only and confidence/clinical classification are unchanged.
         decision = dict(decision)
+        if astronaut_sim.treated_regions and not astronaut_sim.is_recovering and isinstance(decision.get("organ_hud_status"), dict):
+            decision["organ_hud_status"] = dict(decision["organ_hud_status"])
+            for region in astronaut_sim.treated_regions:
+                if region in decision["organ_hud_status"]:
+                    decision["organ_hud_status"][region] = "CYAN"
         decision["earth_report"] = capture_report(decision["earth_report"], confidence=decision.get("confidence"),
             assessment_id=decision.get("diagnosis_id"), incident_id=astronaut_sim.incident_id)
         payload["rag_diagnosis"] = decision
@@ -552,6 +680,8 @@ def advance_telemetry() -> Dict[str, Any]:
             "id": astronaut_sim.incident_id, "phase": phase,
             "recovery_cause": astronaut_sim.blind_recovery_cause,
             "actions": blind_actions(decision) if phase == "assessed" else [],
+            **({"administered_steps": sorted(astronaut_sim.administered_steps)} if astronaut_sim.administered_steps else {}),
+            **({"treated_regions": sorted(astronaut_sim.treated_regions)} if astronaut_sim.treated_regions else {}),
             **({"reveal": blind.replace("_", " ")} if complete else {}),
         }
 

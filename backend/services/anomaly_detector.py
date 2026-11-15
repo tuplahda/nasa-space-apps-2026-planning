@@ -495,6 +495,12 @@ class EdgeAnomalyDetector:
             if b.parameter in ("cbt_C", "ambient_radiation_msv_h", "alc_cells_uL", "bladder_volume_mL"):
                 if pins["RAD-04"] != "RED":
                     pins["RAD-04"] = color
+        symptom_text = (packet.symptom_log or "").lower()
+        if breached and pins["SANS-01"] == "CYAN" and any(
+            term in symptom_text
+            for term in ("headache", "dizzy", "dizziness", "lightheaded", "phosphene", "blur", "faint", "focusing", "tingling", "paresthesia")
+        ):
+            pins["SANS-01"] = "RED" if any(b.severity == "CRITICAL_RED" for b in breached) else "AMBER"
         return pins
 
     def _format_triggering_vitals(

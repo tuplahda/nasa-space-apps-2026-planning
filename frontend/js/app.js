@@ -1,4 +1,4 @@
-import { TelemetryView, setText } from './telemetry.js';
+import { TelemetryView, classify, resolveTreatedRegions, setText } from './telemetry.js';
 import { TelemetryConnection } from './websocket.js';
 import { Backend } from './scenarios.js';
 import { MedicalPanel } from './medical_panel.js';
@@ -8,7 +8,7 @@ import { InsightsView } from './assessment_insights.js';
 const query=new URLSearchParams(location.search);
 const api=new Backend(query.get('api') || `${location.protocol==='https:'?'https:':'http:'}//localhost:8000`);
 let view,body,connection,packet,mode='waiting',transport='',generation=0;
-let starting=false,expectedIncident=null,lastIncident=null,consultation=null,revealedIncident=null;
+let starting=false,expectedIncident=null,lastIncident=null,consultation=null,revealedIncident=null,activeTreatedRegions=[];
 const simulateButton=document.getElementById('run-assessment');
 const consultButton=document.getElementById('analyze-crisis');
 const revealButton=document.getElementById('reveal-incident');
@@ -17,20 +17,32 @@ const reports=new ReportDownloads(api);
 const insights=new InsightsView();
 const formatTime=timestamp=>new Date(timestamp).toLocaleTimeString('en-GB',{timeZone:'Indian/Mauritius'});
 const fresh=()=>mode==='backend' && packet && connection?.lastAt && Date.now()-connection.lastAt<=5000;
-const panel=new MedicalPanel(async()=> {
+const panel=new MedicalPanel(async(info={})=> {
   if(!fresh())throw new Error('Fresh backend telemetry is required.');
   const actionPacket=packet;
   const incident=packet.blind_incident;
+  const acknowledged=info.acknowledgedSteps || panel.checks.filter(step=>step.input.checked).map(step=>step.step);
+  const baseStatuses=view?classify({...actionPacket,treated_regions:[],blind_incident:incident?{...incident,treated_regions:[]}:undefined},view.baselines).statuses:(actionPacket.anomaly_assessment?.organ_hud_status||{});
+  const treatedRegions=info.partial?resolveTreatedRegions(info.steps||[],acknowledged,baseStatuses):[];
+  const details={...info,acknowledgedSteps:acknowledged,treatedRegions};
+  const applyPartialVisuals=result=>{
+    if(info.partial) {
+      activeTreatedRegions=Array.isArray(result?.treated_regions)&&result.treated_regions.length?result.treated_regions:treatedRegions;
+      actionPacket.treated_regions=activeTreatedRegions;
+      const states=view.update(actionPacket,transport);body?.update(actionPacket,states);updateAlerts(states);
+    } else activeTreatedRegions=[];
+    return result;
+  };
   if(incident) {
     if(incident.phase!=='assessed' || incident.id!==consultation?.incidentId)throw new Error('There is no matching current consultation action.');
     const action=incident.actions?.[0];if(!action)throw new Error('No modeled recovery action was returned.');
-    insights.requestAction(actionPacket);
-    try { return await api.applyBlindAction(incident.id,action.id,panel.checks.filter(step=>step.input.checked).map(step=>step.step)); }
-    catch(error) { insights.failure('Simulated action failed',actionPacket);throw error; }
+    insights.requestAction(actionPacket,info.administeredAt,details);
+    try { return applyPartialVisuals(await api.applyBlindAction(incident.id,action.id,acknowledged,info.partial)); }
+    catch(error) { insights.failure('Simulated action failed',actionPacket,info.administeredAt);throw error; }
   }
-  insights.requestAction(actionPacket);
-  try { return await api.recover(packet.active_scenario_id); }
-  catch(error) { insights.failure('Simulated action failed',actionPacket);throw error; }
+  insights.requestAction(actionPacket,info.administeredAt,details);
+  try { return applyPartialVisuals(await api.recover(packet.active_scenario_id,{acknowledgedSteps:acknowledged,partial:info.partial})); }
+  catch(error) { insights.failure('Simulated action failed',actionPacket,info.administeredAt);throw error; }
 });
 function controlError(message='') {
   const node=document.getElementById('control-error');node.hidden=!message;node.textContent=message;
@@ -82,9 +94,10 @@ function ingest(p,source) {
     || (lastIncident!==null && Number.isInteger(p.simulation_incident) && p.simulation_incident<lastIncident))return;
   if(expectedIncident!==null && p.simulation_incident>=expectedIncident)expectedIncident=null;
   if(lastIncident!==p.simulation_incident) {
-    lastIncident=p.simulation_incident;generation++;consultation=null;reports.reset();
+    lastIncident=p.simulation_incident;generation++;consultation=null;activeTreatedRegions=[];reports.reset();
     panel.reset('Telemetry monitoring is active. Press Consult Doctor to request an assessment.');
   }
+  if(activeTreatedRegions.length && !Array.isArray(p.treated_regions) && !Array.isArray(p.blind_incident?.treated_regions))p.treated_regions=activeTreatedRegions;
   packet=p;transport=source;mode='backend';
   insights.observe(p);
   const states=view.update(p,source);body?.update(p,states);updateAlerts(states);
@@ -95,7 +108,7 @@ function ingest(p,source) {
   if(resolved && consultation) {
     // A completed treatment response alone is not proof of recovery. Clear the
     // consultation only on the server's completed, nominal telemetry snapshot.
-    generation++;consultation=null;reports.reset();
+    generation++;consultation=null;activeTreatedRegions=[];reports.reset();
     panel.reset('Recovery complete. Monitoring telemetry; consult the doctor when a new assessment is needed.');
     setText('assessment-latency','ENGINE STANDBY');
   }
@@ -125,7 +138,7 @@ simulateButton.addEventListener('click',async()=> {
     const result=await api.startBlindCrisis();
     if(version!==generation)return;
     if(!Number.isInteger(result.incident_id))throw new Error('The backend did not acknowledge a random streaming incident.');
-    expectedIncident=result.incident_id;consultation=null;reports.reset();
+    expectedIncident=result.incident_id;consultation=null;activeTreatedRegions=[];reports.reset();
     panel.reset('Random crisis started. Monitoring changing vitals; doctor remains idle until consultation.');
     showIncident(null);setText('assessment-latency','MONITORING TELEMETRY');updateProvenance();
   } catch(error) {controlError(`${error.message} Random streaming simulation requires the existing simulate-crisis endpoint; no local fallback is used.`);}
@@ -163,7 +176,7 @@ resetSimulation.addEventListener('click',async()=> {
   try {
     await api.trigger('nominal');
     const observed=await api.snapshot('nominal');
-    starting=false;expectedIncident=null;ingest(observed,transport);
+    starting=false;expectedIncident=null;activeTreatedRegions=[];ingest(observed,transport);
   } catch(error) {controlError(`Simulation reset failed: ${error.message}`);}
   finally {starting=false;updateControls();}
 });

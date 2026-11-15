@@ -21,8 +21,8 @@ export class Backend {
   analyzeBlindCrisis(incidentId) {
     return this.request('/api/scenarios/analyze-crisis', {incident_id: incidentId});
   }
-  applyBlindAction(incidentId, actionId, acknowledgedSteps) {
-    return this.request('/api/treatments/apply', {incident_id: incidentId, action_id: actionId, ...(acknowledgedSteps ? {acknowledged_steps: acknowledgedSteps} : {})});
+  applyBlindAction(incidentId, actionId, acknowledgedSteps, partial) {
+    return this.request('/api/treatments/apply', {incident_id: incidentId, action_id: actionId, ...(acknowledgedSteps ? {acknowledged_steps: acknowledgedSteps} : {}), ...(partial ? {partial: true} : {})});
   }
   async downloadReport(reference,{signal}={}) {
     const response=await fetch(new URL('/api/reports/download?format=pdf',this.base),{
@@ -52,5 +52,5 @@ export class Backend {
     throw new Error('Astronaut agent has not published the selected scenario yet. Waiting for stream updates.');
   }
   diagnose(packet) { return this.request('/api/diagnose',diagnosisPayload(packet)); }
-  recover(key) { return this.request('/api/treatments/apply',{treatment:key==='hypercapnia'?'li_oh_swap_and_o2':'standard countermeasure protocol'}); }
+  recover(key, options={}) { return this.request('/api/treatments/apply',{treatment:key==='hypercapnia'?'li_oh_swap_and_o2':'standard countermeasure protocol',...(options.acknowledgedSteps?{acknowledged_steps:options.acknowledgedSteps}:{}),...(options.partial?{partial:true}:{})}); }
 }

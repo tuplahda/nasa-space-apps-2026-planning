@@ -65,8 +65,9 @@ export class MedicalPanel {
         const copy=el('span',step.action || 'Action unavailable');
         if(step.critical) copy.prepend(el('b','CRITICAL · ','critical-label'));
         const stamp=el('small',''); label.append(input,copy); row.append(label,stamp);list.append(row);
-        const record={input,critical:!!step.critical,step:step.step ?? index+1,stamp};this.checks.push(record);
+        const record={input,critical:!!step.critical,step:step.step ?? index+1,action:step.action||'',stamp,administered:false,administeredAt:null};this.checks.push(record);
         input.addEventListener('change',()=> {
+          if(record.administered){input.checked=true;return;}
           record.at=input.checked?new Date().toISOString():null;
           stamp.textContent=record.at?`Acknowledged ${new Date(record.at).toLocaleTimeString('en-GB',{timeZone:'Indian/Mauritius'})} MUT`:'';
           this.audit.push({assessment:a.diagnosis_id,step:record.step,acknowledged:input.checked,timestamp:new Date().toISOString()});
@@ -79,8 +80,9 @@ export class MedicalPanel {
   }
   progress() {
     const checks=this.checks || [], done=checks.filter(x=>x.input.checked).length;
-    const required=checks.some(x=>x.critical)?checks.filter(x=>x.critical):checks;
-    this.ready=checks.length>0 && required.every(x=>x.input.checked);
+    const unadministeredChecked=checks.filter(x=>x.input.checked && !x.administered);
+    const administeredCount=checks.filter(x=>x.administered).length;
+    this.ready=checks.length>0 && unadministeredChecked.length>0;
     setText('action-count',`${done}/${checks.length}`);
     const blind = this.assessment?.blindIncident;
     const action = blind?.actions?.[0];
@@ -89,13 +91,34 @@ export class MedicalPanel {
     this.submit.title=action?.label || 'Request backend simulated recovery';
     this.submit.hidden=false;
     this.submit.disabled=!this.ready || this.pending || this.submitted || (!!blind && (!action || blind.phase!=='assessed'));
-    for(const c of checks) c.input.disabled=this.pending || this.submitted;
-    setText('checklist-status',recovering?'Backend recovery in progress. Waiting for nominal telemetry.':complete?'Backend recovery completed. Acknowledgements are not administration records.':action?.kind==='simulation_only' && !this.pending && !this.submitted?`${done}/${checks.length} acknowledged · simulation-only completion; no validated physical treatment is implied.`:this.submitted?'Simulated recovery requested. Acknowledgements do not record treatment administration.':this.pending?'Requesting simulated recovery…':`${this.assessment?.demo?'LOCAL DEMONSTRATION · ':''}${done}/${checks.length} acknowledged · session only; no medical administration recorded.`);
+    for(const c of checks) c.input.disabled=this.pending || this.submitted || c.administered;
+    setText('checklist-status',recovering?'Backend recovery in progress. Waiting for nominal telemetry.':complete?'Backend recovery completed. Acknowledgements are not administration records.':action?.kind==='simulation_only' && !this.pending && !this.submitted && !administeredCount?`${done}/${checks.length} acknowledged · simulation-only completion; no validated physical treatment is implied.`:this.submitted?'Simulated recovery requested. Acknowledgements do not record treatment administration.':administeredCount>0 && !this.pending?`${administeredCount}/${checks.length} administered · check remaining tasks to complete recovery.`:this.pending?'Requesting simulated recovery…':`${this.assessment?.demo?'LOCAL DEMONSTRATION · ':''}${done}/${checks.length} acknowledged · session only; no medical administration recorded.`);
   }
   async recover() {
     if(!this.ready || this.pending || this.submitted || this.submit.disabled) return;
-    const version=this.version;this.pending=true;this.progress();this.error('');
-    try { await this.onRecover(); if(version===this.version) this.submitted=true; }
+    const version=this.version,administeredAt=new Date().toISOString();
+    const newlyChecked=this.checks.filter(x=>x.input.checked && !x.administered);
+    const allChecked=this.checks.filter(x=>x.input.checked || x.administered);
+    const partial=allChecked.length<this.checks.length;
+    this.pending=true;this.progress();this.error('');
+    try {
+      await this.onRecover({
+        newlyChecked:newlyChecked.map(x=>x.step),
+        acknowledgedSteps:allChecked.map(x=>x.step),
+        totalSteps:this.checks.length,
+        partial,
+        administeredAt,
+        steps:this.checks.map(x=>({step:x.step,action:x.action,critical:x.critical})),
+      });
+      if(version===this.version) {
+        const timeStr=new Date(administeredAt).toLocaleTimeString('en-GB',{timeZone:'Indian/Mauritius'});
+        for(const c of newlyChecked) {
+          c.administered=true;c.administeredAt=administeredAt;
+          c.stamp.textContent=`Administered ${timeStr} MUT`;
+        }
+        this.submitted=!partial;
+      }
+    }
     catch(e) { if(version===this.version)this.error(`Recovery failed: ${e.message}. You may retry.`); }
     finally {if(version===this.version){this.pending=false;this.progress();}}
   }

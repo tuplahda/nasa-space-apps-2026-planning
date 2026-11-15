@@ -59,6 +59,8 @@ export function classify(p, data) {
   const authoritative=p.anomaly_assessment?.organ_hud_status;
   for (const [region,color] of Object.entries(authoritative || {})) if (region in statuses) statuses[region]=normalizeStatus(color);
   for (const [region,def] of Object.entries(regions)) if (!authoritative?.[region] && !def.fields.some(path=>finite(get(p,path)))) statuses[region]='unknown';
+  const treated=Array.isArray(p.treated_regions)?p.treated_regions:Array.isArray(p.blind_incident?.treated_regions)?p.blind_incident.treated_regions:[];
+  for (const region of treated) if (region in statuses && statuses[region]!=='unknown') statuses[region]='cyan';
   const edge=p.anomaly_assessment;
   if(edge && Array.isArray(edge.breached_parameters)) {
     const canonical={heart_rate:'hr_bpm',blood_pressure_sys:'sbp_mmHg',blood_pressure_dia:'dbp_mmHg',hrv_ms:'hrv_rmssd_ms',spo2:'spo2_pct',respiration_rate:'rr_bpm',core_temp_c:'cbt_C',cabin_co2_mmhg:'cabin_ppCO2_mmHg'};
@@ -71,6 +73,39 @@ export function classify(p, data) {
   return {statuses,channels};
 }
 export const normalizeStatus = c => ({CYAN:'cyan',NORMAL:'cyan',NOMINAL:'cyan',AMBER:'amber',YELLOW:'amber',WARNING:'amber',WARNING_YELLOW:'amber',RED:'red',CRITICAL:'red',CRITICAL_RED:'red'})[String(c).toUpperCase()] || 'unknown';
+const REGION_KEYWORDS = {
+  'SANS-01': /headache|cephalea|acetaminophen|ibuprofen|analgesi|pain|neuro|brain|ocular|eye|vision|optic|acetazolamide|dizz|vestibular|relocate|rest|sleep|cns/i,
+  'CV-02': /heart|cardiac|bp|pressure|saline|fluid|rehydrat|\biv\b|orthostatic|vascular|thrombus|ondansetron|circulation|ared|exercise/i,
+  'RAD-04': /radiat|solar|\bspe\b|shelter|shield|dosimet|alara|c2m2|cbc|lymphocyte|alc|thermal|temp|cool|lcvg|heat|hypotherm|warm/i,
+  'ECLSS-03': /lung|respirat|airway|breath|spo2|oxygen|\bo2\b|co2|scrubber|lioh|cdra|camras|zeolite|ventilat|airflow|fan|mask|rsp|broncho|dyspnea|repressur|airlock/i,
+};
+const REGION_PRIORITY = ['SANS-01', 'CV-02', 'RAD-04', 'ECLSS-03'];
+export function resolveTreatedRegions(steps = [], administeredStepIds = [], statuses = {}) {
+  const abnormal = REGION_PRIORITY.filter(r => ['red', 'amber'].includes(normalizeStatus(statuses?.[r])));
+  const effectiveAbnormal = abnormal.length >= 2 ? abnormal : abnormal.length === 1
+    ? [...new Set(['SANS-01', ...abnormal, 'ECLSS-03'])].slice(0, 2)
+    : ['SANS-01', 'ECLSS-03'];
+  const adminSet = new Set(administeredStepIds.map(String));
+  const total = steps.length || 1;
+  const adminCount = Math.min(total, adminSet.size);
+  if (!adminCount) return [];
+  if (adminCount >= total) return [...effectiveAbnormal];
+  const scored = effectiveAbnormal.map((region, idx) => {
+    const regex = REGION_KEYWORDS[region];
+    let matchedTotal = 0, matchedAdmin = 0;
+    steps.forEach((step, sIdx) => {
+      const id = String(step?.step ?? sIdx + 1);
+      if (regex?.test(String(step?.action || ''))) {
+        matchedTotal++;
+        if (adminSet.has(id)) matchedAdmin++;
+      }
+    });
+    const ratio = matchedTotal > 0 ? matchedAdmin / matchedTotal : (idx === 0 ? 1 : 0);
+    return { region, ratio, idx };
+  }).sort((a, b) => (b.ratio - a.ratio) || (a.idx - b.idx));
+  const count = Math.max(1, Math.min(effectiveAbnormal.length - 1, Math.round((adminCount / total) * effectiveAbnormal.length)));
+  return scored.slice(0, count).map(x => x.region);
+}
 export class TelemetryView {
   history=[];
   constructor(data) { this.baselines=data; }
