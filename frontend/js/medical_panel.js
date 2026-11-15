@@ -32,9 +32,9 @@ export class MedicalPanel {
     setText('confidence-value',`${Math.round(a.confidence*100)}%`); document.getElementById('confidence-meter').style.width=`${a.confidence*100}%`;
     document.getElementById('diagnosis-card').className=`diagnosis-card ${a.severity?.includes('CLASS_1')?'alert':nominal?'':'warning'}`;
     const details=document.getElementById('assessment-details'); details.replaceChildren();
-    const add=(label,value)=>{if(value && (!Array.isArray(value)||value.length)){const block=el('div');block.append(el('b',label),el('p',Array.isArray(value)?value.map(display).join('\n'):display(value)));details.append(block);}};
+    const add=(label,value)=>{if(value && (!Array.isArray(value)||value.length)){const block=el('div');if(label)block.append(el('b',label));block.append(el('p',Array.isArray(value)?value.map(display).join('\n'):display(value)));details.append(block);}};
     add('SOURCE',a.source_document || 'Unavailable');
-    add('VERIFICATION',a.demo?'UNVERIFIED DEMONSTRATION':a.clinical_protocol_verification_status || a.source_verification_status || 'Verification unavailable');
+    add(null,a.demo?'UNVERIFIED DEMONSTRATION':a.clinical_protocol_verification_status || a.source_verification_status || 'Verification unavailable');
     if(modeB) {
       add('ABSTENTION REASON',a.abstention_reason);
       add('SYMPTOM-BASED STABILIZATION',a.abc_vital_stabilization?.protocol);
@@ -69,7 +69,7 @@ export class MedicalPanel {
         input.addEventListener('change',()=> {
           if(record.administered){input.checked=true;return;}
           record.at=input.checked?new Date().toISOString():null;
-          stamp.textContent=record.at?`Acknowledged ${new Date(record.at).toLocaleTimeString('en-GB',{timeZone:'Indian/Mauritius'})} MUT`:'';
+          stamp.textContent=record.at?`Acknowledged ${new Date(record.at).toLocaleTimeString('en-GB',{timeZone:'Indian/Mauritius'})} MET`:'';
           this.audit.push({assessment:a.diagnosis_id,step:record.step,acknowledged:input.checked,timestamp:new Date().toISOString()});
           if(this.audit.length>200) this.audit.shift(); this.progress();
         });
@@ -114,7 +114,7 @@ export class MedicalPanel {
         const timeStr=new Date(administeredAt).toLocaleTimeString('en-GB',{timeZone:'Indian/Mauritius'});
         for(const c of newlyChecked) {
           c.administered=true;c.administeredAt=administeredAt;
-          c.stamp.textContent=`Administered ${timeStr} MUT`;
+          c.stamp.textContent=`Administered ${timeStr} MET`;
         }
         this.submitted=!partial;
       }

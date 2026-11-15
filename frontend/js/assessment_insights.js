@@ -146,11 +146,29 @@ const element=(tag,text,className)=>{
   const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(className)node.className=className;return node;
 };
 const clock=timestamp=>timestamp && Number.isFinite(Date.parse(timestamp))
-  ?new Date(timestamp).toLocaleTimeString('en-GB',{timeZone:'Indian/Mauritius'})+' MUT':'Time not supplied';
+  ?new Date(timestamp).toLocaleTimeString('en-GB',{timeZone:'Indian/Mauritius'})+' MET':'Time not supplied';
 const valueText=(value,metric)=>value===null?'—':value.toFixed(metric.digits);
 
 export class InsightsView {
-  constructor(catalog={}) { this.model=new IncidentInsights();this.catalog=catalog;this.render(); }
+  constructor(catalog={}) {
+    this.model=new IncidentInsights();this.catalog=catalog;
+    document.getElementById('crew-toggle').addEventListener('click',()=>this.setCrewOpen(!this.crewOpen));
+    document.getElementById('crew-close').addEventListener('click',()=>this.setCrewOpen(false));
+    document.getElementById('crew-panel').addEventListener('keydown',event=>{
+      if(event.key==='Escape' && this.crewOpen){event.preventDefault();this.setCrewOpen(false);}
+    });
+    this.setCrewOpen(false);this.render();
+  }
+  setCrewOpen(open) {
+    const wasOpen=this.crewOpen;this.crewOpen=open;
+    document.getElementById('crew-panel').dataset.expanded=String(open);
+    document.getElementById('crew-insights').hidden=!open;
+    const toggle=document.getElementById('crew-toggle');
+    toggle.setAttribute('aria-expanded',String(open));toggle.title=open?'Close crew member history':'Open crew member history';
+    document.getElementById('crew-history-label').textContent=open?'Close':'History';
+    if(open)document.getElementById('crew-close').focus?.();
+    else if(wasOpen)toggle.focus?.();
+  }
   observe(packet) { this.model.observe(packet);this.render(); }
   requestConsultation(packet) { this.model.requestConsultation(packet);this.render(); }
   receiveAssessment(assessment,packet) {
@@ -168,12 +186,17 @@ export class InsightsView {
     if(renderKey===this.renderKey)return;
     this.renderKey=renderKey;
     const plain=document.getElementById('plain-assessment'),evidence=document.getElementById('evidence-card');
-    plain.hidden=!m.assessment;evidence.hidden=!m.assessment;
+    plain.hidden=!m.assessment || m.complete;evidence.hidden=!m.assessment || m.complete;
     document.getElementById('comparison-card').hidden=!m.assessment;
     document.getElementById('timeline-card').hidden=m.events.length===0;
-    if(this.renderedScope!==m.scope)document.getElementById('technical-assessment').open=!m.assessment;
+    document.getElementById('crew-history-empty').hidden=!!m.assessment || m.events.length>0;
+    if(this.renderedScope!==m.scope || m.complete)document.getElementById('technical-assessment').open=!m.assessment || m.complete;
     this.renderedScope=m.scope;
-    if(m.assessment) {
+    if(m.complete) {
+      for(const id of ['plain-title','plain-summary','plain-score','plain-source','insight-state','evidence-context','evidence-symptoms'])document.getElementById(id).textContent='';
+      document.getElementById('evidence-list').replaceChildren();document.getElementById('evidence-card').open=false;
+      this.evidenceSignature=null;
+    } else if(m.assessment) {
       const explanation=explainAssessment(m.assessment,this.catalog);
       document.getElementById('plain-title').textContent=explanation.title;
       document.getElementById('plain-summary').textContent=explanation.summary;
@@ -192,14 +215,17 @@ export class InsightsView {
         document.getElementById('evidence-symptoms').textContent=m.evidence.symptoms;
         document.getElementById('evidence-context').textContent=`Context: ${m.evidence.context} · source telemetry ${clock(m.consultation.timestamp)}${m.evidence.quality.length?' · missing/unreliable: '+m.evidence.quality.join(', '):''}`;
       }
+    }
+    if(m.assessment) {
       document.getElementById('comparison-state').textContent=m.complete
         ?'Final backend-confirmed nominal snapshot. Normal readings do not establish that the underlying condition is cured.'
         :m.stale?'Connection stale. The last received measurements are retained.'
         :m.recoveryStarted?'Backend recovery is active. The right column shows the latest observed readings.'
         :m.actionRequested?'Action requested; awaiting backend recovery confirmation.'
         :'At consultation versus current readings. Treatment has not been requested.';
-      document.getElementById('comparison-before-label').textContent=m.actionRequested?'At action request':'At consultation';
-      document.getElementById('comparison-after-label').textContent=m.complete?'Final observed':'Latest observed';
+      const beforeLabel=document.getElementById('comparison-before-label'),afterLabel=document.getElementById('comparison-after-label');
+      beforeLabel.textContent='Before';beforeLabel.title=m.actionRequested?'At action request':'At consultation';
+      afterLabel.textContent=m.complete?'Final':'Latest';afterLabel.title=m.complete?'Final observed':'Latest observed';
       const rows=m.comparison();
       if(!this.comparisonCells) {
         const tbody=document.getElementById('comparison-rows');tbody.replaceChildren();
@@ -213,7 +239,7 @@ export class InsightsView {
         const values=[valueText(row.before,row),valueText(row.after,row),row.delta===null?'—':`${row.delta>0?'+':''}${row.delta.toFixed(row.digits)}`];
         values.forEach((value,column)=>{const cell=this.comparisonCells[index][column];if(cell.textContent!==value)cell.textContent=value;});
       }
-      document.getElementById('comparison-times').textContent=`Before: ${clock(m.lastActionAt || m.before?.timestamp)} · latest: ${clock(m.after?.timestamp)}. Changes are numerical, not a clinical improvement score. Unavailable readings are shown as —.`;
+      document.getElementById('comparison-times').textContent=`Before (${m.actionRequested?'at action request':'at consultation'}): ${clock(m.lastActionAt || m.before?.timestamp)} · latest: ${clock(m.after?.timestamp)}. Changes are numerical, not a clinical improvement score. Unavailable readings are shown as —.`;
       this.renderTrend();
     }
     const eventSignature=JSON.stringify(m.events);

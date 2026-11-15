@@ -30,6 +30,21 @@ frame.src='../index.html?api='+encodeURIComponent(api.base);fitPreview();
 window.addEventListener('resize',fitPreview);
 document.getElementById('size-1366').onclick=()=>{if(!running)void dimensions(1366,768);};
 document.getElementById('size-1920').onclick=()=>{if(!running)void dimensions(1920,1080);};
+document.getElementById('crew-check').onclick=async()=>{
+  if(running)return;
+  const doc=frame.contentDocument,q=id=>doc.getElementById(id),comparison=q('comparison-card'),timeline=q('timeline-card');
+  try {
+    if(q('crew-toggle').getAttribute('aria-expanded')!=='true')q('crew-toggle').click();
+    comparison.open=true;timeline.open=true;await wait(200);
+    const panel=q('crew-panel').getBoundingClientRect(),body=doc.querySelector('.body-panel').getBoundingClientRect();
+    if(!q('crew-panel').contains(comparison)||!q('crew-panel').contains(timeline)||doc.querySelector('.clinical-panel').contains(comparison))throw new Error('History is not owned by the crew panel');
+    if(panel.right>body.left||panel.bottom>height||doc.documentElement.scrollWidth>width||doc.documentElement.scrollHeight>height)throw new Error('Crew history overlaps or overflows the dashboard');
+    if(q('crew-insights').scrollWidth>q('crew-insights').clientWidth)throw new Error('Crew history has horizontal overflow');
+    if(/\bMUT\b/.test(doc.body.innerText))throw new Error('A visible MUT label remains');
+    log(`PASS ${width}×${height}: existing crew history fits its column; no overlap, page scroll or MUT labels; browserErrors=${errors.length}`);
+    phase.textContent='Crew history verified. Close it with Close crew history or Escape.';
+  }catch(error){phase.textContent='FAIL: '+error.message;log('FAIL '+error.message);}
+};
 async function liveCase(seed) {
   if(running)return;running=true;phase.textContent='Resetting isolated simulator…';
   const doc=frame.contentDocument,q=id=>doc.getElementById(id);
@@ -40,6 +55,7 @@ async function liveCase(seed) {
     await until(()=>!q('analyze-crisis').disabled,'Consultation control did not enable');q('analyze-crisis').click();
     const assessed=await until(async()=>{const p=await api.snapshot();return p.blind_incident?.id===ack.incident_id&&p.blind_incident.phase==='assessed'&&p;},'Doctor did not return assessment');
     const a=assessed.rag_diagnosis,reference=a.earth_report.report_ref;
+    if([...q('assessment-details').querySelectorAll('b')].some(node=>node.textContent==='VERIFICATION'))throw new Error('Verification subtitle is still displayed');
     log(`REAL ASSESSMENT ${a.mode}; raw confidence=${a.confidence}; report=${reference.slice(0,12)}`);
     if(a.confidence>=.75) {
       await until(()=>!q('send-earth').hidden,'Send to Earth was not shown');
@@ -59,6 +75,8 @@ async function liveCase(seed) {
     await until(()=>!q('run-assessment').disabled,'Simulate Crisis did not re-enable');
     await until(()=>q('result-mode').textContent==='AWAITING ASSESSMENT','Doctor panel did not reset after nominal recovery');
     if(q('assessment-details').children.length || !q('send-earth').hidden || !q('download-report').hidden || !q('apply-treatment').disabled)throw new Error('Stale clinical content or controls survived recovery');
+    if(!q('plain-assessment').hidden || !q('evidence-card').hidden || q('plain-title').textContent || !q('technical-assessment').open)throw new Error('Doctor insights did not clear to their no-crisis state');
+    if(q('comparison-card').hidden || q('timeline-card').hidden)throw new Error('Crew incident history was lost on clinical reset');
     if(doc.querySelector('.clinical-panel').scrollTop!==0)throw new Error('Doctor panel did not scroll back to its default view');
     log(`PASS ${a.mode}: acknowledgements alone had no effect; backend recovery completed nominally; next crisis enabled.`);
     phase.textContent='Live recovery/report check passed. Inspect the browser download and PDF contents.';

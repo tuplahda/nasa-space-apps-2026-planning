@@ -93,14 +93,39 @@
             </div>
           </section>
 
-          <section class="panel crew-panel">
-            <div class="crew-avatar" aria-hidden="true">—</div>
-            <div class="crew-copy">
-              <span class="eyebrow">CREW MEMBER</span>
-              <strong id="astronaut-name">—</strong>
-              <small id="astronaut-id">—</small>
+          <section class="panel crew-panel" id="crew-panel" data-expanded="false">
+            <button id="crew-toggle" class="crew-toggle" type="button" aria-expanded="false" aria-controls="crew-insights" title="Open crew member history">
+              <span class="crew-avatar" aria-hidden="true">—</span>
+              <span class="crew-copy">
+                <span class="eyebrow">CREW MEMBER</span>
+                <strong id="astronaut-name">—</strong>
+                <small id="astronaut-id">—</small>
+              </span>
+              <span class="crew-history-label" id="crew-history-label">History</span>
+              <span class="crew-indicator" title="Crew telemetry selected"></span>
+            </button>
+            <div id="crew-insights" class="crew-insights" hidden>
+              <button id="crew-close" class="mode-button" type="button">Close crew history</button>
+              <p id="crew-history-empty" class="insight-note">History appears as incidents are observed.</p>
+              <details id="comparison-card" class="insight-card" hidden>
+                <summary>Before and after treatment</summary>
+                <p id="comparison-state" class="insight-note"></p>
+                <table class="comparison-table">
+                  <caption>Observed measurements</caption>
+                  <thead><tr><th scope="col">Reading</th><th id="comparison-before-label" scope="col">At consultation</th><th id="comparison-after-label" scope="col">Latest observed</th><th scope="col">Change</th></tr></thead>
+                  <tbody id="comparison-rows"></tbody>
+                </table>
+                <p id="comparison-times" class="insight-note"></p>
+                <div id="comparison-trend" class="comparison-trend"></div>
+              </details>
+
+              <details id="timeline-card" class="insight-card" hidden>
+                <summary>Incident timeline</summary>
+                <p class="insight-note">Events observed in this browser session. Request times and backend telemetry times are identified separately.</p>
+                <ol id="incident-events" class="incident-events"></ol>
+              </details>
+
             </div>
-            <span class="crew-indicator" title="Crew telemetry selected"></span>
           </section>
         </aside>
 
@@ -241,24 +266,6 @@
             <p id="blind-status" role="status" hidden></p>
             <button id="reset-simulation" class="mode-button" type="button" hidden>Reset simulation</button>
             <button id="reveal-incident" class="mode-button" type="button" hidden>Reveal simulated incident</button>
-
-            <details id="comparison-card" class="insight-card" hidden>
-              <summary>Before and after treatment</summary>
-              <p id="comparison-state" class="insight-note"></p>
-              <table class="comparison-table">
-                <caption>Observed measurements</caption>
-                <thead><tr><th scope="col">Reading</th><th id="comparison-before-label" scope="col">At consultation</th><th id="comparison-after-label" scope="col">Latest observed</th><th scope="col">Change</th></tr></thead>
-                <tbody id="comparison-rows"></tbody>
-              </table>
-              <p id="comparison-times" class="insight-note"></p>
-              <div id="comparison-trend" class="comparison-trend"></div>
-            </details>
-
-            <details id="timeline-card" class="insight-card" hidden>
-              <summary>Incident timeline</summary>
-              <p class="insight-note">Events observed in this browser session. Request times and backend telemetry times are identified separately.</p>
-              <ol id="incident-events" class="incident-events"></ol>
-            </details>
 
             <section class="report-controls" aria-label="Consultation PDF report">
               <button id="send-earth" class="report-button" type="button" hidden>Send to Earth</button>
