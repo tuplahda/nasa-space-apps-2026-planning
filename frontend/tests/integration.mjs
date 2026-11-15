@@ -12,7 +12,7 @@ const fixture=JSON.parse(await readFile(new URL('../data/demo_cases.json',import
 const health=await api.request('/health');assert.equal(health.status,'NOMINAL');
 let connection;
 try {
-  for(const path of ['/','/style.css','/js/app.js','/js/reports.js','/js/body_dynamics.js','/js/body_hud.js','/js/websocket.js','/js/telemetry.js','/js/scenarios.js','/js/mock_data.js','/js/medical_panel.js','/vendor/three/three.module.js','/vendor/three/addons/loaders/GLTFLoader.js','/vendor/three/addons/controls/OrbitControls.js','/vendor/three/addons/utils/BufferGeometryUtils.js','/assets/models/ares_upper_body_hologram.glb','/data/baselines.json','/data/demo_cases.json']) {
+  for(const path of ['/','/style.css','/js/app.js','/js/assessment_insights.js','/js/reports.js','/js/body_dynamics.js','/js/body_hud.js','/js/websocket.js','/js/telemetry.js','/js/scenarios.js','/js/mock_data.js','/js/medical_panel.js','/vendor/three/three.module.js','/vendor/three/addons/loaders/GLTFLoader.js','/vendor/three/addons/controls/OrbitControls.js','/vendor/three/addons/utils/BufferGeometryUtils.js','/assets/models/ares_upper_body_hologram.glb','/data/baselines.json','/data/demo_cases.json','/data/user_explanations.json']) {
     const response=await fetch(frontend+path);assert.equal(response.status,200,path);await response.arrayBuffer();
   }
   console.log('PASS: all HTML, CSS, modules, GLB and local dependencies served via HTTP');

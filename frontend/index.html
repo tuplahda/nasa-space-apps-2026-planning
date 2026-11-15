@@ -187,7 +187,27 @@
               <span class="uplink-light"></span>
             </div>
 
-            <div class="diagnosis-card" id="diagnosis-card" aria-live="polite">
+            <section id="plain-assessment" class="insight-card plain-assessment" aria-label="Plain-English assessment" hidden>
+              <span class="eyebrow">IN PLAIN ENGLISH</span>
+              <small id="insight-state">Recorded consultation</small>
+              <h3 id="plain-title"></h3>
+              <p id="plain-summary"></p>
+              <p id="plain-score" class="insight-note"></p>
+              <p id="plain-source" class="insight-note"></p>
+            </section>
+
+            <details id="evidence-card" class="insight-card" hidden>
+              <summary>Observations behind this assessment</summary>
+              <p class="insight-note">Recorded monitoring flags and reported symptoms. These observations do not prove the cause of an illness.</p>
+              <p id="evidence-context" class="insight-note"></p>
+              <ul id="evidence-list" class="evidence-list"></ul>
+              <strong class="insight-label">Crew report at consultation</strong>
+              <p id="evidence-symptoms"></p>
+            </details>
+
+            <details id="technical-assessment" class="technical-assessment" open>
+              <summary>Technical assessment</summary>
+              <div class="diagnosis-card" id="diagnosis-card" aria-live="polite">
               <div class="diagnosis-topline">
                 <span class="result-mode" id="result-mode">AWAITING ASSESSMENT</span>
                 <span class="result-severity" id="result-severity">—</span>
@@ -203,7 +223,8 @@
               <p id="assessment-freshness">Live telemetry alerts are monitoring observations, not a diagnosis.</p>
             </div>
 
-            <div id="assessment-details" class="assessment-details"></div>
+              <div id="assessment-details" class="assessment-details"></div>
+            </details>
             <p id="clinical-error" class="clinical-error" role="alert" hidden></p>
             <div class="clinical-detail">
               <div class="detail-title">
@@ -220,6 +241,25 @@
             <p id="blind-status" role="status" hidden></p>
             <button id="reset-simulation" class="mode-button" type="button" hidden>Reset simulation</button>
             <button id="reveal-incident" class="mode-button" type="button" hidden>Reveal simulated incident</button>
+
+            <details id="comparison-card" class="insight-card" hidden>
+              <summary>Before and after treatment</summary>
+              <p id="comparison-state" class="insight-note"></p>
+              <table class="comparison-table">
+                <caption>Observed measurements</caption>
+                <thead><tr><th scope="col">Reading</th><th id="comparison-before-label" scope="col">At consultation</th><th id="comparison-after-label" scope="col">Latest observed</th><th scope="col">Change</th></tr></thead>
+                <tbody id="comparison-rows"></tbody>
+              </table>
+              <p id="comparison-times" class="insight-note"></p>
+              <div id="comparison-trend" class="comparison-trend"></div>
+            </details>
+
+            <details id="timeline-card" class="insight-card" hidden>
+              <summary>Incident timeline</summary>
+              <p class="insight-note">Events observed in this browser session. Request times and backend telemetry times are identified separately.</p>
+              <ol id="incident-events" class="incident-events"></ol>
+            </details>
+
             <section class="report-controls" aria-label="Consultation PDF report">
               <button id="send-earth" class="report-button" type="button" hidden>Send to Earth</button>
               <button id="download-report" class="report-button" type="button" hidden>Download Report</button>

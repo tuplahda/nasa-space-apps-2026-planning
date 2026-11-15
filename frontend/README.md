@@ -19,6 +19,12 @@ Open http://localhost:5500/ . Use normal browser zoom (Ctrl+0) if this site was 
 
 The application now requires backend telemetry. There is no rehearsal selector, local-demo switch, automatic mock fallback, or production import of mock_data.js. Existing mock_data.js and demo_cases.json remain as legacy test fixtures only; mode=demo does not enable a local mode.
 
+## Assessment insights
+
+After an explicitly requested consultation, the right panel shows a plain-English explanation with the original technical assessment in an expandable section. `data/user_explanations.json` contains forty fixed project-authored descriptions, each linked to the original record in the repository's `data/rag_protocols_expanded.json`. These descriptions explain what a protocol covers; they are not clinically reviewed. Unknown protocol IDs show an unavailable message, and Mode B does not infer a disease. Technical API responses, medication instructions, safety rules, and PDF report content are unchanged.
+
+The expandable evidence card records the backend's monitoring flags and supplied reference ranges, the crew's symptom report, and the source telemetry time. Missing or unreliable readings are not substituted. The incident timeline distinguishes browser requests from observed backend events. Before-and-after comparison freezes the actual reading snapshot at the action request and updates its latest column from received telemetry; it never labels a numeric change as medical improvement. Its heart-rate trace contains at most sixty observed samples, with gaps for unavailable readings. Final readings and incident history remain visible as a recorded incident after the doctor panel resets, until the next incident or page reload. They are session observations, not a persistent medical audit or a confirmation that an illness was cured.
+
 ## Simulation and doctor consultation
 
 Simulate Crisis calls `POST /api/scenarios/simulate-crisis` with `{ "streaming": true }`. The server chooses a random crisis and advances the astronaut agent. The frontend does not choose a named scenario or make a diagnosis request as part of this action.
@@ -72,6 +78,7 @@ Run with recent Node.js (24+), without npm:
 ```powershell
 node frontend/tests/frontend.test.mjs
 node frontend/tests/body_dynamics.test.mjs
+node frontend/tests/assessment_insights.test.mjs
 # Existing backend/frontend running; this changes test simulator state:
 node frontend/tests/integration.mjs
 # For a separate test backend, optionally set:

@@ -25,7 +25,7 @@ class Element {
   closest(){return this;}
 }
 const nodes=new Map();
-globalThis.document={getElementById(id){if(!nodes.has(id))nodes.set(id,new Element());return nodes.get(id);},createElement(tag){return new Element(tag);}};
+globalThis.document={getElementById(id){if(!nodes.has(id))nodes.set(id,new Element());return nodes.get(id);},createElement(tag){return new Element(tag);},createElementNS(namespace,tag){return new Element(tag);}};
 
 test('packet validation rejects malformed data and invalid timestamps',()=>{
   assert.equal(validatePacket(null),null);assert.equal(validatePacket({type:'ERROR'}),null);
@@ -178,7 +178,7 @@ test('actual GLB is upright, skeleton-free and pickable through translucent skin
 test('real HTML preserves unique IDs and all static module DOM references',async()=>{
   const html=await readFile(new URL('../index.html',import.meta.url),'utf8');
   const ids=[...html.matchAll(/id="([^"]+)"/g)].map(m=>m[1]);assert.equal(new Set(ids).size,ids.length);
-  for(const name of ['app','body_hud','telemetry','medical_panel','reports','scenarios','websocket','mock_data']) {
+  for(const name of ['app','assessment_insights','body_hud','telemetry','medical_panel','reports','scenarios','websocket','mock_data']) {
     const js=await readFile(new URL(`../js/${name}.js`,import.meta.url),'utf8');
     for(const match of js.matchAll(/(?:getElementById|setText)\('([^']+)'/g)) assert.ok(ids.includes(match[1]),`Missing DOM ID: ${match[1]}`);
   }
@@ -199,6 +199,7 @@ test('dashboard separates random simulation from explicit consultation and ignor
   const button=document.getElementById('run-assessment');button.classList={add(){},remove(){}};
   globalThis.fetch=async(url,options)=> {
     if(url==='data/baselines.json')return {ok:true,json:async()=>baselines};
+    if(url==='data/user_explanations.json')return {ok:true,json:async()=>({protocols:{}})};
     calls.push([url.pathname,options?.body?JSON.parse(options.body):null]);
     return {ok:true,json:async()=>({status:'ok',incident_id:3})};
   };
@@ -221,12 +222,15 @@ test('dashboard separates random simulation from explicit consultation and ignor
     assert.equal(document.getElementById('result-mode').textContent,'AWAITING ASSESSMENT');
     send(3,2,'observing');assert.equal(document.getElementById('analyze-crisis').disabled,true);
     send(3,3,'awaiting_doctor');
+    assert.equal(document.getElementById('plain-assessment').hidden,true);
     assert.match(document.getElementById('telemetry-alert').textContent,/Critical telemetry/);
     assert.equal(document.getElementById('result-mode').textContent,'AWAITING ASSESSMENT');
     const consult=document.getElementById('analyze-crisis');assert.equal(consult.disabled,false);
     await consult.events.click();await consult.events.click();
     assert.deepEqual(calls[1],['/api/scenarios/analyze-crisis',{incident_id:3}]);assert.equal(calls.length,2);
     send(3,4,'assessed',data.cases.hypercapnia.assessment);
+    assert.equal(document.getElementById('plain-assessment').hidden,false);
+    assert.equal(document.getElementById('technical-assessment').open,false);
     assert.match(document.getElementById('result-mode').textContent,/MODE A/);
     assert.match(document.getElementById('assessment-latency').textContent,/CONSULTATION \d+ ms/);
     send(3,5,'recovering',data.cases.hypercapnia.assessment);
@@ -237,6 +241,9 @@ test('dashboard separates random simulation from explicit consultation and ignor
     assert.match(document.getElementById('result-mode').textContent,/MODE A/);
     assert.equal(button.disabled,true);
     send(3,8,'complete',data.cases.hypercapnia.assessment);
+    assert.equal(document.getElementById('plain-assessment').hidden,false);
+    assert.match(document.getElementById('insight-state').textContent,/Completed incident/);
+    assert.match(document.getElementById('incident-events').textContent,/Backend confirms nominal/);
     assert.equal(document.getElementById('result-mode').textContent,'AWAITING ASSESSMENT');
     assert.equal(document.getElementById('diagnosis-title').textContent,'Monitoring telemetry');
     assert.equal(document.getElementById('confidence-meter').style.width,'0%');

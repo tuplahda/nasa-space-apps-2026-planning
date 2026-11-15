@@ -3,6 +3,7 @@ import { TelemetryConnection } from './websocket.js';
 import { Backend } from './scenarios.js';
 import { MedicalPanel } from './medical_panel.js';
 import { ReportDownloads } from './reports.js';
+import { InsightsView } from './assessment_insights.js';
 
 const query=new URLSearchParams(location.search);
 const api=new Backend(query.get('api') || `${location.protocol==='https:'?'https:':'http:'}//localhost:8000`);
@@ -13,17 +14,23 @@ const consultButton=document.getElementById('analyze-crisis');
 const revealButton=document.getElementById('reveal-incident');
 const resetSimulation=document.getElementById('reset-simulation');
 const reports=new ReportDownloads(api);
+const insights=new InsightsView();
 const formatTime=timestamp=>new Date(timestamp).toLocaleTimeString('en-GB',{timeZone:'Indian/Mauritius'});
 const fresh=()=>mode==='backend' && packet && connection?.lastAt && Date.now()-connection.lastAt<=5000;
 const panel=new MedicalPanel(async()=> {
   if(!fresh())throw new Error('Fresh backend telemetry is required.');
+  const actionPacket=packet;
   const incident=packet.blind_incident;
   if(incident) {
     if(incident.phase!=='assessed' || incident.id!==consultation?.incidentId)throw new Error('There is no matching current consultation action.');
     const action=incident.actions?.[0];if(!action)throw new Error('No modeled recovery action was returned.');
-    return api.applyBlindAction(incident.id,action.id,panel.checks.filter(step=>step.input.checked).map(step=>step.step));
+    insights.requestAction(actionPacket);
+    try { return await api.applyBlindAction(incident.id,action.id,panel.checks.filter(step=>step.input.checked).map(step=>step.step)); }
+    catch(error) { insights.failure('Simulated action failed',actionPacket);throw error; }
   }
-  return api.recover(packet.active_scenario_id);
+  insights.requestAction(actionPacket);
+  try { return await api.recover(packet.active_scenario_id); }
+  catch(error) { insights.failure('Simulated action failed',actionPacket);throw error; }
 });
 function controlError(message='') {
   const node=document.getElementById('control-error');node.hidden=!message;node.textContent=message;
@@ -79,6 +86,7 @@ function ingest(p,source) {
     panel.reset('Telemetry monitoring is active. Press Consult Doctor to request an assessment.');
   }
   packet=p;transport=source;mode='backend';
+  insights.observe(p);
   const states=view.update(p,source);body?.update(p,states);updateAlerts(states);
   setText('packet-source',`SIMULATED TELEMETRY · ${formatTime(p.timestamp)} MUT`);
   setText('data-badge','AGENT · 1 Hz');
@@ -103,6 +111,7 @@ function ingest(p,source) {
     if(consultation.status==='complete') {
       const assessment={...p.rag_diagnosis,blindIncident:p.blind_incident};
       panel.render(assessment);
+      insights.receiveAssessment(assessment,p);
       if(!consultation.reportBound){reports.setAssessment(assessment,{incidentId:p.simulation_incident});consultation.reportBound=true;}
     }
   }
@@ -125,6 +134,7 @@ simulateButton.addEventListener('click',async()=> {
 consultButton.addEventListener('click',async()=> {
   if(consultButton.disabled || !fresh())return;
   const observed=structuredClone(packet),incident=observed.blind_incident,version=generation;
+  insights.requestConsultation(observed);
   consultation={incidentId:observed.simulation_incident,status:'pending',requestedAt:new Date().toISOString(),sourceTimestamp:observed.timestamp,start:performance.now()};
   panel.error('');controlError();setText('assessment-latency','CONSULTING DOCTOR…');updateProvenance();updateControls();
   try {
@@ -136,11 +146,13 @@ consultButton.addEventListener('click',async()=> {
       const result=await api.diagnose(observed);
       if(version!==generation || consultation?.incidentId!==observed.simulation_incident)return;
       panel.render(result);reports.setAssessment(result,{incidentId:observed.simulation_incident});consultation.reportBound=true;consultation.status='complete';consultation.receivedAt=new Date().toISOString();
+      insights.receiveAssessment(result,observed);
       setText('assessment-latency',`CONSULTATION ${(performance.now()-consultation.start).toFixed(0)} ms`);
     }
   } catch(error) {
     if(version===generation && consultation) {
       consultation.status='failed';panel.error(error.message);setText('assessment-latency','CONSULTATION FAILED');
+      insights.failure('Consultation failed');
       setText('assessment-freshness','Consultation failed. No new assessment is available; retry when permitted by the backend.');
     }
   } finally {updateProvenance();updateControls();}
@@ -164,6 +176,10 @@ async function init() {
   try {
     const response=await fetch('data/baselines.json');if(!response.ok)throw new Error('Local monitoring baselines failed to load.');
     view=new TelemetryView(await response.json());
+    try {
+      const explanations=await fetch('data/user_explanations.json');
+      if(explanations.ok)insights.catalog=await explanations.json();
+    } catch { /* Monitoring stays available; unmatched explanations use the explicit fallback. */ }
     try {const {AresBodyHUD}=await import('./body_hud.js');body=new AresBodyHUD(document.getElementById('body-canvas'));}
     catch(error){setText('model-status',`3D unavailable: ${error.message}`);}
     connection=new TelemetryConnection(api.base,ingest,(state,label)=> {
@@ -172,7 +188,7 @@ async function init() {
       else {
         setText('api-state-label',state==='stale'?'STALE TELEMETRY':state==='connecting'?'CONNECTING API':state==='invalid'?'INVALID PACKET':'API DISCONNECTED');
         if(state==='stale' || state==='disconnected') {
-          mode='disconnected';body?.markStale();setText('telemetry-alert','Backend unavailable · readings and organ status are retained, not fresh observations.');document.getElementById('telemetry-alert').dataset.status='unknown';setText('data-badge',state==='stale'?'STALE':'DISCONNECTED');
+          mode='disconnected';body?.markStale();insights.markStale();setText('telemetry-alert','Backend unavailable · readings and organ status are retained, not fresh observations.');document.getElementById('telemetry-alert').dataset.status='unknown';setText('data-badge',state==='stale'?'STALE':'DISCONNECTED');
           setText('packet-source',packet?'BACKEND UNAVAILABLE · retained readings':'NO BACKEND TELEMETRY · reconnecting');
         }
       }
