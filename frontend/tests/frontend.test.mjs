@@ -9,6 +9,7 @@ const {MockAdapter}=await import('../js/mock_data.js');
 const {Backend}=await import('../js/scenarios.js');
 const {TelemetryConnection}=await import('../js/websocket.js');
 const {MedicalPanel}=await import('../js/medical_panel.js');
+const {InsightsView}=await import('../js/assessment_insights.js');
 const data=JSON.parse(await readFile(new URL('../data/demo_cases.json',import.meta.url)));
 const baselines=JSON.parse(await readFile(new URL('../data/baselines.json',import.meta.url)));
 const sample=()=>structuredClone(data.cases.nominal.packet);
@@ -23,6 +24,7 @@ class Element {
   setAttribute(k,v){this.attributes[k]=v;}
   removeAttribute(k){delete this.attributes[k];}
   closest(){return this;}
+  focus(){document.activeElement=this;}
 }
 const nodes=new Map();
 globalThis.document={getElementById(id){if(!nodes.has(id))nodes.set(id,new Element());return nodes.get(id);},createElement(tag){return new Element(tag);},createElementNS(namespace,tag){return new Element(tag);}};
@@ -223,7 +225,47 @@ test('real HTML preserves unique IDs and all static module DOM references',async
     for(const match of js.matchAll(/(?:getElementById|setText)\('([^']+)'/g)) assert.ok(ids.includes(match[1]),`Missing DOM ID: ${match[1]}`);
   }
   assert.ok(html.includes('href="style.css"'));assert.ok(!html.includes('https://fonts.googleapis.com'));
+  const crew=html.slice(html.indexOf('id="crew-panel"'),html.indexOf('</aside>'));
+  for(const id of ['comparison-card','timeline-card'])assert.ok(crew.includes(`id="${id}"`),`${id} belongs to crew panel`);
+  const doctor=html.slice(html.indexOf('<aside class="clinical-column">'));
+  assert.ok(!doctor.includes('id="comparison-card"') && !doctor.includes('id="timeline-card"'));
+  assert.match(crew,/button id="crew-toggle"[^>]*type="button"[^>]*aria-expanded="false"[^>]*aria-controls="crew-insights"/);
+  for(const name of ['app','medical_panel','assessment_insights']) {
+    const js=await readFile(new URL(`../js/${name}.js`,import.meta.url),'utf8');
+    assert.doesNotMatch(js,/\bMUT\b/);
+  }
   const {fmt}=await import('../js/telemetry.js');assert.equal(fmt(null),'\u2014');
+});
+
+test('crew history opens and closes accessibly; completed history survives a cleared clinical view',()=>{
+  const insights=new InsightsView(),p={...sample(),simulation_incident:9,blind_incident:{id:9,phase:'assessed'}};
+  insights.observe(p);insights.receiveAssessment(data.cases.hypercapnia.assessment,p);
+  const toggle=nodes.get('crew-toggle');toggle.events.click();
+  assert.equal(toggle.attributes['aria-expanded'],'true');
+  assert.equal(nodes.get('crew-insights').hidden,false);
+  assert.equal(document.activeElement,nodes.get('crew-close'));
+  assert.equal(nodes.get('comparison-card').hidden,false);
+  assert.equal(nodes.get('timeline-card').hidden,false);
+  nodes.get('crew-close').events.click();
+  assert.equal(toggle.attributes['aria-expanded'],'false');assert.equal(document.activeElement,toggle);
+  toggle.events.click();let prevented=false;
+  nodes.get('crew-panel').events.keydown({key:'Escape',preventDefault(){prevented=true;}});
+  assert.ok(prevented);assert.equal(nodes.get('crew-insights').hidden,true);
+  assert.equal(document.activeElement,toggle);
+  assert.match(nodes.get('evidence-context').textContent,/ MET/);
+  insights.observe({...p,blind_incident:{id:9,phase:'complete'},anomaly_assessment:{alert_level:'CRITICAL_RED'}});
+  assert.equal(nodes.get('plain-assessment').hidden,false);
+  insights.observe({...p,timestamp:'2026-11-15T15:00:01Z',blind_incident:{id:9,phase:'complete'},anomaly_assessment:{alert_level:'NOMINAL'}});
+  for(const id of ['plain-assessment','evidence-card'])assert.equal(nodes.get(id).hidden,true);
+  for(const id of ['plain-title','plain-summary','plain-score','plain-source','insight-state'])assert.equal(nodes.get(id).textContent,'');
+  assert.equal(nodes.get('technical-assessment').open,true);
+  assert.equal(nodes.get('comparison-card').hidden,false);assert.equal(nodes.get('timeline-card').hidden,false);
+  assert.match(nodes.get('incident-events').textContent,/Backend confirms nominal/);
+  insights.observe(p);insights.receiveAssessment(data.cases.hypercapnia.assessment,p);
+  assert.equal(nodes.get('plain-assessment').hidden,true);
+  const medical=new MedicalPanel(async()=>{});medical.render(data.cases.hypercapnia.assessment);
+  assert.ok(!nodes.get('assessment-details').children.some(block=>block.children.some(child=>child.tagName==='b' && child.textContent==='VERIFICATION')));
+  assert.match(nodes.get('assessment-details').textContent,/UNVERIFIED_SIMULATION_CONTENT/);
 });
 
 test('dashboard separates random simulation from explicit consultation and ignores stale incident results', async () => {
@@ -281,8 +323,10 @@ test('dashboard separates random simulation from explicit consultation and ignor
     assert.match(document.getElementById('result-mode').textContent,/MODE A/);
     assert.equal(button.disabled,true);
     send(3,8,'complete',data.cases.hypercapnia.assessment);
-    assert.equal(document.getElementById('plain-assessment').hidden,false);
-    assert.match(document.getElementById('insight-state').textContent,/Completed incident/);
+    assert.equal(document.getElementById('plain-assessment').hidden,true);
+    assert.equal(document.getElementById('evidence-card').hidden,true);
+    assert.equal(document.getElementById('plain-title').textContent,'');
+    assert.equal(document.getElementById('technical-assessment').open,true);
     assert.match(document.getElementById('incident-events').textContent,/Backend confirms nominal/);
     assert.equal(document.getElementById('result-mode').textContent,'AWAITING ASSESSMENT');
     assert.equal(document.getElementById('diagnosis-title').textContent,'Monitoring telemetry');
@@ -293,6 +337,9 @@ test('dashboard separates random simulation from explicit consultation and ignor
     assert.equal(document.getElementById('download-report').hidden,true);
     assert.equal(document.getElementById('blind-status').hidden,true);
     assert.equal(button.disabled,false);
+    send(3,7,'assessed',data.cases.hypercapnia.assessment);
+    assert.equal(document.getElementById('plain-assessment').hidden,true);
+    assert.equal(document.getElementById('result-mode').textContent,'AWAITING ASSESSMENT');
     send(3,9,'complete',data.cases.hypercapnia.assessment);
     assert.equal(document.getElementById('result-mode').textContent,'AWAITING ASSESSMENT');
     // A subsequent Mode B incident must clear in exactly the same way.

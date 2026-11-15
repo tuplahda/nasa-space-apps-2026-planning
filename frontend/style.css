@@ -895,3 +895,24 @@ body { font-size:14px; line-height:1.5; }
 .incident-events li::before { content:''; position:absolute; width:5px; height:5px; border-radius:50%; background:#8ad4df; left:-13px; top:5px; }
 .incident-events strong,.incident-events small { display:block; }
 .incident-events small { margin-top:4px; color:var(--muted); font-size:10px; overflow-wrap:anywhere; }
+
+/* Crew history uses the existing left-column space without covering other panels. */
+.crew-panel { min-width:0; }
+.crew-toggle { display:flex; align-items:center; gap:6px; width:100%; min-width:0; padding:0; border:0; border-radius:5px; background:transparent; color:inherit; text-align:left; cursor:pointer; }
+.crew-toggle .crew-copy { min-width:0; flex:1; }
+.crew-toggle .crew-copy strong { overflow-wrap:anywhere; }
+.crew-toggle .crew-avatar { flex-shrink:0; }
+.crew-history-label { color:var(--cyan); font:9px var(--mono); }
+.crew-insights[hidden] { display:none; }
+.crew-insights { flex:1; min-height:0; overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain; padding:3px; }
+.crew-insights > .mode-button { margin:5px 0; }
+.crew-insights .insight-card { padding:10px; }
+.crew-insights .comparison-table { font-size:11px; }
+.crew-insights .comparison-table thead th { font-size:10px; overflow-wrap:normal; }
+.crew-insights .insight-note { color:var(--muted); font-size:11px; line-height:1.55; }
+.telemetry-column:has(.crew-panel[data-expanded="true"]) { grid-template-rows:minmax(0,1fr); }
+.telemetry-column:has(.crew-panel[data-expanded="true"]) > .telemetry-panel { display:none; }
+.crew-panel[data-expanded="true"] { display:flex; flex-direction:column; align-items:stretch; min-height:0; height:100%; }
+@media (max-width:1200px) {
+  .crew-panel[data-expanded="true"] { height:min(78dvh,720px); }
+}

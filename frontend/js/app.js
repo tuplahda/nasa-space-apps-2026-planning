@@ -74,11 +74,11 @@ function updateProvenance() {
     setText('assessment-freshness','Live telemetry alerts are monitoring observations, not a diagnosis.');return;
   }
   if(consultation.status==='pending') {
-    setText('assessment-time',`Requested ${formatTime(consultation.requestedAt)} MUT`);
+    setText('assessment-time',`Requested ${formatTime(consultation.requestedAt)} MET`);
     setText('assessment-freshness','Awaiting the backend doctor. Live telemetry continues updating.');return;
   }
   if(consultation.status==='failed')return;
-  setText('assessment-time',`Received ${formatTime(consultation.receivedAt)} MUT · telemetry ${formatTime(consultation.sourceTimestamp)} MUT`);
+  setText('assessment-time',`Received ${formatTime(consultation.receivedAt)} MET · telemetry ${formatTime(consultation.sourceTimestamp)} MET`);
   const newer=Date.parse(packet?.timestamp)>Date.parse(consultation.sourceTimestamp);
   setText('assessment-freshness',!fresh()?'Backend disconnected or stale. This is a retained consultation.':newer?'Last consultation · newer telemetry has arrived; this result is not a new assessment of every tick.':'Last consultation · source telemetry shown above.');
 }
@@ -101,7 +101,7 @@ function ingest(p,source) {
   packet=p;transport=source;mode='backend';
   insights.observe(p);
   const states=view.update(p,source);body?.update(p,states);updateAlerts(states);
-  setText('packet-source',`SIMULATED TELEMETRY · ${formatTime(p.timestamp)} MUT`);
+  setText('packet-source',`SIMULATED TELEMETRY · ${formatTime(p.timestamp)} MET`);
   setText('data-badge','AGENT · 1 Hz');
   const resolved=p.anomaly_assessment?.alert_level==='NOMINAL'
     && (p.blind_incident?.phase==='complete' || (!p.blind_incident && p.recovery_status==='COMPLETE' && p.active_scenario_id==='nominal'));
