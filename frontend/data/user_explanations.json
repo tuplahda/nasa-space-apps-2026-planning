@@ -1,0 +1,400 @@
+{
+  "format_version": 1,
+  "source_dataset": "data/rag_protocols_expanded.json",
+  "review_status": "project_authored_not_clinically_reviewed",
+  "description": "Fixed plain-English descriptions of the project protocols. These describe what the matched protocol covers; they do not independently diagnose, confirm causation, or add treatments. Source pointers permit checking each description against its original record.",
+  "protocols": {
+    "SCENARIO_1_HYPERCAPNIA": {
+      "title": "Excess carbon dioxide exposure",
+      "summary": "The matched project protocol covers carbon dioxide exposure and problems with the cabin air-cleaning system.",
+      "source_pointer": "/legacy_8_scenarios/0",
+      "source_fields": [
+        "title"
+      ],
+      "technical_title": "Acute and Chronic Hypercapnia (CO2 Toxicity & ECLSS Scrubbing Degradation)"
+    },
+    "SCENARIO_2_SANS": {
+      "title": "Spaceflight-related vision changes",
+      "summary": "The matched project protocol covers vision and eye changes associated with spaceflight.",
+      "source_pointer": "/legacy_8_scenarios/1",
+      "source_fields": [
+        "title"
+      ],
+      "technical_title": "Spaceflight-Associated Neuro-Ocular Syndrome (SANS)"
+    },
+    "SCENARIO_3_ORTHOSTATIC_INTOLERANCE": {
+      "title": "Feeling faint during a gravity change",
+      "summary": "The matched project protocol covers blood-pressure and faintness problems during a change in gravity.",
+      "source_pointer": "/legacy_8_scenarios/2",
+      "source_fields": [
+        "title"
+      ],
+      "technical_title": "Orthostatic Intolerance and Gravitational Transition Pre-Syncope"
+    },
+    "SCENARIO_4_SOLAR_RADIATION_ARS": {
+      "title": "Possible effects of a radiation event",
+      "summary": "The matched project protocol covers radiation exposure during a solar particle event.",
+      "source_pointer": "/legacy_8_scenarios/3",
+      "source_fields": [
+        "title"
+      ],
+      "technical_title": "Acute Radiation Syndrome (ARS) from Solar Particle Event (SPE)"
+    },
+    "SCENARIO_5_EVA_THERMAL_DCS": {
+      "title": "Possible heat, fluid-loss or pressure-change problems",
+      "summary": "This combined project protocol covers several possible spacewalk problems. Its title alone does not identify which one explains the observations.",
+      "source_pointer": "/legacy_8_scenarios/4",
+      "source_fields": [
+        "title"
+      ],
+      "technical_title": "EVA Thermal Strain ('Space Fever'), Dehydration, and Decompression Sickness (DCS)"
+    },
+    "SCENARIO_6_CIRCADIAN_SLEEP": {
+      "title": "Disrupted sleep and fatigue",
+      "summary": "The matched project protocol covers disrupted sleep timing, broken sleep and fatigue.",
+      "source_pointer": "/legacy_8_scenarios/5",
+      "source_fields": [
+        "title"
+      ],
+      "technical_title": "Circadian Desynchrony, Sleep Architecture Fragmentation, and Behavioral Asthenia"
+    },
+    "SCENARIO_7_IJV_THROMBOSIS_ARRHYTHMIA": {
+      "title": "Possible neck-vein clot or abnormal heart rhythm",
+      "summary": "This combined project protocol covers vein clots and heart-rhythm problems. Its title alone does not establish which one is present.",
+      "source_pointer": "/legacy_8_scenarios/6",
+      "source_fields": [
+        "title"
+      ],
+      "technical_title": "Spaceflight Venous Thromboembolism (IJV Thrombosis) and Cardiac Arrhythmia"
+    },
+    "SCENARIO_8_SAS_URINARY_RETENTION": {
+      "title": "Early-flight adaptation, sinus or urinary problems",
+      "summary": "This combined project protocol covers space adaptation symptoms, sinus problems and trouble passing urine. Its title alone does not establish which one is present.",
+      "source_pointer": "/legacy_8_scenarios/7",
+      "source_fields": [
+        "title"
+      ],
+      "technical_title": "Early-Mission Space Adaptation Syndrome (SAS), Rhinosinusitis, and Acute Urinary Retention"
+    },
+    "CPG-01": {
+      "title": "Possible appendix problem",
+      "summary": "The matched project protocol checks lower-right belly pain, fever, blood tests and an appendix scan.",
+      "source_pointer": "/clinical_practice_guidelines/0",
+      "source_fields": [
+        "title",
+        "diagnostic_criteria"
+      ],
+      "technical_title": "Acute Appendicitis (Simulated Non-Operative Management)"
+    },
+    "CPG-02": {
+      "title": "Possible heart attack",
+      "summary": "The matched project protocol checks chest pain and changes on a heart recording.",
+      "source_pointer": "/clinical_practice_guidelines/1",
+      "source_fields": [
+        "title",
+        "diagnostic_criteria"
+      ],
+      "technical_title": "Acute Coronary Syndrome (ACS) / Myocardial Infarction"
+    },
+    "CPG-03": {
+      "title": "Possible cardiac arrest",
+      "summary": "The matched project protocol covers a person who is unresponsive, not breathing and has no pulse.",
+      "source_pointer": "/clinical_practice_guidelines/2",
+      "source_fields": [
+        "title",
+        "diagnostic_criteria"
+      ],
+      "technical_title": "Cardiac Arrest / Ventricular Fibrillation (ACLS)"
+    },
+    "CPG-04": {
+      "title": "Possible clot in a neck vein",
+      "summary": "The matched project protocol checks neck symptoms and blood flow in the neck veins using ultrasound.",
+      "source_pointer": "/clinical_practice_guidelines/3",
+      "source_fields": [
+        "title",
+        "diagnostic_criteria"
+      ],
+      "technical_title": "Internal Jugular Vein (IJV) Thrombosis"
+    },
+    "CPG-05": {
+      "title": "Possible fast or irregular heartbeat",
+      "summary": "The matched project protocol checks a fast or irregular heartbeat and the heart recording.",
+      "source_pointer": "/clinical_practice_guidelines/4",
+      "source_fields": [
+        "title",
+        "diagnostic_criteria"
+      ],
+      "technical_title": "Supraventricular Tachycardia / Atrial Fibrillation"
+    },
+    "CPG-06": {
+      "title": "Spaceflight-related vision changes",
+      "summary": "The matched project protocol checks blurred near vision and changes seen on eye measurements or scans.",
+      "source_pointer": "/clinical_practice_guidelines/5",
+      "source_fields": [
+        "title",
+        "diagnostic_criteria"
+      ],
+      "technical_title": "Spaceflight-Associated Neuro-ocular Syndrome (SANS)"
+    },
+    "CPG-07": {
+      "title": "Excess carbon dioxide exposure",
+      "summary": "The matched project protocol checks carbon dioxide exposure, breathing symptoms and reported headache or slowed thinking.",
+      "source_pointer": "/clinical_practice_guidelines/6",
+      "source_fields": [
+        "title",
+        "diagnostic_criteria"
+      ],
+      "technical_title": "Acute Hypercapnia (Cabin CO2 Toxicity)"
+    },
+    "CPG-08": {
+      "title": "Possible illness from a pressure change",
+      "summary": "The matched project protocol checks a pressure drop together with joint pain, tingling, dizziness or changes in brain and nerve function.",
+      "source_pointer": "/clinical_practice_guidelines/7",
+      "source_fields": [
+        "title",
+        "diagnostic_criteria"
+      ],
+      "technical_title": "Decompression Sickness (DCS)"
+    },
+    "CPG-09": {
+      "title": "Possible effects of radiation exposure",
+      "summary": "The matched project protocol checks radiation exposure, nausea or vomiting, and changes in blood counts.",
+      "source_pointer": "/clinical_practice_guidelines/8",
+      "source_fields": [
+        "title",
+        "diagnostic_criteria"
+      ],
+      "technical_title": "Acute Radiation Syndrome (ARS) / Solar Particle Event (SPE)"
+    },
+    "CPG-10": {
+      "title": "Possible ammonia exposure",
+      "summary": "The matched project protocol checks an ammonia or coolant leak with eye irritation and breathing symptoms.",
+      "source_pointer": "/clinical_practice_guidelines/9",
+      "source_fields": [
+        "title",
+        "diagnostic_criteria"
+      ],
+      "technical_title": "Ammonia (NH3) Toxic Inhalation / Coolant Leak"
+    },
+    "CPG-11": {
+      "title": "Possible exposure to spacecraft propellant",
+      "summary": "The matched project protocol checks possible hydrazine contamination and irritation of the breathing passages or other reported symptoms.",
+      "source_pointer": "/clinical_practice_guidelines/10",
+      "source_fields": [
+        "title",
+        "diagnostic_criteria"
+      ],
+      "technical_title": "Hydrazine (N2H4) Propellant Exposure"
+    },
+    "CPG-12": {
+      "title": "Possible smoke or carbon monoxide exposure",
+      "summary": "The matched project protocol checks fire or smoke exposure with headache, confusion or breathing changes. Its notes warn that the oxygen reading may appear normal.",
+      "source_pointer": "/clinical_practice_guidelines/11",
+      "source_fields": [
+        "title",
+        "diagnostic_criteria"
+      ],
+      "technical_title": "Carbon Monoxide (CO) / Spacecraft Fire Smoke Inhalation"
+    },
+    "CPG-13": {
+      "title": "Motion sickness during space adaptation",
+      "summary": "The matched project protocol covers nausea, vomiting and disorientation during early adjustment to low gravity or a gravity change.",
+      "source_pointer": "/clinical_practice_guidelines/12",
+      "source_fields": [
+        "title",
+        "diagnostic_criteria"
+      ],
+      "technical_title": "Space Motion Sickness (SMS) / Space Adaptation Syndrome"
+    },
+    "CPG-14": {
+      "title": "Feeling faint during a gravity change",
+      "summary": "The matched project protocol checks a blood-pressure drop, a faster pulse and faintness around landing or a change in gravity.",
+      "source_pointer": "/clinical_practice_guidelines/13",
+      "source_fields": [
+        "title",
+        "diagnostic_criteria"
+      ],
+      "technical_title": "Orthostatic Intolerance (Post-Landing / G-Transition)"
+    },
+    "CPG-15": {
+      "title": "Possible overheating",
+      "summary": "The matched project protocol checks suit cooling or workload problems together with a high body temperature and other symptoms.",
+      "source_pointer": "/clinical_practice_guidelines/14",
+      "source_fields": [
+        "title",
+        "diagnostic_criteria"
+      ],
+      "technical_title": "EVA Thermal Heat Strain / Hyperthermia"
+    },
+    "CPG-16": {
+      "title": "Possible kidney stone",
+      "summary": "The matched project protocol checks severe pain on one side of the back or side of the body, urinary symptoms and an ultrasound scan.",
+      "source_pointer": "/clinical_practice_guidelines/15",
+      "source_fields": [
+        "title",
+        "diagnostic_criteria"
+      ],
+      "technical_title": "Nephrolithiasis (Renal Colic / Kidney Stones)"
+    },
+    "CPG-17": {
+      "title": "Trouble passing urine",
+      "summary": "The matched project protocol checks inability to pass urine, lower-belly discomfort and a bladder scan.",
+      "source_pointer": "/clinical_practice_guidelines/16",
+      "source_fields": [
+        "title",
+        "diagnostic_criteria"
+      ],
+      "technical_title": "Urinary Retention (Microgravity Detrusor Stasis)"
+    },
+    "CPG-18": {
+      "title": "Possible urinary infection",
+      "summary": "The matched project protocol checks painful or frequent urination, with fever or pain in the side of the body in some presentations.",
+      "source_pointer": "/clinical_practice_guidelines/17",
+      "source_fields": [
+        "title",
+        "diagnostic_criteria"
+      ],
+      "technical_title": "Urinary Tract Infection (Cystitis & Pyelonephritis)"
+    },
+    "CPG-19": {
+      "title": "Possible lung infection or severe infection",
+      "summary": "The matched project protocol checks fever, cough, breathing changes, blood pressure and laboratory findings.",
+      "source_pointer": "/clinical_practice_guidelines/18",
+      "source_fields": [
+        "title",
+        "diagnostic_criteria"
+      ],
+      "technical_title": "Pneumonia & Systemic Sepsis"
+    },
+    "CPG-20": {
+      "title": "Possible severe allergic reaction",
+      "summary": "The matched project protocol checks a sudden allergic reaction involving skin changes, swelling, breathing problems or low blood pressure.",
+      "source_pointer": "/clinical_practice_guidelines/19",
+      "source_fields": [
+        "title",
+        "diagnostic_criteria"
+      ],
+      "technical_title": "Anaphylaxis / Severe Allergic Reaction"
+    },
+    "CPG-21": {
+      "title": "Eye and breathing irritation after dust exposure",
+      "summary": "The matched project protocol checks dust exposure after a spacewalk with eye irritation, sneezing or wheezing.",
+      "source_pointer": "/clinical_practice_guidelines/20",
+      "source_fields": [
+        "title",
+        "diagnostic_criteria"
+      ],
+      "technical_title": "Regolith Dust Conjunctivitis & Airway Irritation"
+    },
+    "CPG-22": {
+      "title": "Possible scratch or particle injury to the eye",
+      "summary": "The matched project protocol checks eye pain, light sensitivity, tearing and an eye examination.",
+      "source_pointer": "/clinical_practice_guidelines/21",
+      "source_fields": [
+        "title",
+        "diagnostic_criteria"
+      ],
+      "technical_title": "Corneal Abrasion / Particulate Eye Trauma"
+    },
+    "CPG-23": {
+      "title": "Possible tooth infection or pressure-related tooth pain",
+      "summary": "The matched project protocol checks tooth pain, swelling, tenderness, fever or pain during a pressure change.",
+      "source_pointer": "/clinical_practice_guidelines/22",
+      "source_fields": [
+        "title",
+        "diagnostic_criteria"
+      ],
+      "technical_title": "Odontogenic Abscess & Barodontalgia"
+    },
+    "CPG-24": {
+      "title": "Possible skin or nearby tissue infection",
+      "summary": "The matched project protocol checks spreading redness, warmth, tenderness, swelling or pus.",
+      "source_pointer": "/clinical_practice_guidelines/23",
+      "source_fields": [
+        "title",
+        "diagnostic_criteria"
+      ],
+      "technical_title": "Skin & Soft Tissue Infection (Cellulitis / Abscess)"
+    },
+    "CPG-25": {
+      "title": "Possible shingles",
+      "summary": "The matched project protocol checks a painful blistering rash on one side of the body, sometimes preceded by burning or tingling.",
+      "source_pointer": "/clinical_practice_guidelines/24",
+      "source_fields": [
+        "title",
+        "diagnostic_criteria"
+      ],
+      "technical_title": "Herpes Zoster (Shingles) / Latent Viral Reactivation"
+    },
+    "CPG-26": {
+      "title": "Possible fungal skin rash",
+      "summary": "The matched project protocol checks an itchy, scaly or moist rash in the described skin areas.",
+      "source_pointer": "/clinical_practice_guidelines/25",
+      "source_fields": [
+        "title",
+        "diagnostic_criteria"
+      ],
+      "technical_title": "Cutaneous Fungal Dermatitis (Tinea / Candidiasis)"
+    },
+    "CPG-27": {
+      "title": "Muscle or joint strain after activity",
+      "summary": "The matched project protocol checks shoulder, wrist or lower-back strain after a spacewalk or resistance exercise.",
+      "source_pointer": "/clinical_practice_guidelines/26",
+      "source_fields": [
+        "title",
+        "diagnostic_criteria"
+      ],
+      "technical_title": "EVA Musculoskeletal Strain / Suit Shoulder Injury"
+    },
+    "CPG-28": {
+      "title": "Possible internal injury or bleeding",
+      "summary": "The matched project protocol checks a significant impact or crush injury, ultrasound findings and laboratory changes.",
+      "source_pointer": "/clinical_practice_guidelines/27",
+      "source_fields": [
+        "title",
+        "diagnostic_criteria"
+      ],
+      "technical_title": "Blunt Trauma & Hemorrhage Control (eFAST Protocol)"
+    },
+    "CPG-29": {
+      "title": "Possible stomach or bowel infection",
+      "summary": "The matched project protocol covers watery diarrhoea, stomach cramps and nausea.",
+      "source_pointer": "/clinical_practice_guidelines/28",
+      "source_fields": [
+        "title",
+        "diagnostic_criteria"
+      ],
+      "technical_title": "Acute Gastroenteritis / Infectious Diarrhea"
+    },
+    "CPG-30": {
+      "title": "Constipation or slowed bowel movements",
+      "summary": "The matched project protocol checks less frequent bowel movements and mild bloating without the listed warning symptoms.",
+      "source_pointer": "/clinical_practice_guidelines/29",
+      "source_fields": [
+        "title",
+        "diagnostic_criteria"
+      ],
+      "technical_title": "Spaceflight Constipation / Bowel Dysmotility"
+    },
+    "CPG-31": {
+      "title": "Disrupted sleep timing or trouble sleeping",
+      "summary": "The matched project protocol checks sleep timing, difficulty falling asleep, short sleep and environmental factors.",
+      "source_pointer": "/clinical_practice_guidelines/30",
+      "source_fields": [
+        "title",
+        "diagnostic_criteria"
+      ],
+      "technical_title": "Circadian Misalignment & Acute Insomnia"
+    },
+    "CPG-32": {
+      "title": "Fatigue after a long shift or too little sleep",
+      "summary": "The matched project protocol checks extended work, sleep loss and slower reaction time.",
+      "source_pointer": "/clinical_practice_guidelines/31",
+      "source_fields": [
+        "title",
+        "diagnostic_criteria"
+      ],
+      "technical_title": "Mission Fatigue & Cognitive Sustainment"
+    }
+  }
+}
