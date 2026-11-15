@@ -41,8 +41,10 @@ from backend.services.donki_service import donki_service
 from backend.services.report_store import capture_report, retrieve_report, ReportNotFound
 
 logger = logging.getLogger("ares_med.server")
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+FRONTEND_DIRECTORY = os.path.join(PROJECT_ROOT, "frontend")
 
-ALLOWED_ORIGINS = [
+DEFAULT_ALLOWED_ORIGINS = [
     "http://localhost:8000",
     "http://127.0.0.1:8000",
     "http://localhost:5500",
@@ -50,6 +52,22 @@ ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
+
+
+def configured_allowed_origins() -> List[str]:
+    """Return local defaults plus explicitly configured hosted frontend origins.
+
+    Render and other static hosts use a different frontend origin than local
+    development. Keep the default list for the existing local workflow, while
+    allowing a comma- or newline-separated ``ARES_ALLOWED_ORIGINS`` value to
+    be supplied as an environment variable in deployment.
+    """
+    raw = os.getenv("ARES_ALLOWED_ORIGINS", "")
+    configured = [origin.strip().rstrip("/") for origin in re.split(r"[,\n]", raw) if origin.strip()]
+    return list(dict.fromkeys(DEFAULT_ALLOWED_ORIGINS + configured))
+
+
+ALLOWED_ORIGINS = configured_allowed_origins()
 
 
 class ConnectionManager:
@@ -737,7 +755,8 @@ def run_offline_telemetry(stop: Event) -> None:
 if FASTAPI_AVAILABLE:
     from fastapi import Body, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
     from fastapi.middleware.cors import CORSMiddleware
-    from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
+    from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
+    from fastapi.staticfiles import StaticFiles
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -777,8 +796,11 @@ if FASTAPI_AVAILABLE:
     app.include_router(diagnose_router)
 
     @app.get("/", include_in_schema=False)
-    async def root_redirect() -> RedirectResponse:
-        """Redirect root URL to the offline API console (/docs)."""
+    async def root_redirect() -> Response:
+        """Serve the dashboard when present, otherwise open the API console."""
+        frontend_index = os.path.join(FRONTEND_DIRECTORY, "index.html")
+        if os.path.isfile(frontend_index):
+            return FileResponse(frontend_index)
         return RedirectResponse(url="/docs")
 
     @app.get("/docs", include_in_schema=False, response_class=HTMLResponse)
@@ -948,6 +970,12 @@ if FASTAPI_AVAILABLE:
     async def space_weather_endpoint() -> Dict[str, Any]:
         """Get live or air-gapped NASA DONKI space weather report."""
         return simulation_response("/api/space-weather")[1]
+
+    # Keep the API and the existing static frontend deployable as one Render
+    # web service. This mount is registered after API routes so /api/* and
+    # /ws/telemetry remain authoritative.
+    if os.path.isdir(FRONTEND_DIRECTORY):
+        app.mount("/", StaticFiles(directory=FRONTEND_DIRECTORY, html=True), name="frontend")
 
 else:
     app = None  # type: ignore

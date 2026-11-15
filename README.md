@@ -147,3 +147,23 @@ python -m http.server 5500 --bind 127.0.0.1 --directory frontend
 Open `http://localhost:5500`. Below 75% confidence, a completed anomaly consultation requests its assessment-specific PDF automatically once. At 75% or above, use **Send to Earth**. If the browser blocks an automatic download, use **Download Report**; a download does not confirm Earth transmission. HTTP 503 mentioning ReportLab means the dependency is missing from the running backend's Python environment. Install the requirements there and restart that backend.
 
 After **Administer Treatment**, the doctor panel returns to its default monitoring state only when backend telemetry confirms both completed recovery and nominal status. Checklist acknowledgement alone does not resolve the incident.
+
+## Deploy the backend on Render
+
+The repository includes [`render.yaml`](./render.yaml) for a Render web service. In Render, choose **New → Blueprint**, connect this repository and branch, and accept the `ares-med-api` service definition. The same service serves the existing `frontend/` dashboard at `/`, while preserving the API and WebSocket routes. The service uses:
+
+```text
+Build command: pip install -r backend/requirements.txt
+Start command: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+Health check: /health
+```
+
+After Render creates the service, set `ARES_ALLOWED_ORIGINS` to the exact public origin of the separately hosted frontend, without a trailing slash. Multiple origins may be separated by commas, for example `https://ares-med.example.com,https://www.ares-med.example.com`. Keep the localhost defaults for local development; the hosted origins are added to them.
+
+The deployed service URL will look like `https://ares-med-api.onrender.com`. Open that URL directly for the combined dashboard. If you keep the frontend on a separate static host, point it at the API by adding the URL query parameter:
+
+```text
+https://your-frontend.example.com/?api=https%3A%2F%2Fares-med-api.onrender.com
+```
+
+The frontend then uses `https://` REST requests and `wss://` telemetry automatically. Verify the deployment at `https://ares-med-api.onrender.com/health` before opening the frontend. Render's free service may sleep when idle, so the first connection can take a short time to wake it.
