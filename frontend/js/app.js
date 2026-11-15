@@ -6,7 +6,13 @@ import { ReportDownloads } from './reports.js';
 import { InsightsView } from './assessment_insights.js';
 
 const query=new URLSearchParams(location.search);
-const api=new Backend(query.get('api') || `${location.protocol==='https:'?'https:':'http:'}//localhost:8000`);
+const localApiDefault=location.protocol==='http:' && /^(localhost|127\.0\.0\.1)$/i.test(location.hostname)
+  ? 'http://localhost:8000'
+  : location.origin;
+// A same-origin Render deployment serves the dashboard and API together. A
+// separate frontend host can still override this explicitly with ?api=...
+// (or window.ARES_API_BASE before this module loads).
+const api=new Backend(query.get('api') || window.ARES_API_BASE || localApiDefault);
 let view,body,connection,packet,mode='waiting',transport='',generation=0;
 let starting=false,expectedIncident=null,lastIncident=null,consultation=null,revealedIncident=null,activeTreatedRegions=[];
 const simulateButton=document.getElementById('run-assessment');

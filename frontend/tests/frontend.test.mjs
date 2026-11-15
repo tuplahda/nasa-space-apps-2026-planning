@@ -275,7 +275,7 @@ test('dashboard separates random simulation from explicit consultation and ignor
     static OPEN=1;static CONNECTING=0;readyState=1;
     constructor(){Socket.current=this;}close(){this.readyState=3;}
   }
-  globalThis.location={search:'',protocol:'http:'};
+  globalThis.location={search:'',protocol:'http:',hostname:'localhost',origin:'http://localhost:5500'};
   globalThis.window={addEventListener:(name,cb)=>{events[name]=cb;}};
   globalThis.WebSocket=Socket;document.querySelector=document.getElementById;
   const button=document.getElementById('run-assessment');button.classList={add(){},remove(){}};

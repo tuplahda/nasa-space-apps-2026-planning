@@ -15,7 +15,7 @@ python -m backend.main
 python -m http.server 5500 --bind 127.0.0.1 --directory frontend
 ```
 
-Open http://localhost:5500/ . Use normal browser zoom (Ctrl+0) if this site was previously zoomed out. Do not open index.html through file://. Port 5500 is already allowed by the backend CORS configuration. An existing compatible API can be selected with `?api=http%3A%2F%2Flocalhost%3A8001`; HTTPS hosting needs an HTTPS backend and a permitted frontend origin.
+Open http://localhost:5500/ . Use normal browser zoom (Ctrl+0) if this site was previously zoomed out. Do not open index.html through file://. Port 5500 is already allowed by the backend CORS configuration. When the dashboard and API are served by the same origin (including the Render deployment), the frontend uses that origin automatically. A separate compatible API can be selected with `?api=http%3A%2F%2Flocalhost%3A8001`; HTTPS hosting needs an HTTPS backend and a permitted frontend origin.
 
 The application now requires backend telemetry. There is no rehearsal selector, local-demo switch, automatic mock fallback, or production import of mock_data.js. Existing mock_data.js and demo_cases.json remain as legacy test fixtures only; mode=demo does not enable a local mode.
 
